@@ -18,19 +18,23 @@ export const consensusTool = {
   inputSchema: {
     type: "object" as const,
     properties: {
-      prompt: { type: "string" },
+      prompt: { type: "string", maxLength: 16_384 },
       voters: {
         type: "array",
-        items: { type: "string" },
+        items: { type: "string", maxLength: 256 },
+        maxItems: 32,
         description: "Agent role names to vote",
       },
       threshold: {
         type: "number",
+        minimum: 0,
+        maximum: 1,
         description: "Approval threshold (0.0–1.0)",
       },
       vetoers: {
         type: "array",
-        items: { type: "string" },
+        items: { type: "string", maxLength: 256 },
+        maxItems: 32,
         description: "Roles with veto power (optional)",
       },
     },

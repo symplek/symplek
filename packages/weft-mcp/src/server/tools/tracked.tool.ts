@@ -20,10 +20,20 @@ export const trackedTool = {
     properties: {
       prompt: {
         type: "string",
+        maxLength: 16_384,
         description: "The agent prompt or claim to track",
       },
-      source: { type: "string", description: "Source URI (file path or URL)" },
-      confidence: { type: "number", description: "Confidence score (0.0–1.0)" },
+      source: {
+        type: "string",
+        maxLength: 2_048,
+        description: "Source URI (file path or URL)",
+      },
+      confidence: {
+        type: "number",
+        minimum: 0,
+        maximum: 1,
+        description: "Confidence score (0.0–1.0)",
+      },
     },
     required: ["prompt", "source", "confidence"],
   },

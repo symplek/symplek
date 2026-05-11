@@ -10,6 +10,7 @@ import { createInterface } from "node:readline";
 import { consensusTool } from "./tools/consensus.tool";
 import { debateTool } from "./tools/debate.tool";
 import { trackedTool } from "./tools/tracked.tool";
+import { ValidationError, validateInput } from "./validateInput";
 
 export { debateTool, consensusTool, trackedTool };
 
@@ -49,6 +50,10 @@ async function dispatchTool(name: string, args: unknown): Promise<unknown> {
     err.code = -32601;
     throw err;
   }
+  // Validate at the JSON-RPC boundary — the tool's TypeScript shape is not
+  // enforced at runtime, so untyped MCP callers could otherwise pass anything.
+  // ValidationError carries JSON-RPC code -32602 and a precise path/reason.
+  validateInput(args, tool.inputSchema);
   return tool.execute(args as never);
 }
 
@@ -142,12 +147,21 @@ export async function startWeftMcpServer(): Promise<void> {
         writeResponse({ jsonrpc: "2.0", id, result });
       },
       (error: unknown) => {
-        const message =
-          error instanceof Error ? error.message : "Internal error";
+        // Sanitise the error surface for MCP callers. We expose:
+        //   - The code (so callers can branch on -32601 / -32602 / -32603)
+        //   - A short message for our own thrown errors (ValidationError, etc.)
+        //   - A generic message for anything else (no stack traces, no internals)
         const code =
           typeof (error as { code?: number }).code === "number"
             ? (error as { code: number }).code
             : -32603;
+        const isOwnError =
+          error instanceof ValidationError ||
+          (error instanceof Error &&
+            typeof (error as { code?: number }).code === "number");
+        const message = isOwnError
+          ? (error as Error).message
+          : "Internal error";
         writeResponse({
           jsonrpc: "2.0",
           id,

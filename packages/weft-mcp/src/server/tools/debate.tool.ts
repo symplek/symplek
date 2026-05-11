@@ -20,7 +20,23 @@ interface DebateSessionEntry {
   created_at: number;
 }
 
+/**
+ * Capacity cap for the in-process session cache. Prevents unbounded growth
+ * if a misbehaving caller floods unique session_ids — without a cap, the
+ * server would eventually OOM. When the cap is hit we evict the oldest
+ * entry by insertion order (Map iteration is insertion-ordered).
+ */
+const SESSION_STORE_CAPACITY = 256;
+
 export const sessionStore = new Map<string, DebateSessionEntry>();
+
+function setSessionEntry(id: string, entry: DebateSessionEntry): void {
+  if (sessionStore.size >= SESSION_STORE_CAPACITY && !sessionStore.has(id)) {
+    const oldestKey = sessionStore.keys().next().value;
+    if (oldestKey !== undefined) sessionStore.delete(oldestKey);
+  }
+  sessionStore.set(id, entry);
+}
 
 // ─── Tool Definition ──────────────────────────────────────────────────────────
 
@@ -33,15 +49,17 @@ export const debateTool = {
     properties: {
       prompt: {
         type: "string",
+        maxLength: 16_384,
         description: "The question or proposal to debate",
       },
       roles: {
         type: "array",
+        maxItems: 32,
         items: {
           type: "object",
           properties: {
-            role: { type: "string" },
-            model: { type: "string" },
+            role: { type: "string", maxLength: 256 },
+            model: { type: "string", maxLength: 256 },
           },
           required: ["role", "model"],
         },
@@ -49,10 +67,13 @@ export const debateTool = {
       },
       rounds: {
         type: "number",
+        minimum: 1,
+        maximum: 16,
         description: "Number of debate rounds (default: 2)",
       },
       session_id: {
         type: "string",
+        maxLength: 128,
         description:
           "Optional: reuse an ongoing debate session across multiple calls. When provided, results are cached in process-memory and returned on subsequent calls with the same session_id.",
       },
@@ -99,9 +120,9 @@ export const debateTool = {
       rounds_completed: result.value.rounds,
     };
 
-    // Cache result when session_id was provided.
+    // Cache result when session_id was provided (capped LRU-style; see setSessionEntry).
     if (input.session_id) {
-      sessionStore.set(input.session_id, { ...output, created_at: Date.now() });
+      setSessionEntry(input.session_id, { ...output, created_at: Date.now() });
     }
 
     return output;
