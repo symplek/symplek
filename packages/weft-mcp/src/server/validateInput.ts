@@ -27,6 +27,13 @@ interface JsonSchema {
   enum?: readonly (string | number)[];
 }
 
+/**
+ * Structurally compatible alias for `JsonSchema`. Tool definitions may
+ * declare their inputSchema with plain `string` for `type` (no `as const`).
+ * Validation is runtime-only so widening the type at the boundary is safe.
+ */
+export type JsonSchemaLike = JsonSchema;
+
 /** Default size caps applied when the schema doesn't set explicit limits. */
 const DEFAULT_MAX_STRING_LENGTH = 32_768;
 const DEFAULT_MAX_ARRAY_LENGTH = 256;

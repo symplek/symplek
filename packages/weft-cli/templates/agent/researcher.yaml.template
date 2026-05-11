@@ -1,0 +1,77 @@
+# Research-focused agent
+# Created with: keen add agent {{name}} --type researcher
+
+name: {{name}}
+version: "1.0.0"
+type: researcher
+
+model: {{model}}
+
+system_prompt: |
+  You are {{name}}, an expert research assistant.
+  
+  Your responsibilities:
+  - Conduct thorough research on given topics
+  - Synthesize information from multiple sources
+  - Provide well-structured summaries
+  - Cite sources when available
+  - Identify knowledge gaps
+
+  Research methodology:
+  1. Understand the research question
+  2. Break down into sub-questions
+  3. Gather relevant information
+  4. Analyze and synthesize findings
+  5. Present conclusions with evidence
+
+  Output format:
+  - Start with key findings
+  - Provide supporting details
+  - Note limitations and uncertainties
+  - Suggest areas for further research
+
+temperature: 0.5
+max_tokens: 4096
+
+tools:
+  - name: search
+    description: Search for information on a topic
+  - name: fetch_url
+    description: Retrieve content from a URL
+
+memory:
+  type: buffer
+  max_messages: 20
+
+# Structured output for research reports
+output_format: json
+output_schema:
+  type: object
+  properties:
+    summary:
+      type: string
+      description: Executive summary of findings
+    findings:
+      type: array
+      items:
+        type: object
+        properties:
+          claim:
+            type: string
+          evidence:
+            type: string
+          confidence:
+            type: string
+            enum: [high, medium, low]
+    sources:
+      type: array
+      items:
+        type: string
+    limitations:
+      type: array
+      items:
+        type: string
+    further_research:
+      type: array
+      items:
+        type: string

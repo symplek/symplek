@@ -92,11 +92,11 @@ systemPrompt: You are a helpful assistant.`,
       expect(existsSync(result.outputFile)).toBe(true);
 
       const content = readFileSync(result.outputFile, "utf-8");
-      expect(content).toContain("import { AgentUnit } from 'weft-core'");
-      expect(content).toContain("import { openai } from '@ai-sdk/openai'");
+      expect(content).toContain('import { AgentUnit } from "weft-core"');
+      expect(content).toContain('import { openai } from "@ai-sdk/openai"');
       expect(content).toContain("export const myAgent");
-      expect(content).toContain("name: 'my-agent'");
-      expect(content).toContain("model: openai('gpt-4o')");
+      expect(content).toContain('name: "my-agent"');
+      expect(content).toContain('model: openai("gpt-4o")');
     });
 
     it("generates to custom output directory", () => {
@@ -149,8 +149,8 @@ systemPrompt: OpenAI test.`,
       generateFile(yamlPath, undefined, true);
       const content = readFileSync(join(testDir, "openai-agent.ts"), "utf-8");
 
-      expect(content).toContain("import { openai } from '@ai-sdk/openai'");
-      expect(content).toContain("model: openai('gpt-4o-mini')");
+      expect(content).toContain('import { openai } from "@ai-sdk/openai"');
+      expect(content).toContain('model: openai("gpt-4o-mini")');
     });
 
     it("maps Anthropic models correctly", () => {
@@ -169,9 +169,9 @@ systemPrompt: Anthropic test.`,
       );
 
       expect(content).toContain(
-        "import { anthropic } from '@ai-sdk/anthropic'",
+        'import { anthropic } from "@ai-sdk/anthropic"',
       );
-      expect(content).toContain("model: anthropic('claude-3-sonnet')");
+      expect(content).toContain('model: anthropic("claude-3-sonnet")');
     });
 
     it("maps Google models correctly", () => {
@@ -186,8 +186,8 @@ systemPrompt: Google test.`,
       generateFile(yamlPath, undefined, true);
       const content = readFileSync(join(testDir, "google-agent.ts"), "utf-8");
 
-      expect(content).toContain("import { google } from '@ai-sdk/google'");
-      expect(content).toContain("model: google('gemini-2.0-flash')");
+      expect(content).toContain('import { google } from "@ai-sdk/google"');
+      expect(content).toContain('model: google("gemini-2.0-flash")');
     });
   });
 
@@ -205,7 +205,7 @@ description: A helpful agent for testing.`,
       generateFile(yamlPath, undefined, true);
       const content = readFileSync(join(testDir, "desc-agent.ts"), "utf-8");
 
-      expect(content).toContain("description: 'A helpful agent for testing.'");
+      expect(content).toContain('description: "A helpful agent for testing."');
     });
 
     it("includes temperature when present", () => {
@@ -273,8 +273,10 @@ tools:
       generateFile(yamlPath, undefined, true);
       const content = readFileSync(join(testDir, "tools-agent.ts"), "utf-8");
 
-      expect(content).toContain("// TODO: Import tools: webSearch, calculator");
-      expect(content).toContain("// tools: [webSearch, calculator]");
+      expect(content).toContain(
+        '// TODO: Import tools: "webSearch", "calculator"',
+      );
+      expect(content).toContain('// tools: ["webSearch", "calculator"]');
     });
 
     it("handles tool config objects", () => {
@@ -400,7 +402,9 @@ systemPrompt: |
         "utf-8",
       );
 
-      expect(content).toContain("systemPrompt: `");
+      // Multi-line prompts now emit as JSON-quoted strings with \n escapes
+      // (safe emitter — no template literals, no injection surface).
+      expect(content).toContain('systemPrompt: "');
       expect(content).toContain("You are a helpful assistant.");
     });
 
@@ -416,7 +420,9 @@ systemPrompt: "Use \`backticks\` carefully"`,
       generateFile(yamlPath, undefined, true);
       const content = readFileSync(join(testDir, "escape-agent.ts"), "utf-8");
 
-      expect(content).toContain("\\`backticks\\`");
+      // Backticks are safe inside JSON double-quoted strings — no escaping
+      // needed since we no longer emit template literals.
+      expect(content).toContain("`backticks`");
     });
   });
 

@@ -280,7 +280,7 @@ function generateTypeScript(
 
   // Imports — modelInfo.pkg is a fixed npm package name, safe to emit
   // as a string literal via emitString.
-  lines.push("import { AgentUnit } from 'weft-core';");
+  lines.push('import { AgentUnit } from "weft-core";');
   lines.push(`import { ${safeModelFn} } from ${emitString(modelInfo.pkg)};`);
 
   // Tool import comments — tool names emitted as JSON-quoted strings so a

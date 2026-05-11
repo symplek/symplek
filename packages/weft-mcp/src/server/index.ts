@@ -10,6 +10,7 @@ import { createInterface } from "node:readline";
 import { consensusTool } from "./tools/consensus.tool";
 import { debateTool } from "./tools/debate.tool";
 import { trackedTool } from "./tools/tracked.tool";
+import type { JsonSchemaLike } from "./validateInput";
 import { ValidationError, validateInput } from "./validateInput";
 
 export { debateTool, consensusTool, trackedTool };
@@ -53,7 +54,10 @@ async function dispatchTool(name: string, args: unknown): Promise<unknown> {
   // Validate at the JSON-RPC boundary — the tool's TypeScript shape is not
   // enforced at runtime, so untyped MCP callers could otherwise pass anything.
   // ValidationError carries JSON-RPC code -32602 and a precise path/reason.
-  validateInput(args, tool.inputSchema);
+  // Tool inputSchemas use literal-string `type` fields (e.g. `type: "object"`)
+  // without `as const`, so TS sees them as plain `string`. validateInput
+  // narrows at runtime regardless; the cast asserts the structural intent.
+  validateInput(args, tool.inputSchema as unknown as JsonSchemaLike);
   return tool.execute(args as never);
 }
 

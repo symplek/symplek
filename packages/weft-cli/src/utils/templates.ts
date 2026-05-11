@@ -23,22 +23,36 @@ export function processTemplate(content: string, vars: TemplateVars): string {
 }
 
 /**
+ * Resolve the templates root, handling both build and source layouts:
+ *
+ *   - Built CLI (dist/utils/templates.js): `../templates` → `dist/templates/`,
+ *     populated by `scripts/copy-templates.mjs` at build time.
+ *   - Source-time / tests (src/utils/templates.ts): `../templates` would
+ *     point at the deleted `src/templates/`. Walk one level higher to
+ *     find the package-root `templates/` directory directly.
+ */
+function resolveTemplatesRoot(): string {
+  const dist = resolve(__dirname, "..", "templates");
+  if (existsSync(dist)) return dist;
+  const src = resolve(__dirname, "..", "..", "templates");
+  return src;
+}
+
+/**
  * Get the absolute path to a project template file
  */
 export function getProjectTemplatePath(
   tier: ProjectTier,
   ...pathSegments: string[]
 ): string {
-  const templatesRoot = resolve(__dirname, "..", "templates");
-  return join(templatesRoot, "project", tier, ...pathSegments);
+  return join(resolveTemplatesRoot(), "project", tier, ...pathSegments);
 }
 
 /**
  * Get the absolute path to an agent template file
  */
 export function getAgentTemplatePath(filename: string): string {
-  const templatesRoot = resolve(__dirname, "..", "templates");
-  return join(templatesRoot, "agent", filename);
+  return join(resolveTemplatesRoot(), "agent", filename);
 }
 
 /**
@@ -82,7 +96,7 @@ export function loadAgentTemplate(
  * Get the templates root directory path
  */
 export function getTemplatesRoot(): string {
-  return resolve(__dirname, "..", "templates");
+  return resolveTemplatesRoot();
 }
 
 /**

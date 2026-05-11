@@ -59,7 +59,14 @@ const SHELL_TOOLS = new Set(["Bash", "bash", "shell", "exec"]);
  * SDK tools use different field names — Glob uses `pattern`, Edit/Write
  * use `file_path`, etc. We check all of them and use whichever is set.
  */
-const PATH_ARG_NAMES = ["file_path", "filePath", "path", "pattern"] as const;
+const PATH_ARG_NAMES = [
+  "file_path",
+  "filePath",
+  "path",
+  "pattern",
+  "notebook_path",
+  "notebookPath",
+] as const;
 
 function extractPathArg(args: unknown): string | undefined {
   if (args === null || typeof args !== "object") return undefined;
@@ -139,10 +146,18 @@ export function buildPermissionBridge(
     if (FILE_TOOLS.has(toolName)) {
       const rawPath = extractPathArg(args);
       if (rawPath === undefined) {
-        // Tool was approved at the requiredTools level but supplied no path
-        // argument — that's unusual for file tools, but harmless: nothing
-        // to gate. Allow.
-        return { behavior: "allow" };
+        // Fail-closed: file tools are path-gated, so a call with no
+        // recognisable path argument means we cannot apply the gate.
+        // Previously we let these through ("nothing to enforce"), which
+        // turned the path gate into a no-op for any tool whose arg shape
+        // we don't recognise — e.g. NotebookEdit pre-`notebook_path`.
+        // Now we reject so the contract is "no path → no access".
+        throw new HarnessDeviationError(
+          `File tool "${toolName}" invoked with no recognisable path argument; path gate cannot apply (plan: ${planId})`,
+          toolName,
+          "unauthorized_path",
+          planId,
+        );
       }
       let normalised: string;
       try {
