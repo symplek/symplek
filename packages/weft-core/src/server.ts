@@ -1,5 +1,5 @@
 /**
- * @module server - Server-only exports for @weft/core
+ * @module server - Server-only exports for weft-core
  * @description Honest package boundary for Node/Convex consumers that need runtime AI utilities.
  *   Everything here pulls provider SDKs and must NOT be re-exported from the
  *   browser-safe package root.

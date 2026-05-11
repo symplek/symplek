@@ -1,6 +1,6 @@
 /**
  * @fileoverview Policy: Only allow results from registry-attested MCP servers
- * @module @weft/mcp/policies
+ * @module weft-mcp/policies
  * @since 0.1.0
  */
 

@@ -1,6 +1,6 @@
 /**
  * @fileoverview Policy: Results need corroboration from at least two sources
- * @module @weft/mcp/policies
+ * @module weft-mcp/policies
  * @since 0.1.0
  */
 

@@ -7,8 +7,8 @@
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */
 
-import { createContext } from "@weft/core";
 import { describe, expect, it } from "vitest";
+import { createContext } from "weft-core";
 import { LowProvenanceError } from "../errors";
 import { makePlanUnit } from "../operators/plan";
 import type { HarnessConfig } from "../types";

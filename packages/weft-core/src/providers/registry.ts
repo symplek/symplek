@@ -1,5 +1,5 @@
 ﻿/**
- * @fileoverview Provider Registry for @weft/core
+ * @fileoverview Provider Registry for weft-core
  * @description Manages registration and retrieval of AI providers.
  */
 

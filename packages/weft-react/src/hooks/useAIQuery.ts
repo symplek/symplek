@@ -1,5 +1,5 @@
-import { type AIResult, ai } from "@weft/core/server";
 import { useCallback, useState } from "react";
+import { type AIResult, ai } from "weft-core/server";
 import type { z } from "zod";
 import { useAIConfig } from "../AIProvider";
 

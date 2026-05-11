@@ -1,7 +1,7 @@
 /**
  * @fileoverview Agreement Rate Confidence Calculation
  * @description Tier 1 - Immediate confidence from voting agreement
- * @module @weft/core/confidence/calculations/agreementRate
+ * @module weft-core/confidence/calculations/agreementRate
  * @since 2.0.0
  *
  * 📝 BUILD[01.04]: Agreement rate calculation from research
@@ -19,7 +19,7 @@
  * - Empty votes: returns 0.0 (no data)
  */
 
-import type { Vote } from "@weft/core";
+import type { Vote } from "weft-core";
 import type { ConfidenceSignal } from "../types";
 
 /**

@@ -92,7 +92,7 @@ systemPrompt: You are a helpful assistant.`,
       expect(existsSync(result.outputFile)).toBe(true);
 
       const content = readFileSync(result.outputFile, "utf-8");
-      expect(content).toContain("import { AgentUnit } from '@weft/core'");
+      expect(content).toContain("import { AgentUnit } from 'weft-core'");
       expect(content).toContain("import { openai } from '@ai-sdk/openai'");
       expect(content).toContain("export const myAgent");
       expect(content).toContain("name: 'my-agent'");

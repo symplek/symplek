@@ -1,5 +1,5 @@
 /**
- * Package Contract Smoke Test — @weft/pro
+ * Package Contract Smoke Test — weft-pro
  *
  * Proves that root exports produce real behavior, not just symbol existence.
  * Imports ONLY from "../index" (the package entrypoint).
@@ -21,7 +21,7 @@ import {
   VERSION,
 } from "../index";
 
-describe("@weft/pro — Package Contract Smoke", () => {
+describe("weft-pro — Package Contract Smoke", () => {
   // ─── TaCo Consensus ───────────────────────────────────────────────────────
 
   describe("TaCo consensus exports", () => {
@@ -141,7 +141,7 @@ describe("@weft/pro — Package Contract Smoke", () => {
     });
   });
 
-  // ─── Observability moved to @weft/core ─────────────────────────────────────
+  // ─── Observability moved to weft-core ─────────────────────────────────────
   // See packages/weft-core/src/__tests__/contractSmoke.test.ts for coverage.
 
   // ─── Trust behavior ───────────────────────────────────────────────────────
@@ -195,8 +195,8 @@ describe("@weft/pro — Package Contract Smoke", () => {
 
   // ─── Peer dependency documentation ────────────────────────────────────────
 
-  describe("@weft/core peer dependency resolution", () => {
-    it("tacoConsensus depends on AgentUnit from @weft/core", () => {
+  describe("weft-core peer dependency resolution", () => {
+    it("tacoConsensus depends on AgentUnit from weft-core", () => {
       expect(typeof tacoConsensus).toBe("function");
     });
   });

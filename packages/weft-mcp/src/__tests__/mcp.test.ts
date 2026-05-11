@@ -14,7 +14,7 @@ import {
   TrustPolicyEngine,
 } from "../index";
 
-describe("@weft/mcp evidence", () => {
+describe("weft-mcp evidence", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -136,7 +136,7 @@ describe("@weft/mcp evidence", () => {
   });
 });
 
-describe("@weft/mcp policies", () => {
+describe("weft-mcp policies", () => {
   it("TrustPolicyEngine chains policies correctly", () => {
     const degradePolicy: MCPTrustPolicy = {
       name: "degradeFirst",
@@ -222,7 +222,7 @@ describe("@weft/mcp policies", () => {
   });
 });
 
-describe("@weft/mcp registry", () => {
+describe("weft-mcp registry", () => {
   it("MCPRegistry registers and retrieves servers", () => {
     const registry = new MCPRegistry();
 

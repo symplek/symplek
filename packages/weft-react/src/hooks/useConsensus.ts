@@ -1,11 +1,11 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   AgentUnit,
   ConsensusOptions,
   ConsensusResult,
   Vote,
   VoteInput,
-} from "@weft/core";
-import { useCallback, useEffect, useRef, useState } from "react";
+} from "weft-core";
 
 type ConsensusVoter<T> = (
   proposal: T,
@@ -67,7 +67,7 @@ export function useConsensus<T>(
       setIsRunning(true);
 
       try {
-        const { AgentUnit, createContext } = await import("@weft/core");
+        const { AgentUnit, createContext } = await import("weft-core");
         const unit = AgentUnit.of(proposal).consensus(voters, options);
         const trackedResult = await unit.run(
           createContext({

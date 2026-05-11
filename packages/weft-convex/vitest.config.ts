@@ -5,11 +5,11 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: "@weft/core/server",
+        find: "weft-core/server",
         replacement: resolve(__dirname, "../weft-core/src/server.ts"),
       },
       {
-        find: "@weft/core",
+        find: "weft-core",
         replacement: resolve(__dirname, "../weft-core/src/index.ts"),
       },
     ],

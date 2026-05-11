@@ -1,7 +1,7 @@
 /**
- * @fileoverview Public API exports for @weft/core
+ * @fileoverview Public API exports for weft-core
  * @description MIT-licensed free-tier package — full public surface
- * @module @weft/core
+ * @module weft-core
  * @since 1.0.0-beta.1
  * @rules .cursor/rules/patterns/029-file-header-contracts.mdc
  */
@@ -55,7 +55,7 @@ export type {
 } from "./interview";
 // ─── Interview ───────────────────────────────────────────────────────────────
 export { Interview } from "./interview";
-// ─── Observability (Free Tier — moved from @weft/pro) ────────────────────────
+// ─── Observability (Free Tier — moved from weft-pro) ────────────────────────
 export {
   clearTraces,
   configureObservability,

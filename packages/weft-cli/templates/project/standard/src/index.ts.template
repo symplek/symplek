@@ -1,6 +1,6 @@
 import "./weft.config.js";
-import { createContext } from "@weft/core";
-import { Weft } from "@weft/core/server";
+import { createContext } from "weft-core";
+import { Weft } from "weft-core/server";
 
 /**
  * {{name}} — a minimal Weft agent.

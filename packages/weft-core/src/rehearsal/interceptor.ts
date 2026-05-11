@@ -1,7 +1,7 @@
 /**
  * @fileoverview Interceptor interfaces and LLM interceptor implementation
  * @description Pluggable interception for recording/replaying non-deterministic calls
- * @module @weft/core/rehearsal/interceptor
+ * @module weft-core/rehearsal/interceptor
  * @since 1.0.0
  *
  * 📝 BUILD[02.01]: Interceptor Provider Interface
@@ -293,19 +293,29 @@ export class RecordingLLMInterceptor implements InterceptorProvider {
  */
 export class ReplayLLMInterceptor implements InterceptorProvider {
   readonly name = "llm";
+
   private readonly calls: RecordedLLMCall[];
   private callIndex = 0;
+  // Recorder ref is part of the InterceptorProvider contract — install/uninstall
+  // must accept and clear it. ReplayLLMInterceptor never reads this field
+  // (replay is sourced from `calls`, not the live recorder), but the assignments
+  // are still required so the lifecycle works. The `void` reads below keep
+  // biome's noUnusedPrivateClassMembers honest without weakening the type.
+  private recorder: InterceptorRecorder | null = null;
 
   constructor(calls: RecordedLLMCall[]) {
     this.calls = calls;
   }
 
-  install(_recorder: InterceptorRecorder): void {
+  install(recorder: InterceptorRecorder): void {
+    this.recorder = recorder;
+    void this.recorder;
     this.callIndex = 0;
   }
 
   uninstall(): void {
-    // no-op: recorder reference is not stored
+    this.recorder = null;
+    void this.recorder;
   }
 
   intercept(request: unknown): Promise<unknown> | undefined {

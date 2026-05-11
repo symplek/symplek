@@ -1,6 +1,6 @@
-import type { Trace } from "@weft/core";
-import { ai } from "@weft/core/server";
 import type { FunctionReference, GenericActionCtx } from "convex/server";
+import type { Trace } from "weft-core";
+import { ai } from "weft-core/server";
 
 export interface MiddlewareStack {
   wrap<T>(fn: () => Promise<T>): Promise<T>;

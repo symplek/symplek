@@ -1,5 +1,5 @@
 /**
- * @module @weft/core/AgentUnit/operators/model
+ * @module weft-core/AgentUnit/operators/model
  * @description AgentUnit model selection operators: .model(), .quality()
  * @blast_radius HIGH
  * @status STABLE

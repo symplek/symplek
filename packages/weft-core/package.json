@@ -1,5 +1,5 @@
 {
-  "name": "@weft/core",
+  "name": "weft-core",
   "version": "1.0.0-beta.1",
   "description": "Composable AI agents for TypeScript",
   "type": "module",

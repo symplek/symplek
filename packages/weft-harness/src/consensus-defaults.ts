@@ -1,4 +1,4 @@
-/** @module ConsensusDefaults - Per-tier threshold and minimum-veto config for @weft/harness */
+/** @module ConsensusDefaults - Per-tier threshold and minimum-veto config for weft-harness */
 
 import type { ImpactTier } from "./types";
 

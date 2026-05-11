@@ -57,7 +57,7 @@ importers:
 
   packages/weft-convex:
     dependencies:
-      '@weft/core':
+      weft-core:
         specifier: workspace:*
         version: link:../weft-core
       zod:
@@ -175,19 +175,19 @@ importers:
       '@types/react':
         specifier: ^18.0.0
         version: 18.3.28
-      '@weft/core':
-        specifier: workspace:*
-        version: link:../weft-core
       typescript:
         specifier: ^5.0.0
         version: 5.9.3
       vitest:
         specifier: ^1.0.0
         version: 1.6.1(@types/node@22.19.18)
+      weft-core:
+        specifier: workspace:*
+        version: link:../weft-core
 
   packages/weft-mcp:
     dependencies:
-      '@weft/core':
+      weft-core:
         specifier: workspace:*
         version: link:../weft-core
     devDependencies:
@@ -209,7 +209,7 @@ importers:
 
   packages/weft-pro:
     dependencies:
-      '@weft/core':
+      weft-core:
         specifier: workspace:*
         version: link:../weft-core
     devDependencies:
@@ -231,15 +231,15 @@ importers:
 
   packages/weft-react:
     dependencies:
-      '@weft/core':
-        specifier: workspace:*
-        version: link:../weft-core
       react:
         specifier: ^18.0.0 || ^19.0.0
         version: 19.2.6
       react-dom:
         specifier: ^18.0.0 || ^19.0.0
         version: 19.2.6(react@19.2.6)
+      weft-core:
+        specifier: workspace:*
+        version: link:../weft-core
     devDependencies:
       '@types/react':
         specifier: ^19.0.0
@@ -262,7 +262,7 @@ importers:
 
   packages/weft-testing:
     dependencies:
-      '@weft/core':
+      weft-core:
         specifier: workspace:*
         version: link:../weft-core
     devDependencies:

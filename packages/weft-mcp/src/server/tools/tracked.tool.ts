@@ -7,7 +7,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { AgentUnit, createContext } from "@weft/core";
+import { AgentUnit, createContext } from "weft-core";
 
 // ─── Tool Definition ──────────────────────────────────────────────────────────
 

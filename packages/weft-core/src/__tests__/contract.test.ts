@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Tests for contract validation
  * @description Unit tests for ContractError, zodErrorToMismatches, and defineContract
- * @module @weft/core/contract.test
+ * @module weft-core/contract.test
  *
  * 📝 BUILD[F-047]: Story 03.01, 03.02, 03.03 - Contract validation tests
  */

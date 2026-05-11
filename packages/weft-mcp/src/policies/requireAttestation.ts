@@ -1,6 +1,6 @@
 /**
  * @fileoverview Policy: Results must carry provenance attestation
- * @module @weft/mcp/policies
+ * @module weft-mcp/policies
  * @since 0.1.0
  */
 

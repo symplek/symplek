@@ -1,5 +1,5 @@
 {
-  "name": "@weft/convex",
+  "name": "weft-convex",
   "version": "0.1.0",
   "description": "Weft Framework — Convex integration for AI agent actions",
   "license": "MIT",
@@ -28,7 +28,7 @@
     "test:contract": "vitest run src/__tests__/contractSmoke.test.ts"
   },
   "peerDependencies": {
-    "@weft/core": "workspace:*",
+    "weft-core": "workspace:*",
     "convex": "^1.19.0",
     "zod": "^3.0.0"
   },

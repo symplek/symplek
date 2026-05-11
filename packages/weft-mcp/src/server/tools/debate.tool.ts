@@ -6,7 +6,7 @@
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */
 
-import { AgentUnit, createContext } from "@weft/core";
+import { AgentUnit, createContext } from "weft-core";
 import type { DebateAgent } from "../weft-core-ops";
 
 // ─── Session Store ────────────────────────────────────────────────────────────

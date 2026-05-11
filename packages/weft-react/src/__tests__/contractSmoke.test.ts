@@ -1,11 +1,11 @@
 /**
- * Package Contract Smoke Test — @weft/react
+ * Package Contract Smoke Test — weft-react
  *
  * Proves that the package entrypoint (src/index.ts) exports what the
  * package.json contract claims. Imports ONLY from "../index" (the
  * package entrypoint), never from internal modules.
  *
- * @weft/react depends on @weft/core and react as peer dependencies.
+ * weft-react depends on weft-core and react as peer dependencies.
  * Packed-install verification lives in the root packed-proof harness.
  */
 
@@ -27,7 +27,7 @@ const boundaryTsconfig = JSON.parse(
   readFileSync(resolve(packageRoot, "tsconfig.boundary.json"), "utf8"),
 );
 
-describe("@weft/react — Package Contract Smoke", () => {
+describe("weft-react — Package Contract Smoke", () => {
   it("exports the supported root surface and nothing else", () => {
     expect(Object.keys(weftReact).sort()).toEqual(
       [
@@ -69,7 +69,7 @@ describe("@weft/react — Package Contract Smoke", () => {
   it("keeps the package marked experimental while the surface is still small", () => {
     expect(packageJson.version).toBe("0.1.0");
     expect(packageJson.peerDependencies).toMatchObject({
-      "@weft/core": expect.any(String),
+      "weft-core": expect.any(String),
       react: expect.any(String),
       "react-dom": expect.any(String),
     });

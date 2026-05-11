@@ -1,8 +1,8 @@
 /**
- * @module weft-core-ops.d.ts - Local AgentUnit operator augmentation for @weft/core
- * @description The @weft/core dist uses `declare module "../AgentUnit"` augmentations
+ * @module weft-core-ops.d.ts - Local AgentUnit operator augmentation for weft-core
+ * @description The weft-core dist uses `declare module "../AgentUnit"` augmentations
  * which are relative to the dist directory and don't resolve from external consumers.
- * This file re-declares the operators on the `@weft/core` module namespace so TypeScript
+ * This file re-declares the operators on the `weft-core` module namespace so TypeScript
  * can see them in weft-mcp source files.
  */
 
@@ -12,11 +12,11 @@ import type {
   SourceTrackingOptions,
   TrackedResult,
   VoteInput,
-} from "@weft/core";
+} from "weft-core";
 
-// Local copies of types not exported from @weft/core public API:
+// Local copies of types not exported from weft-core public API:
 
-/** ConvergentAgent contribution — mirrors @weft/core internal type. */
+/** ConvergentAgent contribution — mirrors weft-core internal type. */
 export interface ConvergeContribution<T> {
   result: T;
   hasMore: boolean;
@@ -29,21 +29,21 @@ export type DebateAgent<T> = (
   round: number,
 ) => ConvergeContribution<T> | Promise<ConvergeContribution<T>>;
 
-/** DebateOptions — mirrors @weft/core internal DebateOptions. */
+/** DebateOptions — mirrors weft-core internal DebateOptions. */
 export interface DebateOptions {
   maxRounds?: number;
   maxConsensusAttempts?: number;
   onReject?: "retry" | "fail";
 }
 
-/** DebateResult — mirrors @weft/core internal DebateResult. */
+/** DebateResult — mirrors weft-core internal DebateResult. */
 export interface DebateResult<T> {
   outcome: "consensus" | "no-consensus" | "exhausted";
   finalState: T;
   rounds: number;
   attempts: number;
   converged: boolean;
-  votes?: import("@weft/core").Vote[];
+  votes?: import("weft-core").Vote[];
   contributions: Array<{
     round: number;
     agentId: string;
@@ -52,7 +52,7 @@ export interface DebateResult<T> {
   }>;
 }
 
-declare module "@weft/core" {
+declare module "weft-core" {
   interface AgentUnit<T> {
     /** Run debate coordination: sequential converge + unanimous consensus. */
     debate(

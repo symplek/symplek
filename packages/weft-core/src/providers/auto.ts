@@ -1,5 +1,5 @@
 ﻿/**
- * @fileoverview Auto-detection and model selection for @weft/core
+ * @fileoverview Auto-detection and model selection for weft-core
  * @description Implements automatic provider detection from environment variables and intelligent model selection.
  */
 

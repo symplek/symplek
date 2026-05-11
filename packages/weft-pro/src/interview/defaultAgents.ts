@@ -1,13 +1,13 @@
 ﻿/**
  * @fileoverview Schema-driven default agent generation
  * @description Generates evaluator, questioner, and extractor from Zod schema
- * @module @weft/core/interview/defaultAgents
+ * @module weft-core/interview/defaultAgents
  * @since 1.0.0-beta.3
  *
  * 📝 BUILD[Weft-interview]: Schema-driven agent generation
  */
 
-import { AgentUnit } from "@weft/core";
+import { AgentUnit } from "weft-core";
 import type { z } from "zod";
 import type {
   ClarityScore,

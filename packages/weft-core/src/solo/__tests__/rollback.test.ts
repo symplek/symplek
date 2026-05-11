@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Tests for Rollback Manager
- * @module @weft/core/solo/__tests__/rollback
+ * @module weft-core/solo/__tests__/rollback
  *
  * 📝 BUILD[STORY-03.04]: Rollback tests
  */

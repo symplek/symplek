@@ -1,9 +1,9 @@
 /**
- * @fileoverview MCP type definitions for @weft/mcp package
+ * @fileoverview MCP type definitions for weft-mcp package
  * @description Trust-aware tool consumption types mirroring the canonical
  *   definitions in convex/lib/agent_framework/algebra/core/types/mcp.types.ts.
  *   Kept local to avoid cross-boundary imports from packages/ into convex/.
- * @module @weft/mcp/types
+ * @module weft-mcp/types
  * @since 0.1.0
  */
 
@@ -50,7 +50,7 @@ export interface CorroborationRef {
 
 /**
  * MCP-sourced evidence wrapper with full provenance metadata.
- * Extends the conceptual TrackedResult pattern from @weft/core with
+ * Extends the conceptual TrackedResult pattern from weft-core with
  * MCP-specific fields (server, tool, transport, freshness, corroboration).
  */
 export interface MCPEvidence<T = unknown> {

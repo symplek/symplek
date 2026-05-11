@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Test utilities for Rehearsal Mode
  * @description Test harness, assertions, and deep equality for deterministic testing
- * @module @weft/core/rehearsal/testing
+ * @module weft-core/rehearsal/testing
  * @since 1.0.0
  *
  * 📝 BUILD[04.04]: Test Harness Factory

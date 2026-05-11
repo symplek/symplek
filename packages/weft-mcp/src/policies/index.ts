@@ -1,6 +1,6 @@
 /**
  * @fileoverview MCP trust policy barrel exports
- * @module @weft/mcp/policies
+ * @module weft-mcp/policies
  * @since 0.1.0
  */
 

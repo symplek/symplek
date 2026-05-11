@@ -1,7 +1,7 @@
 /**
  * @module useHarnessProgress
  * @description React hook for accumulating HarnessProgressEvent stream into typed state accessors.
- * Designed for UIs that need to show real-time phase/tool progress as @weft/harness operators
+ * Designed for UIs that need to show real-time phase/tool progress as weft-harness operators
  * execute. Pairs with HarnessConfig.onProgress or ExecuteOptions.onProgress callbacks.
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */

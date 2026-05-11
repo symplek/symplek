@@ -1,6 +1,6 @@
 /**
- * @fileoverview @weft/mcp — MCP Fabric for trust-aware tool consumption
- * @module @weft/mcp
+ * @fileoverview weft-mcp — MCP Fabric for trust-aware tool consumption
+ * @module weft-mcp
  * @since 0.1.0
  *
  * Provides trust-policy-driven MCP server consumption with provenance

@@ -1,4 +1,4 @@
-# @weft/pro
+# weft-pro
 
 **Advanced multi-agent consensus, observability, and security primitives for production AI systems.**
 
@@ -9,18 +9,18 @@
 ## Install
 
 ```bash
-npm install @weft/core @weft/pro
+npm install weft-core weft-pro
 # or
-pnpm add @weft/core @weft/pro
+pnpm add weft-core weft-pro
 ```
 
-`@weft/core` is a required peer dependency.
+`weft-core` is a required peer dependency.
 
 ---
 
-## What @weft/pro adds
+## What weft-pro adds
 
-| Feature | Description | @weft/core | @weft/pro |
+| Feature | Description | weft-core | weft-pro |
 |---|---|:---:|:---:|
 | Lazy agent monad (`AgentUnit`) | Compose agents without executing until `.run()` | ✓ | ✓ |
 | Resilience operators | `.retry()`, `.timeout()`, `.fallback()` | ✓ | ✓ |
@@ -58,8 +58,8 @@ Define a `Team` once with its agents, mode (converge/dialectic), and options. Re
 ## TaCo consensus example
 
 ```typescript
-import { AgentUnit, createContext } from "@weft/core";
-import { tacoConsensus } from "@weft/pro";
+import { AgentUnit, createContext } from "weft-core";
+import { tacoConsensus } from "weft-pro";
 
 const ctx = createContext();
 
@@ -97,7 +97,7 @@ console.log(result.value.finalAgreementLevel); // e.g. 0.83
 ## Antibody example
 
 ```typescript
-import { AntibodyRegistry } from "@weft/pro";
+import { AntibodyRegistry } from "weft-pro";
 
 const registry = new AntibodyRegistry();
 
@@ -120,7 +120,7 @@ if (scan.recommendation === "reject") {
 ## Observability example
 
 ```typescript
-import { createOperatorSpan, getTraces, configureObservability } from "@weft/pro";
+import { createOperatorSpan, getTraces, configureObservability } from "weft-pro";
 
 configureObservability({ enabled: true, verbosity: "verbose" });
 
@@ -139,18 +139,18 @@ console.log(traces[0].durationMs); // wall-clock time for the span
 
 ## Upgrade path
 
-Already using `@weft/core`? Add `@weft/pro` alongside it — no breaking changes.
+Already using `weft-core`? Add `weft-pro` alongside it — no breaking changes.
 
 ```bash
 # Add pro without removing core
-pnpm add @weft/pro
+pnpm add weft-pro
 ```
 
-Import pro features directly alongside your existing `@weft/core` imports:
+Import pro features directly alongside your existing `weft-core` imports:
 
 ```typescript
-import { AgentUnit, createContext } from "@weft/core"; // unchanged
-import { tacoConsensus, AntibodyRegistry } from "@weft/pro"; // additive
+import { AgentUnit, createContext } from "weft-core"; // unchanged
+import { tacoConsensus, AntibodyRegistry } from "weft-pro"; // additive
 ```
 
 ---

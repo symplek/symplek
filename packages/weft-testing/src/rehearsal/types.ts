@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Core types for Rehearsal Mode
  * @description Deterministic record/replay types for multi-agent AI testing
- * @module @weft/core/rehearsal/types
+ * @module weft-core/rehearsal/types
  * @since 1.0.0
  *
  * 📝 BUILD[01.01]: Core types for Rehearsal Mode

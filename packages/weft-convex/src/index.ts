@@ -1,6 +1,6 @@
 /**
- * @weft/convex
- * Bridge between Convex ActionCtx and @weft/core
+ * weft-convex
+ * Bridge between Convex ActionCtx and weft-core
  */
 
 export * from "./middleware";

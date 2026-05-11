@@ -2,7 +2,7 @@
  * @fileoverview MCP Transport Client — transport abstraction for MCP server communication.
  * Provides abstract base + concrete stdio/HTTP implementations designed for
  * Convex Actions (`"use node"`).
- * @module @weft/mcp/client
+ * @module weft-mcp/client
  * @since 0.1.0
  */
 

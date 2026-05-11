@@ -1,5 +1,5 @@
 ﻿/**
- * @fileoverview Providers entry point for @weft/core
+ * @fileoverview Providers entry point for weft-core
  */
 
 export * from "./anthropic";

@@ -1,7 +1,7 @@
 /**
  * @fileoverview TaCo Iterative Consensus
  * @description Multi-round voting that reduces error amplification by 17.2×
- * @module @weft/pro/taco
+ * @module weft-pro/taco
  * @since 1.0.0-beta.1
  *
  * 📝 BUILD[05.05]: TaCo iterative consensus implementation
@@ -12,10 +12,10 @@
  * single-round voting. Agents vote, see each other's rationales, revise,
  * and converge to stable agreement.
  *
- * Requires @weft/core as peer dependency.
+ * Requires weft-core as peer dependency.
  */
 
-import { AgentUnit } from "@weft/core";
+import { AgentUnit } from "weft-core";
 import type {
   TaCoConsensusOptions,
   TaCoResult,
@@ -30,8 +30,8 @@ import type {
  *
  * @example
  * ```typescript
- * import { AgentUnit } from '@weft/core';
- * import { tacoConsensus } from '@weft/pro';
+ * import { AgentUnit } from 'weft-core';
+ * import { tacoConsensus } from 'weft-pro';
  *
  * const result = await AgentUnit.fromAgent(proposer, messages)
  *   .pipe(tacoConsensus([voter1, voter2, voter3], {

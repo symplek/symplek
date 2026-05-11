@@ -9,7 +9,7 @@ import {
   isTracked,
   type ResultSource,
   type TrackedResult,
-} from "@weft/core";
+} from "weft-core";
 
 export interface ProvenanceOptions {
   /** Source category — one of Weft's `ResultSource` literals. */

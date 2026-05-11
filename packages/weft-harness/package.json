@@ -1,5 +1,5 @@
 {
-  "name": "@weft/harness",
+  "name": "weft-harness",
   "version": "0.1.0-alpha.1",
   "description": "Algebraic trust layer for Claude Agent SDK and OpenAI Agents SDK",
   "license": "MIT",
@@ -21,7 +21,7 @@
     }
   },
   "peerDependencies": {
-    "@weft/core": "^1.0.0-beta",
+    "weft-core": "^1.0.0-beta",
     "@anthropic-ai/claude-agent-sdk": ">=0.2.0",
     "openai": "^4.0.0",
     "react": "^18.0.0 || ^19.0.0"
@@ -40,7 +40,7 @@
   "devDependencies": {
     "@types/node": "*",
     "@types/react": "^18.0.0",
-    "@weft/core": "workspace:*",
+    "weft-core": "workspace:*",
     "typescript": "^5.0.0",
     "vitest": "^1.0.0"
   },

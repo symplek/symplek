@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Rehearsal Mode exports
  * @description Barrel exports for deterministic record/replay
- * @module @weft/core/rehearsal
+ * @module weft-core/rehearsal
  * @since 1.0.0
  *
  * 📝 BUILD[01.04, 02.05, 03.07, 04.08]: Barrel exports for all epics

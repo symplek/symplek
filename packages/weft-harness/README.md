@@ -1,4 +1,4 @@
-# @weft/harness
+# weft-harness
 
 Algebraic trust layer for AI agent SDKs. Wraps Claude Agent SDK and OpenAI agent calls in Weft's `AgentUnit<T>` algebra so you get retries, timeouts, fallbacks, consensus, replay, and trace recording without rewriting the underlying agent code.
 
@@ -9,7 +9,7 @@ Algebraic trust layer for AI agent SDKs. Wraps Claude Agent SDK and OpenAI agent
 ## Install
 
 ```bash
-pnpm add @weft/harness @weft/core
+pnpm add weft-harness weft-core
 ```
 
 Optional peers — install whichever vendor SDKs you actually use:
@@ -26,11 +26,11 @@ pnpm add react                             # for the useHarnessProgress hook
 
 Most agent SDKs give you a single function: send a prompt, get a response. They don't compose. They don't retry intelligently. They don't replay. They don't let you run two agents in parallel and pick the winner.
 
-`@weft/harness` lifts agent calls into `AgentUnit<T>` so every Weft operator works on them.
+`weft-harness` lifts agent calls into `AgentUnit<T>` so every Weft operator works on them.
 
 ```typescript
-import { AgentUnit, createContext } from "@weft/core";
-import { plan, execute, session } from "@weft/harness";
+import { AgentUnit, createContext } from "weft-core";
+import { plan, execute, session } from "weft-harness";
 
 const ctx = createContext();
 
@@ -50,8 +50,8 @@ const result = await plan({ goal: "summarise this PDF", model: "claude-sonnet-4"
 - `plan(options)` — Build a plan AgentUnit. Wraps `claude-agent-sdk` planning calls.
 - `execute(planOrPrompt)` — Execute a plan. Wraps the relevant SDK's runtime.
 - `session(config)` — Long-running conversational session. Captures full history.
-- React entry at `@weft/harness/react` — `useHarnessProgress()` hook for streaming progress UI.
-- Replay entry at `@weft/harness/replay` — Deterministic replay of recorded harness traces.
+- React entry at `weft-harness/react` — `useHarnessProgress()` hook for streaming progress UI.
+- Replay entry at `weft-harness/replay` — Deterministic replay of recorded harness traces.
 
 ---
 

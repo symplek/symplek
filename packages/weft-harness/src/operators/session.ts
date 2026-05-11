@@ -1,5 +1,5 @@
 /**
- * @module Session - Full-autonomy escape hatch operator for @weft/harness
+ * @module Session - Full-autonomy escape hatch operator for weft-harness
  * @description Implements `session()` — runs a Claude Agent SDK session in
  * `bypassPermissions` mode (full autonomy). Wraps the final output in a
  * `TrackedResult<string>` so every tool call is still observable through the
@@ -8,8 +8,8 @@
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */
 
-import type { TrackedResult } from "@weft/core";
-import { AgentUnit, TRACKED_MARKER } from "@weft/core";
+import type { TrackedResult } from "weft-core";
+import { AgentUnit, TRACKED_MARKER } from "weft-core";
 import type { SourceRef } from "../types";
 
 // ─── SDK Interface Stub ───────────────────────────────────────────────────────

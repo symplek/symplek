@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Coherence Calculations Barrel Export
  * @description Re-exports all coherence calculation functions
- * @module @weft/core/coherence/calculations
+ * @module weft-core/coherence/calculations
  * @since 2.1.0
  *
  * 📝 BUILD[STORY-01.05]: Barrel export for calculations

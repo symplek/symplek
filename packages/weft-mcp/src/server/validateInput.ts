@@ -3,7 +3,7 @@
  * @description Validates `tools/call` arguments against the declared `inputSchema`
  *   at the JSON-RPC boundary. We hand-roll the subset (type/properties/required/
  *   maxLength/maxItems/minimum/maximum/enum) instead of pulling in ajv to keep
- *   the published @weft/mcp surface dependency-free.
+ *   the published weft-mcp surface dependency-free.
  *
  *   This is intentionally strict: any deviation from the schema is rejected with
  *   JSON-RPC -32602 (Invalid params). MCP callers get a precise error message;

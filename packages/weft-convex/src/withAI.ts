@@ -1,5 +1,5 @@
-import { ai } from "@weft/core/server";
 import type { GenericActionCtx } from "convex/server";
+import { ai } from "weft-core/server";
 import type { z } from "zod";
 import {
   createActivityMiddleware,
@@ -48,7 +48,7 @@ export interface ConvexAI {
     stream: AsyncIterable<string>,
     config: StreamToMutationConfig,
   ) => Promise<void>;
-  /** The raw ai() function from @weft/core */
+  /** The raw ai() function from weft-core */
   raw: typeof ai;
   /** Experimental helpers — not part of the supported API contract */
   experimental: ConvexAIExperimental;

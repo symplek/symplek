@@ -1,10 +1,10 @@
 /**
  * @fileoverview Basic operators for AgentUnit
  * @description Free-tier operators: retry, timeout, fallback, consensus, source tracking
- * @module @weft/core/operators
+ * @module weft-core/operators
  * @since 1.0.0-beta.1
  *
- * 📝 BUILD[05.04]: Basic operators for @weft/core package (MIT License)
+ * 📝 BUILD[05.04]: Basic operators for weft-core package (MIT License)
  */
 
 import type { AgentComputation, AgentUnitMetadata } from "./AgentUnit";
@@ -243,7 +243,7 @@ type Voter<T> = (
  *
  * @remarks
  * This is the free-tier single-round consensus. For multi-round TaCo consensus,
- * see @weft/pro package.
+ * see weft-pro package.
  */
 export function createConsensusComputation<T>(
   innerComputation: AgentComputation<T>,

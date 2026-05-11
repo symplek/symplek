@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Composite Coherence Calculation
  * @description Weighted combination of all coherence signals
- * @module @weft/core/coherence/calculations/compositeCoherence
+ * @module weft-core/coherence/calculations/compositeCoherence
  * @since 2.1.0
  *
  * 📝 BUILD[STORY-01.05]: Composite coherence implementation
@@ -21,7 +21,7 @@
  * - Stigmergy: 5% (future pheromone trails)
  */
 
-import type { Vote } from "@weft/core";
+import type { Vote } from "weft-core";
 import { calculateAgreementRate } from "../../confidence/calculations/agreementRate";
 import {
   COHERENCE_ALGORITHM_VERSION,

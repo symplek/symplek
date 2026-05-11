@@ -1,5 +1,5 @@
-import type { WeftErrorDetail } from "@weft/core";
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import type { WeftErrorDetail } from "weft-core";
 
 /**
  * Props for the AIErrorBoundary component.

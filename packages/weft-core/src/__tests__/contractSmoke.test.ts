@@ -1,5 +1,5 @@
 /**
- * Package Contract Smoke Test — @weft/core
+ * Package Contract Smoke Test — weft-core
  *
  * Proves that the package entrypoint (src/index.ts) exports what the
  * package.json contract claims. Imports ONLY from "../index" (the
@@ -66,7 +66,7 @@ import {
   WeftError,
 } from "../index";
 
-describe("@weft/core — Package Contract Smoke", () => {
+describe("weft-core — Package Contract Smoke", () => {
   describe("Core exports", () => {
     it("exports AgentUnit as a class with static factory methods", () => {
       expect(AgentUnit).toBeDefined();
@@ -93,7 +93,7 @@ describe("@weft/core — Package Contract Smoke", () => {
   });
 
   describe("BOUNDARY TRUTH: Facade is server-only", () => {
-    it("Weft is NOT exported from package root (moved to @weft/core/server)", () => {
+    it("Weft is NOT exported from package root (moved to weft-core/server)", () => {
       expect((entrypoint as any).Weft).toBeUndefined();
     });
 

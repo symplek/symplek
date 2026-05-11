@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Unit tests for Checkpoint Manager
- * @module @weft/core/rehearsal/__tests__/checkpoint
+ * @module weft-core/rehearsal/__tests__/checkpoint
  */
 
 import { describe, expect, it } from "vitest";

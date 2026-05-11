@@ -1,5 +1,5 @@
 {
-  "name": "@weft/react",
+  "name": "weft-react",
   "version": "0.1.0",
   "description": "Weft Framework — React hooks and components for AI agent UIs",
   "license": "MIT",
@@ -30,7 +30,7 @@
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0",
-    "@weft/core": "workspace:*"
+    "weft-core": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

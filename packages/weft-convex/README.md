@@ -1,11 +1,11 @@
-# @weft/convex
+# weft-convex
 
 **Weft Framework - Convex Integration**
 
 > **Support Tier: EXPERIMENTAL** (0.1.0)
 >
 > This package provides Convex-specific wrappers that bridge Convex `ActionCtx`
-> with `@weft/core` AI primitives. It has no standalone consumer proof yet.
+> with `weft-core` AI primitives. It has no standalone consumer proof yet.
 >
 > For Convex actions that need the full feature set (context builder, memory bootstrap, tracing),
 > use the internal spine directly: `convex/lib/agent_framework/` with `buildContext(actionCtx)`.
@@ -14,7 +14,7 @@
 
 ## What This Package Contains
 
-`@weft/convex` exports Convex action wrappers for the Weft framework:
+`weft-convex` exports Convex action wrappers for the Weft framework:
 
 - `withAI(ctx, options)` — create an AI client bound to a Convex `ActionCtx`
 - Middleware: activity logging and cost tracking via typed `FunctionReference` mutations
@@ -26,7 +26,7 @@
 ## Quick Start
 
 ```typescript
-import { withAI } from "@weft/convex";
+import { withAI } from "weft-convex";
 import { internal } from "./_generated/api";
 
 export const myAction = internalAction({
@@ -50,7 +50,7 @@ export const myAction = internalAction({
 |---|---|
 | `generate(prompt)` | Generate text from a prompt |
 | `streamToMutation(stream, config)` | Stream AI output to a Convex mutation |
-| `raw` | Direct access to the `ai()` function from `@weft/core` |
+| `raw` | Direct access to the `ai()` function from `weft-core` |
 
 ### Options
 
@@ -102,7 +102,7 @@ const result = await ai.experimental.generateTyped("Create data", zodSchema);
 
 ## Requires
 
-- `@weft/core` as peer dependency
+- `weft-core` as peer dependency
 - `convex` ^1.19.0
 - `zod` ^3.0.0 (**optional** - only for `experimental.generateTyped`)
 

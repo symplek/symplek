@@ -1,13 +1,13 @@
 ﻿/**
  * @fileoverview Objective Confidence Type Definitions
  * @description Core type definitions for mathematically computed confidence scoring
- * @module @weft/core/confidence/types
+ * @module weft-core/confidence/types
  * @since 2.0.0
  *
  * 📝 BUILD[01.02]: Objective confidence types from research findings
  */
 
-import type { Vote } from "@weft/core";
+import type { Vote } from "weft-core";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIDENCE SIGNAL TYPES

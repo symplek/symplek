@@ -1,6 +1,6 @@
 /**
  * @fileoverview MCPEvidence<T> — provenance-wrapped MCP tool results
- * @module @weft/mcp/evidence
+ * @module weft-mcp/evidence
  * @since 0.1.0
  *
  * Wraps MCP tool outputs with trust metadata: integrity hashes,

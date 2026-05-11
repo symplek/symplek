@@ -94,14 +94,14 @@ await server.connect(transport);
 The debate and consensus tools use **simulated agents** — deterministic functions that
 return fixed values without making real LLM calls. This is intentional:
 
-1. The `@weft/mcp` package has no AI provider dependency
+1. The `weft-mcp` package has no AI provider dependency
 2. The operators still execute their coordination logic (rounds, voting, quorum checks)
 3. Real LLM agents can be injected by extending the tool with a model provider option
 
-To add real LLM agents, wire in `@weft/core`'s `AgentUnit.prompt()` with a provider:
+To add real LLM agents, wire in `weft-core`'s `AgentUnit.prompt()` with a provider:
 
 ```typescript
-import { AgentUnit } from "@weft/core";
+import { AgentUnit } from "weft-core";
 // Real agent example (requires provider dependency):
 const agent: DebateAgent<string> = async (current, _round) => ({
   result: await callLLM(`As ${role}, respond to: ${current}`),

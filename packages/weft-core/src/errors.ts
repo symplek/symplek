@@ -1,5 +1,5 @@
 /**
- * Unified error types for @weft/core.
+ * Unified error types for weft-core.
  *
  * Two code systems coexist:
  *  - Exx codes (E001–E403) for developer-facing diagnostics with fix suggestions
@@ -110,7 +110,7 @@ export interface SerializedError {
 }
 
 /**
- * Custom error class for @weft/core with actionable feedback.
+ * Custom error class for weft-core with actionable feedback.
  *
  * Error messages are automatically prefixed with `[weft@VERSION]` so they
  * are self-identifying in stack traces across bundled and server environments.

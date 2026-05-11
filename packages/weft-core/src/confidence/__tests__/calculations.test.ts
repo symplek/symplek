@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Unit Tests for Objective Confidence Calculations
  * @description Tests for all confidence calculation functions
- * @module @weft/core/confidence/__tests__/calculations
+ * @module weft-core/confidence/__tests__/calculations
  * @since 2.0.0
  *
  * 📝 BUILD[01.10]: Unit tests for confidence module

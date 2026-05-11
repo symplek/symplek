@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Tests for Solo Decision Algorithm
- * @module @weft/core/solo/__tests__/decision
+ * @module weft-core/solo/__tests__/decision
  *
  * 📝 BUILD[STORY-03.01]: Decision algorithm tests
  */

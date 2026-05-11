@@ -1,5 +1,5 @@
-import type { AgentUnit, TrackedResult } from "@weft/core";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { AgentUnit, TrackedResult } from "weft-core";
 
 export interface SwarmRunOptions {
   extensions?: Record<string, unknown>;
@@ -53,7 +53,7 @@ export function useSwarm<T>(
       setIsRunning(true);
       setErrors([]);
 
-      const { createContext } = await import("@weft/core");
+      const { createContext } = await import("weft-core");
       const context = createContext({
         signal: controller.signal,
         extensions: options?.extensions,

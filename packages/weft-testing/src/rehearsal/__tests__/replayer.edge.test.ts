@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Edge case tests for Trace Replayer
- * @module @weft/core/rehearsal/__tests__/replayer.edge
+ * @module weft-core/rehearsal/__tests__/replayer.edge
  */
 
 import { describe, expect, it, vi } from "vitest";

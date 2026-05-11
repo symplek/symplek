@@ -1,5 +1,5 @@
-import type { AgentUnit, TrackedResult } from "@weft/core";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { AgentUnit, TrackedResult } from "weft-core";
 
 export interface AgentRunOptions {
   extensions?: Record<string, unknown>;
@@ -53,7 +53,7 @@ export function useAgent<T>(defaultUnit?: AgentUnit<T>): UseAgentResult<T> {
       setError(null);
 
       try {
-        const { createContext } = await import("@weft/core");
+        const { createContext } = await import("weft-core");
         const trackedResult = await activeUnit.run(
           createContext({
             signal: controller.signal,

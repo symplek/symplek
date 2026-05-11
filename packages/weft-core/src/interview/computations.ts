@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Interview computation factories
  * @description createInterviewComputation and createConductComputation following operator pattern
- * @module @weft/core/interview/computations
+ * @module weft-core/interview/computations
  * @since 1.0.0-beta.3
  *
  * 📝 BUILD[Weft-interview]: Computation factories for interview operators

@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Confidence Calculations Barrel Export
  * @description Re-exports all calculation functions for the confidence module
- * @module @weft/core/confidence/calculations
+ * @module weft-core/confidence/calculations
  * @since 2.0.0
  *
  * 📝 BUILD[01.09]: Barrel exports for calculation functions

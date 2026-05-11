@@ -6,9 +6,9 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { AgentUnit } from "@weft/core";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
+import { AgentUnit } from "weft-core";
 import {
   AIErrorBoundary,
   AIProvider,
@@ -18,7 +18,7 @@ import {
   useSwarm,
 } from "../index";
 
-describe("@weft/react root integration", () => {
+describe("weft-react root integration", () => {
   it("provides config through AIProvider and useAIConfig", () => {
     const wrapper = ({ children }: { children: React.ReactNode }) => (
       <AIProvider

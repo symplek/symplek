@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@weft/core": resolve(__dirname, "../weft-core/src/index.ts"),
+      "weft-core": resolve(__dirname, "../weft-core/src/index.ts"),
     },
   },
   test: {

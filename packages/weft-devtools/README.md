@@ -1,4 +1,4 @@
-# @weft/devtools
+# weft-devtools
 
 Chrome DevTools panel for inspecting Weft agent traces, spans, and operator chains in your running app. Drop the extension in, open DevTools, and you can see every `AgentUnit` execution, its operator chain, the spans it produced, the values it threaded through, and any errors it caught.
 
@@ -10,13 +10,13 @@ Chrome DevTools panel for inspecting Weft agent traces, spans, and operator chai
 
 Standard browser DevTools don't understand agents. They show you network calls and console logs, but not which `AgentUnit` made the call, which operator was active when an error fired, or how a `.consensus()` voted.
 
-`@weft/devtools` exposes that view.
+`weft-devtools` exposes that view.
 
 - **Agent timeline.** Every `AgentUnit.run()` since the page loaded, in execution order.
 - **Operator chain.** For each run: what got chained (`of`, `retry`, `fallback`, `consensus`, etc.) and where time went.
 - **Span tree.** Nested operator spans with durations.
 - **Errors.** Operator-level rejections with the operator chain that led to them.
-- **Trace export.** Save a `.rehearsal` trace JSON for offline replay via `@weft/harness/replay`.
+- **Trace export.** Save a `.rehearsal` trace JSON for offline replay via `weft-harness/replay`.
 
 ---
 
@@ -36,7 +36,7 @@ Then in Chrome:
 1. `chrome://extensions`
 2. Toggle **Developer mode**.
 3. **Load unpacked** → select `packages/weft-devtools/dist`.
-4. Open DevTools on any page running `@weft/core` with observability enabled.
+4. Open DevTools on any page running `weft-core` with observability enabled.
 
 A **Weft** tab appears alongside Elements, Console, etc.
 
@@ -47,7 +47,7 @@ A **Weft** tab appears alongside Elements, Console, etc.
 The panel only shows traces your app emits. Turn observability on:
 
 ```typescript
-import { configureObservability } from "@weft/core";
+import { configureObservability } from "weft-core";
 
 configureObservability({ enabled: true });
 ```
@@ -60,7 +60,7 @@ For production you'd typically gate this behind a flag.
 
 - Manifest V3 service worker. Should work in any current Chromium-based browser.
 - Not yet on the Chrome Web Store. Side-load only.
-- The trace shape is shared with `@weft/core`; breaking changes there cascade here.
+- The trace shape is shared with `weft-core`; breaking changes there cascade here.
 
 ---
 

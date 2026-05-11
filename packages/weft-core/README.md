@@ -1,8 +1,8 @@
-# @weft/core
+# weft-core
 
 **Composable AI agents for TypeScript — free and MIT-licensed.**
 
-[![npm](https://img.shields.io/npm/v/@weft/core)](https://www.npmjs.com/package/@weft/core)
+[![npm](https://img.shields.io/npm/v/weft-core)](https://www.npmjs.com/package/weft-core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](package.json)
 
@@ -11,9 +11,9 @@
 ## Install
 
 ```bash
-npm install @weft/core
+npm install weft-core
 # or
-pnpm add @weft/core
+pnpm add weft-core
 ```
 
 ---
@@ -21,7 +21,7 @@ pnpm add @weft/core
 ## Working in 3 lines
 
 ```typescript
-import { Weft } from "@weft/core/server";
+import { Weft } from "weft-core/server";
 
 Weft.configure({ provider: "openai", apiKey: process.env.OPENAI_API_KEY });
 const result = await Weft("List three benefits of TypeScript");
@@ -30,7 +30,7 @@ console.log(result.value); // "1. Static typing catches errors early..."
 
 One import. One config. One result.
 
-> `@weft/core/server` loads provider SDKs — Node.js only. Browser-safe exports live at `@weft/core`.
+> `weft-core/server` loads provider SDKs — Node.js only. Browser-safe exports live at `weft-core`.
 
 ---
 
@@ -51,7 +51,7 @@ One import. One config. One result.
 ### Step 1 — One agent
 
 ```typescript
-import { Weft } from "@weft/core/server";
+import { Weft } from "weft-core/server";
 
 Weft.configure({ provider: "openai", apiKey: process.env.OPENAI_API_KEY });
 
@@ -62,7 +62,7 @@ console.log(result.value); // "Paris"
 ### Step 2 — Agents in parallel
 
 ```typescript
-import { AgentUnit, createContext } from "@weft/core";
+import { AgentUnit, createContext } from "weft-core";
 
 const ctx = createContext();
 
@@ -77,7 +77,7 @@ console.log(result.value); // { analysis: "analysis: low risk", recommendation: 
 ### Step 3 — Consensus vote
 
 ```typescript
-import { AgentUnit, createContext } from "@weft/core";
+import { AgentUnit, createContext } from "weft-core";
 
 const ctx = createContext();
 
@@ -96,7 +96,7 @@ console.log(voted.value.consensus); // "reached"
 ### Step 4 — Resilience
 
 ```typescript
-import { AgentUnit, createContext } from "@weft/core";
+import { AgentUnit, createContext } from "weft-core";
 
 const ctx = createContext();
 
@@ -115,16 +115,16 @@ const result = await robust.run(ctx);
 
 | Export | From | Description |
 |---|---|---|
-| `AgentUnit` | `@weft/core` | Lazy agent monad — `.from()`, `.of()`, `.map()`, `.flatMap()`, `.zipAll()`, `.race()` |
-| `createContext` | `@weft/core` | Create an `AgentContext` for `.run()` calls (zero-arg works) |
-| `WeftError` | `@weft/core` | Structured error with `.code`, `.message`, `.action` fields |
-| `Weft` | `@weft/core/server` | Zero-boilerplate facade — `Weft(task)`, `.run()`, `.stream()`, `.agent()`, `.configure()`, `.providers()` |
+| `AgentUnit` | `weft-core` | Lazy agent monad — `.from()`, `.of()`, `.map()`, `.flatMap()`, `.zipAll()`, `.race()` |
+| `createContext` | `weft-core` | Create an `AgentContext` for `.run()` calls (zero-arg works) |
+| `WeftError` | `weft-core` | Structured error with `.code`, `.message`, `.action` fields |
+| `Weft` | `weft-core/server` | Zero-boilerplate facade — `Weft(task)`, `.run()`, `.stream()`, `.agent()`, `.configure()`, `.providers()` |
 
 ---
 
 ## Need more?
 
-`@weft/core` ships the full free-tier operator suite. Upgrade to `@weft/pro` when you need:
+`weft-core` ships the full free-tier operator suite. Upgrade to `weft-pro` when you need:
 
 - **Multi-round TaCo consensus** — agents share rationale and revote until convergence (reduces error amplification by 17×)
 - **Agent antibodies** — pattern-match and reject bad outputs at runtime (XSS, hallucinated fields, schema violations)
@@ -133,7 +133,7 @@ const result = await robust.run(ctx);
 - **Teams** — named reusable agent teams with shared configuration
 - **Stigmergic coordination** — pheromone-based confidence with evaporation/decay
 
-See [@weft/pro](../weft-pro/README.md) for details.
+See [weft-pro](../weft-pro/README.md) for details.
 
 ---
 

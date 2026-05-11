@@ -1,5 +1,5 @@
 ﻿/**
- * @fileoverview Streaming utilities for @weft/core
+ * @fileoverview Streaming utilities for weft-core
  * @description Provides a unified interface for real-time AI response streaming.
  */
 

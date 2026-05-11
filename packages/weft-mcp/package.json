@@ -1,5 +1,5 @@
 {
-  "name": "@weft/mcp",
+  "name": "weft-mcp",
   "version": "0.1.0",
   "description": "MCP Fabric for Weft — trust-aware tool consumption via Model Context Protocol",
   "type": "module",
@@ -38,7 +38,7 @@
   },
   "dependencies": {},
   "peerDependencies": {
-    "@weft/core": "workspace:*"
+    "weft-core": "workspace:*"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.24.0",

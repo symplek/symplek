@@ -1,10 +1,10 @@
 /**
- * @fileoverview Public type definitions for @weft/core
+ * @fileoverview Public type definitions for weft-core
  * @description Core types exported from the MIT-licensed package
- * @module @weft/core/types
+ * @module weft-core/types
  * @since 1.0.0-beta.1
  *
- * 📝 BUILD[05.04]: Public API types for @weft/core package
+ * 📝 BUILD[05.04]: Public API types for weft-core package
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ export interface VoteInput {
  *
  * @remarks
  * This is the free-tier consensus result. For multi-round TaCo consensus,
- * see @weft/pro package.
+ * see weft-pro package.
  */
 export interface ConsensusResult {
   /** Whether consensus was reached (approved) */
@@ -174,7 +174,7 @@ export interface ConsensusResult {
  * Options for the `.consensus()` operator (single-round only).
  *
  * @remarks
- * For multi-round TaCo consensus options, see @weft/pro package.
+ * For multi-round TaCo consensus options, see weft-pro package.
  */
 export interface ConsensusOptions {
   /**
@@ -308,7 +308,7 @@ export interface RetryOptions {
  *
  * @remarks
  * This is a simplified context that doesn't require Convex.
- * For full Convex integration, use @weft/convex package.
+ * For full Convex integration, use weft-convex package.
  */
 export interface AgentContext {
   /** Request timestamp */
@@ -1007,7 +1007,7 @@ export interface CoherenceResult<T> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OBSERVABILITY TYPES (Free Tier — moved from @weft/pro)
+// OBSERVABILITY TYPES (Free Tier — moved from weft-pro)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**

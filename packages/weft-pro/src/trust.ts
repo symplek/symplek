@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Trusted Traveler Lanes
  * @description Fast-path scanning for trusted sources
- * @module @weft/pro/trust
+ * @module weft-pro/trust
  * @since 1.0.0-beta.1
  *
  * 📝 BUILD[05.05]: Trusted traveler lanes implementation
@@ -11,7 +11,7 @@
  * balancing security with performance. Full trust → skip scan entirely,
  * partial trust → quick scan only, no trust → full scan.
  *
- * Requires @weft/core as peer dependency.
+ * Requires weft-core as peer dependency.
  */
 
 import type { TrustGrant, TrustLevel } from "./types";
@@ -23,7 +23,7 @@ import type { TrustGrant, TrustLevel } from "./types";
  *
  * @example
  * ```typescript
- * import { TrustRegistry } from '@weft/pro';
+ * import { TrustRegistry } from 'weft-pro';
  *
  * const registry = new TrustRegistry();
  *

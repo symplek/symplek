@@ -1,5 +1,5 @@
 ﻿/**
- * @fileoverview Circuit Breaker for @weft/core
+ * @fileoverview Circuit Breaker for weft-core
  * @description Implements the circuit breaker pattern to handle provider failures gracefully.
  */
 

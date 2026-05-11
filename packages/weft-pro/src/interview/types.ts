@@ -1,13 +1,13 @@
 ﻿/**
  * @fileoverview Interview Types - Type definitions for human-in-the-loop Q&A
  * @description Complete type definitions for the interview operator system
- * @module @weft/core/interview/types
+ * @module weft-core/interview/types
  * @since 1.0.0-beta.3
  *
  * 📝 BUILD[Weft-interview]: Types for .interview() and .conduct() operators
  */
 
-import type { AgentUnit } from "@weft/core";
+import type { AgentUnit } from "weft-core";
 import type { z } from "zod";
 
 // =============================================================================

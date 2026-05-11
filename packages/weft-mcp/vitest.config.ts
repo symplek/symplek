@@ -1,4 +1,4 @@
-/** @module vitest.config - Test configuration for @weft/mcp */
+/** @module vitest.config - Test configuration for weft-mcp */
 
 import { defineConfig } from "vitest/config";
 

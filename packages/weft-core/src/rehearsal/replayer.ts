@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Trace Replayer for deterministic playback
  * @description Replays execution traces with divergence detection
- * @module @weft/core/rehearsal/replayer
+ * @module weft-core/rehearsal/replayer
  * @since 1.0.0
  *
  * 📝 BUILD[03.03]: Version Checker

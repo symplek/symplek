@@ -1,11 +1,11 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { AgentUnit } from "@weft/core";
 import { describe, expect, it } from "vitest";
+import { AgentUnit } from "weft-core";
 import { useAgent } from "../hooks/useAgent";
 import { useConsensus } from "../hooks/useConsensus";
 import { useSwarm } from "../hooks/useSwarm";
 
-describe("@weft/react Agent hooks", () => {
+describe("weft-react Agent hooks", () => {
   it("useAgent runs unit and stores tracked result", async () => {
     const { result } = renderHook(() => useAgent<string>());
 

@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     alias: {
-      "@weft/core": resolve(__dirname, "../weft-core/src/index.ts"),
+      "weft-core": resolve(__dirname, "../weft-core/src/index.ts"),
     },
   },
   test: {

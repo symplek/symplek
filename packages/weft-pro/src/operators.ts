@@ -1,7 +1,7 @@
 /**
- * @fileoverview Premium operator factories for @weft/pro
+ * @fileoverview Premium operator factories for weft-pro
  * @description Debate, dialectic, coherence, and solo computation factories (commercial license)
- * @module @weft/pro/operators
+ * @module weft-pro/operators
  * @since 1.0.0-beta.1
  * @blast_radius MEDIUM
  * @status active
@@ -16,8 +16,8 @@ import type {
   TrackedResult,
   Vote,
   VoteInput,
-} from "@weft/core";
-import { TRACKED_MARKER } from "@weft/core";
+} from "weft-core";
+import { TRACKED_MARKER } from "weft-core";
 import { calculateCompositeCoherence } from "./coherence/calculations/compositeCoherence";
 import { resolveThreshold } from "./coherence/config";
 import type { EnsembleCoherence, HasVotes } from "./coherence/types";
@@ -62,7 +62,7 @@ const DEBATE_VOTING_PHASE_ROUND = 0;
 type Voter<T> = (
   proposal: T,
 ) =>
-  | import("@weft/core").AgentUnit<Vote | VoteInput>
+  | import("weft-core").AgentUnit<Vote | VoteInput>
   | Promise<Vote | VoteInput>
   | Vote
   | VoteInput;
@@ -89,7 +89,7 @@ function createConsensusComputation<T>(
 
       try {
         let voteResult:
-          | import("@weft/core").AgentUnit<Vote | VoteInput>
+          | import("weft-core").AgentUnit<Vote | VoteInput>
           | Promise<Vote | VoteInput>
           | Vote
           | VoteInput;
@@ -120,7 +120,7 @@ function createConsensusComputation<T>(
           voteResult !== null &&
           "run" in voteResult
         ) {
-          const unit = voteResult as import("@weft/core").AgentUnit<
+          const unit = voteResult as import("weft-core").AgentUnit<
             Vote | VoteInput
           >;
           const result = await unit.run(ctx, { trustMode: "legacy" });
@@ -238,7 +238,7 @@ export function createConvergeComputation<T>(
 
         let contribution: ConvergeContribution<T>;
         if (result && typeof (result as { run?: unknown }).run === "function") {
-          const unit = result as import("@weft/core").AgentUnit<
+          const unit = result as import("weft-core").AgentUnit<
             ConvergeContribution<T>
           >;
           contribution = await unit.run(ctx, { trustMode: "legacy" });
@@ -404,7 +404,7 @@ export function createDebateComputation<T>(
               result &&
               typeof (result as { run?: unknown }).run === "function"
             ) {
-              const unit = result as import("@weft/core").AgentUnit<
+              const unit = result as import("weft-core").AgentUnit<
                 ConvergeContribution<T>
               >;
               return unit.run(ctx, { trustMode: "legacy" });

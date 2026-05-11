@@ -1,6 +1,6 @@
 /**
  * @fileoverview MCP Trust Registry — manages server connections, health, and attestation
- * @module @weft/mcp/client
+ * @module weft-mcp/client
  * @since 0.1.0
  *
  * 📝 BUILD[F-068/04.07]: Full trust registry with health tracking and connection pooling

@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Unit tests for Dependency Scheduler
- * @module @weft/core/rehearsal/__tests__/scheduler
+ * @module weft-core/rehearsal/__tests__/scheduler
  */
 
 import { describe, expect, it } from "vitest";

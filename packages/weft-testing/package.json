@@ -1,5 +1,5 @@
 {
-  "name": "@weft/testing",
+  "name": "weft-testing",
   "version": "0.1.0",
   "description": "Testing utilities for Weft agent compositions",
   "license": "MIT",
@@ -22,7 +22,7 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "@weft/core": "workspace:*"
+    "weft-core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

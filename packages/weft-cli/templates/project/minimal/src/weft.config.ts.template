@@ -11,7 +11,7 @@
  * the corresponding SDK (`pnpm add @anthropic-ai/sdk` etc.) and update
  * this file.
  */
-import { Weft } from "@weft/core/server";
+import { Weft } from "weft-core/server";
 
 Weft.configure({
   provider: "openai",

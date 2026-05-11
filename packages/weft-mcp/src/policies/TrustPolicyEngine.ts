@@ -1,6 +1,6 @@
 /**
  * @fileoverview Trust Policy Engine — chains and evaluates MCP trust policies
- * @module @weft/mcp/policies
+ * @module weft-mcp/policies
  * @since 0.1.0
  *
  * Verdict precedence: deny > quarantine > degrade > allow.

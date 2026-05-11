@@ -12,7 +12,7 @@ export interface MutationRefs {
 }
 
 /**
- * Experimental helpers — not part of the supported @weft/convex contract.
+ * Experimental helpers — not part of the supported weft-convex contract.
  */
 export interface ConvexAIExperimental {
   /**

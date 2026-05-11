@@ -1,7 +1,7 @@
 ﻿/**
- * @fileoverview Context creation utilities for @weft/core
+ * @fileoverview Context creation utilities for weft-core
  * @description Standalone context creation (no Convex dependency)
- * @module @weft/core/context
+ * @module weft-core/context
  * @since 1.0.0-beta.1
  *
  * 📝 BUILD[05.04]: Context utilities for standalone package

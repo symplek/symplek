@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Stigmergic Confidence with Decay
  * @description Indirect coordination with temporal confidence decay
- * @module @weft/pro/stigmergy
+ * @module weft-pro/stigmergy
  * @since 1.0.0-beta.1
  *
  * 📝 BUILD[05.05]: Stigmergic confidence with decay implementation
@@ -12,7 +12,7 @@
  * scoring and temporal decay, enabling agents to coordinate without direct
  * communication while respecting information freshness.
  *
- * Requires @weft/core as peer dependency.
+ * Requires weft-core as peer dependency.
  */
 
 import type {
@@ -28,7 +28,7 @@ import type {
  *
  * @example
  * ```typescript
- * import { createConfidentPheromone } from '@weft/pro';
+ * import { createConfidentPheromone } from 'weft-pro';
  *
  * const pheromone = createConfidentPheromone('analysis-result', {
  *   confidence: 0.95,

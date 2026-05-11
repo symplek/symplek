@@ -171,7 +171,7 @@ export class ReplayAdapter implements SdkSession {
 
 // ─── Re-exports ───────────────────────────────────────────────────────────────
 // assertDeterministic and DeterminismViolationError live in their own module
-// but are surfaced here so "@weft/harness/replay" is the single import path.
+// but are surfaced here so "weft-harness/replay" is the single import path.
 export {
   assertDeterministic,
   DeterminismViolationError,

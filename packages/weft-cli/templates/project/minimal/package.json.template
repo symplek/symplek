@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@weft/core": "^1.0.0-beta.1",
+    "weft-core": "^1.0.0-beta.1",
     "openai": "^4.104.0"
   },
   "devDependencies": {

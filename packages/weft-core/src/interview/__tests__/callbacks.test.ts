@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Callback Tests
  * @description Tests for callback behavior and real-time updates during interview
- * @module @weft/core/interview/__tests__/callbacks.test
+ * @module weft-core/interview/__tests__/callbacks.test
  * @since 1.0.0-beta.3
  *
  * 📝 BUILD[Weft-interview-operator]: Story 03-05 - Callback Tests

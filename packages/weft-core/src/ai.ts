@@ -1,5 +1,5 @@
 /**
- * @fileoverview Core ai() function for @weft/core
+ * @fileoverview Core ai() function for weft-core
  * @description The primary entry point for AI generation in Weft.
  */
 

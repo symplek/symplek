@@ -1,11 +1,11 @@
-# @weft/react
+# weft-react
 
 React bindings for Weft.
 
 > **Support tier:** experimental (`0.1.0`)
 >
 > The root package surface is intentionally small. Only symbols exported from
-> `@weft/react` itself are part of the public contract.
+> `weft-react` itself are part of the public contract.
 
 ## Root Exports
 
@@ -33,21 +33,21 @@ The following source files exist but are **not** public root exports:
 
 | Hook | Status |
 |---|---|
-| `useAI` | Source-only. Do not import from `@weft/react`. |
-| `useAIQuery` | Source-only. Do not import from `@weft/react`. |
-| `useAIStream` | Source-only. Do not import from `@weft/react`. |
+| `useAI` | Source-only. Do not import from `weft-react`. |
+| `useAIQuery` | Source-only. Do not import from `weft-react`. |
+| `useAIStream` | Source-only. Do not import from `weft-react`. |
 
-If you need the supported surface, import only from `@weft/react`.
+If you need the supported surface, import only from `weft-react`.
 
 ## Example
 
 ```tsx
-import { AgentUnit } from "@weft/core";
+import { AgentUnit } from "weft-core";
 import {
   AIErrorBoundary,
   AIProvider,
   useAgent,
-} from "@weft/react";
+} from "weft-react";
 
 function Greeting() {
   const { run, result, isRunning } = useAgent(AgentUnit.of("hello"));
@@ -75,7 +75,7 @@ export function App() {
 
 ## Peer Dependencies
 
-- `@weft/core`
+- `weft-core`
 - `react`
 - `react-dom`
 

@@ -1,12 +1,12 @@
 /**
  * @module golden-path.test
- * @description Golden-path test suite for @weft/pro public API.
+ * @description Golden-path test suite for weft-pro public API.
  *   Exercises each published primitive on the happy path with no external
  *   provider dependencies — all AI calls are mocked.
  */
 
-import { AgentUnit, createContext } from "@weft/core";
 import { describe, expect, it, vi } from "vitest";
+import { AgentUnit, createContext } from "weft-core";
 import {
   AntibodyRegistry,
   ConfidentStigmergyLayer,
@@ -177,7 +177,7 @@ describe("AgentUnit.dialectic (pro golden-path)", () => {
       }),
     );
 
-    // AgentUnit.dialectic is added via prototype augmentation inside @weft/core.
+    // AgentUnit.dialectic is added via prototype augmentation inside weft-core.
     // The module declaration (`declare module "../AgentUnit"`) uses a relative path
     // that TypeScript cannot resolve across the package boundary from dist/index.d.ts,
     // so we cast through unknown to satisfy the type checker. Runtime behaviour is correct.
@@ -246,5 +246,5 @@ describe("AgentUnit.dialectic (pro golden-path)", () => {
   });
 });
 
-// ─── 4. observability traces — MOVED TO @weft/core ───────────────────────────
+// ─── 4. observability traces — MOVED TO weft-core ───────────────────────────
 // See packages/weft-core/src/__tests__/observability.test.ts for coverage.

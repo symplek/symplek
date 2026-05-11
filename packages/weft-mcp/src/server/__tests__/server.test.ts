@@ -1,13 +1,13 @@
 /**
  * @module server.test - Smoke tests for Weft MCP server tool handlers
  * @description Verifies that weft_debate, weft_consensus, and weft_tracked
- * tool handlers return correct output shapes with mocked @weft/core.
+ * tool handlers return correct output shapes with mocked weft-core.
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// ─── Mock @weft/core ──────────────────────────────────────────────────────────
+// ─── Mock weft-core ──────────────────────────────────────────────────────────
 // Prevents real LLM calls while verifying handler output shape and wiring.
 // vi.mock is hoisted to top of file — use vi.hoisted() for variables that the
 // factory closure references, so they're initialized before the mock runs.
@@ -27,7 +27,7 @@ const { mockRun, mockDebate, mockConsensus, mockTracked, mockOf } = vi.hoisted(
   },
 );
 
-vi.mock("@weft/core", () => ({
+vi.mock("weft-core", () => ({
   AgentUnit: { of: mockOf },
   createContext: vi.fn(() => ({ timestamp: 1234567890, extensions: {} })),
 }));

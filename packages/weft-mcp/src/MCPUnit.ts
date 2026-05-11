@@ -1,6 +1,6 @@
 /**
  * @fileoverview MCPUnit — factory for creating MCP-aware AgentUnit computations
- * @module @weft/mcp
+ * @module weft-mcp
  * @since 0.1.0
  *
  * 📝 BUILD[F-068/04.05]: MCPUnit factory wrapping transport + evidence + policies

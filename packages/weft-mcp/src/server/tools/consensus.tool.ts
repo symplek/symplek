@@ -2,12 +2,12 @@
  * @module ConsensusTool - MCP tool definition for the Weft consensus operator
  * @description Wires weft_consensus MCP calls to AgentUnit.consensus() operator.
  * Simulated voter agents each return an approve vote; quorum and veto rules are
- * enforced by @weft/core's consensus computation.
+ * enforced by weft-core's consensus computation.
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */
 
-import type { ConsensusOptions, Vote, VoteInput } from "@weft/core";
-import { AgentUnit, createContext } from "@weft/core";
+import type { ConsensusOptions, Vote, VoteInput } from "weft-core";
+import { AgentUnit, createContext } from "weft-core";
 
 // ─── Tool Definition ──────────────────────────────────────────────────────────
 

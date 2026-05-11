@@ -1,12 +1,12 @@
 /**
- * @module HarnessTypes - Core type contracts for @weft/harness
+ * @module HarnessTypes - Core type contracts for weft-harness
  * @description Public interface definitions for HarnessConfig, PlanArtifact, VerifiedPlan,
  * and Harness. Wave 1 parallel implementations (adapters, permission bridge, session operator)
  * all implement against these types.
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */
 
-import type { AgentUnit, TrackedResult } from "@weft/core";
+import type { AgentUnit, TrackedResult } from "weft-core";
 
 // ─── Adapter ─────────────────────────────────────────────────────────────────
 

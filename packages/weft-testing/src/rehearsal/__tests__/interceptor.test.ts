@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Unit tests for LLM Interceptors
- * @module @weft/core/rehearsal/__tests__/interceptor
+ * @module weft-core/rehearsal/__tests__/interceptor
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Unit tests for Test Utilities
- * @module @weft/core/rehearsal/__tests__/testing
+ * @module weft-core/rehearsal/__tests__/testing
  */
 
 import { describe, expect, it } from "vitest";

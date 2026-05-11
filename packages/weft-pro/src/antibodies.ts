@@ -1,7 +1,7 @@
 /**
  * @fileoverview Agent Antibodies
  * @description Pattern-based detection and blocking of known bad outputs
- * @module @weft/pro/antibodies
+ * @module weft-pro/antibodies
  * @since 1.0.0-beta.1
  *
  * 📝 BUILD[05.05]: Agent antibodies implementation
@@ -12,7 +12,7 @@
  * Like biological antibodies, they detect, block, learn, and remember
  * patterns across executions.
  *
- * Requires @weft/core as peer dependency.
+ * Requires weft-core as peer dependency.
  */
 
 import type {
@@ -28,7 +28,7 @@ import type {
  *
  * @example
  * ```typescript
- * import { AntibodyRegistry } from '@weft/pro';
+ * import { AntibodyRegistry } from 'weft-pro';
  *
  * const registry = new AntibodyRegistry();
  *

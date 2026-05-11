@@ -1,5 +1,5 @@
 /**
- * Package Contract Smoke Test — @weft/convex
+ * Package Contract Smoke Test — weft-convex
  *
  * Proves that the package entrypoint exports what the contract claims,
  * and that the API surface matches the documented supported path.
@@ -17,7 +17,7 @@ import { withAI } from "../withAI";
 
 const stubCtx = { runMutation: async () => {} } as any;
 
-describe("@weft/convex — Package Contract Smoke", () => {
+describe("weft-convex — Package Contract Smoke", () => {
   describe("Entrypoint version export", () => {
     it("exports version string from entrypoint", async () => {
       const entrypoint = await import("../index");

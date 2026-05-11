@@ -1,5 +1,5 @@
 ﻿/**
- * @fileoverview Provider Interface for @weft/core
+ * @fileoverview Provider Interface for weft-core
  * @description Defines the unified interface and types for AI providers.
  */
 

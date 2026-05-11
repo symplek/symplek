@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Solo Decision Algorithm
  * @description Core decision logic for autonomous agent action
- * @module @weft/core/solo/decision
+ * @module weft-core/solo/decision
  * @since 2.2.0
  *
  * 📝 BUILD[STORY-01.02]: Decision algorithm implementation

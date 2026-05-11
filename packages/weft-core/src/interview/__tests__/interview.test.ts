@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Interview Configuration Tests
  * @description Tests for .interview() operator configuration and lazy evaluation
- * @module @weft/core/interview/__tests__/interview.test
+ * @module weft-core/interview/__tests__/interview.test
  * @since 1.0.0-beta.3
  *
  * 📝 BUILD[Weft-interview-operator]: Story 03-01 - Configuration Tests

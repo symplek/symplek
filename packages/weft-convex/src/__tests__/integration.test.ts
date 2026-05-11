@@ -1,12 +1,12 @@
 /**
- * @fileoverview Integration tests for @weft/convex
- * @description Tests Convex wrapper integration with @weft/core
+ * @fileoverview Integration tests for weft-convex
+ * @description Tests Convex wrapper integration with weft-core
  */
 
-import type { Provider } from "@weft/core/server";
-import { ai, providerRegistry } from "@weft/core/server";
 import type { GenericActionCtx } from "convex/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Provider } from "weft-core/server";
+import { ai, providerRegistry } from "weft-core/server";
 import { MiddlewareStackImpl } from "../middleware";
 import { streamToMutation } from "../streaming";
 import { withAI } from "../withAI";
@@ -75,7 +75,7 @@ const createMockCtx = (): GenericActionCtx<any> => {
   } as any;
 };
 
-describe("@weft/convex Integration", () => {
+describe("weft-convex Integration", () => {
   let mockProvider: MockProvider;
   let mockCtx: GenericActionCtx<any>;
 

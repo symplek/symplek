@@ -2,7 +2,7 @@
  * @fileoverview Canonical ↔ Mirror Contract Tests
  * @description Asserts behavioral and structural equivalence between the
  *   canonical WEFT source at `convex/lib/agent_framework/` and
- *   the @weft/core distribution mirror at `packages/weft-core/src/`.
+ *   the weft-core distribution mirror at `packages/weft-core/src/`.
  *
  * SCOPE — four shared concepts per WEFT-ARCHITECTURE.md §"Shared concepts":
  *   1. AgentUnit     canonical: algebra/core/AgentUnit.ts  | mirror: AgentUnit.ts

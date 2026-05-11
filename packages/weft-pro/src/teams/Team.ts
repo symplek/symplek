@@ -1,13 +1,13 @@
 ﻿/**
  * @fileoverview Team - Reusable agent team definitions
  * @description Define teams once, invoke from anywhere with consistent coordination
- * @module @weft/core/teams/Team
+ * @module weft-core/teams/Team
  * @since 1.0.0-beta.1
  *
  * 📝 BUILD[F-048-01.08]: Team class implementation
  */
 
-import { AgentUnit } from "@weft/core";
+import { AgentUnit } from "weft-core";
 import {
   createConvergeComputation,
   createDebateComputation,

@@ -9,8 +9,8 @@
  */
 
 import { appendFile, readFile, writeFile } from "node:fs/promises";
-import type { TrackedResult } from "@weft/core";
-import { AgentUnit, TRACKED_MARKER } from "@weft/core";
+import type { TrackedResult } from "weft-core";
+import { AgentUnit, TRACKED_MARKER } from "weft-core";
 import { ContractViolationError, HarnessDeviationError } from "../errors";
 import { buildPermissionBridge } from "../permission-bridge";
 import type { ExecuteOptions, VerifiedPlan } from "../types";

@@ -1,6 +1,6 @@
 /**
  * @fileoverview MCP attestation module
- * @module @weft/mcp/attestation
+ * @module weft-mcp/attestation
  * @since 0.1.0
  *
  * STORY-04.06 will implement:

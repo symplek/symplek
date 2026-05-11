@@ -6,8 +6,8 @@
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */
 
-import { AgentUnit } from "@weft/core";
 import { describe, expect, it } from "vitest";
+import { AgentUnit } from "weft-core";
 import { createHarness } from "../adapter/claude-agent-sdk";
 
 describe("openai-agents adapter", () => {
@@ -40,7 +40,7 @@ describe("openai-agents adapter", () => {
   });
 
   it("harness.plan() AgentUnit resolves to a TrackedResult with a plan artifact", async () => {
-    const { createContext } = await import("@weft/core");
+    const { createContext } = await import("weft-core");
     const harness = createHarness({
       adapter: "openai-agents",
       tools: ["Read", "Grep"],

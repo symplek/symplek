@@ -1,4 +1,4 @@
-# @weft/testing
+# weft-testing
 
 Testing utilities for Weft agent compositions. Mocks, fixtures, deterministic providers, replay harness, chaos injection — everything you need to write fast, repeatable tests of `AgentUnit<T>` chains without hitting real LLM APIs.
 
@@ -9,7 +9,7 @@ Testing utilities for Weft agent compositions. Mocks, fixtures, deterministic pr
 ## Install
 
 ```bash
-pnpm add -D @weft/testing
+pnpm add -D weft-testing
 ```
 
 ---
@@ -22,8 +22,8 @@ Replace OpenAI/Anthropic/Google in tests with a deterministic provider that retu
 
 ```typescript
 import { describe, it, expect } from "vitest";
-import { AgentUnit, createContext, configureProvider } from "@weft/core";
-import { createMockProvider } from "@weft/testing";
+import { AgentUnit, createContext, configureProvider } from "weft-core";
+import { createMockProvider } from "weft-testing";
 
 it("summariser handles empty input", async () => {
   configureProvider(createMockProvider({ respond: () => "empty input" }));
@@ -41,7 +41,7 @@ it("summariser handles empty input", async () => {
 Capture a real run as a trace. Replay it deterministically in CI without any API calls.
 
 ```typescript
-import { TraceRecorder, TraceReplayer } from "@weft/testing";
+import { TraceRecorder, TraceReplayer } from "weft-testing";
 
 // Recording phase (one time, against real providers)
 const recorder = new TraceRecorder();
@@ -59,7 +59,7 @@ expect(replayed.value.divergences).toHaveLength(0);
 Inject failures, timeouts, slow responses, partial outputs into a recorded trace to test resilience operators.
 
 ```typescript
-import { injectChaos } from "@weft/testing";
+import { injectChaos } from "weft-testing";
 
 const flaky = injectChaos(trace, { failRate: 0.3, timeoutMs: 5000 });
 const result = await unit.retry(3).timeout(10_000).replay(flaky).run(ctx);
@@ -70,7 +70,7 @@ const result = await unit.retry(3).timeout(10_000).replay(flaky).run(ctx);
 Pre-built fixtures for the common shapes — votes, consensus results, debate rounds, dialectic outputs — so tests don't drown in boilerplate.
 
 ```typescript
-import { createVote, createConsensusInput } from "@weft/testing";
+import { createVote, createConsensusInput } from "weft-testing";
 
 const votes = [
   createVote({ decision: "accept", confidence: 0.9 }),

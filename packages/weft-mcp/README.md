@@ -1,4 +1,4 @@
-# @weft/mcp
+# weft-mcp
 
 MCP Fabric for Weft — trust-aware tool consumption via Model Context Protocol.
 
@@ -10,7 +10,7 @@ Cursor, and any MCP-compatible LLM runtime can call them directly.
 ## Installation
 
 ```bash
-pnpm add @weft/mcp
+pnpm add weft-mcp
 ```
 
 ---
@@ -24,7 +24,7 @@ Add to `.claude/settings.json`:
   "mcpServers": {
     "weft": {
       "command": "node",
-      "args": ["./node_modules/@weft/mcp/dist/server/index.js"]
+      "args": ["./node_modules/weft-mcp/dist/server/index.js"]
     }
   }
 }
@@ -37,7 +37,7 @@ Or with `tsx` (for TypeScript source):
   "mcpServers": {
     "weft": {
       "command": "npx",
-      "args": ["tsx", "./node_modules/@weft/mcp/src/server/index.ts"]
+      "args": ["tsx", "./node_modules/weft-mcp/src/server/index.ts"]
     }
   }
 }
@@ -54,7 +54,7 @@ Add to `.cursor/mcp.json`:
   "mcpServers": {
     "weft": {
       "command": "node",
-      "args": ["./node_modules/@weft/mcp/dist/server/index.js"],
+      "args": ["./node_modules/weft-mcp/dist/server/index.js"],
       "env": {}
     }
   }

@@ -1,7 +1,7 @@
 /**
  * @fileoverview Pro package type definitions
  * @description Commercial license - Advanced feature types
- * @module @weft/pro/types
+ * @module weft-pro/types
  * @since 1.0.0-beta.1
  *
  * 📝 BUILD[05.05]: Pro package type definitions
@@ -246,16 +246,16 @@ export interface TrustGrant {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OBSERVABILITY TYPES — MOVED TO @weft/core (Phase 0 of opencore release)
+// OBSERVABILITY TYPES — MOVED TO weft-core (Phase 0 of opencore release)
 // ─────────────────────────────────────────────────────────────────────────────
 // ObservabilityVerbosity, TraceEntry, TraceCollector, Span, and
-// ObservabilityOptions are now defined in and exported from @weft/core.
+// ObservabilityOptions are now defined in and exported from weft-core.
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CONVERGE TYPES (needed by Debate, Teams — moved to @weft/pro in Wave 3)
+// CONVERGE TYPES (needed by Debate, Teams — moved to weft-pro in Wave 3)
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { Vote } from "@weft/core";
+import type { Vote } from "weft-core";
 export type { Vote };
 
 import type {
@@ -292,7 +292,7 @@ export type ConvergentAgent<T> = (
   current: T,
   round: number,
 ) =>
-  | import("@weft/core").AgentUnit<ConvergeContribution<T>>
+  | import("weft-core").AgentUnit<ConvergeContribution<T>>
   | Promise<ConvergeContribution<T>>
   | ConvergeContribution<T>;
 

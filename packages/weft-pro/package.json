@@ -1,5 +1,5 @@
 {
-  "name": "@weft/pro",
+  "name": "weft-pro",
   "version": "1.0.0-beta.1",
   "description": "Advanced multi-agent coordination for Weft — TaCo consensus, teams, solo gate, rehearsal",
   "type": "module",
@@ -50,7 +50,7 @@
     "test:contract": "vitest run src/__tests__/contractSmoke.test.ts"
   },
   "peerDependencies": {
-    "@weft/core": "workspace:*"
+    "weft-core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

@@ -1,6 +1,6 @@
 /**
  * @module golden-path.test
- * @description Golden-path test suite for @weft/core public API.
+ * @description Golden-path test suite for weft-core public API.
  *   Exercises each published primitive on the happy path — proves the package
  *   works end-to-end as shipped with zero external providers required.
  */
@@ -159,8 +159,8 @@ describe("WeftError", () => {
     const err = new WeftError({
       code: "SETUP_ERROR",
       message:
-        'AgentUnit operators not loaded. Import from "@weft/core", not internal paths.',
-      action: 'Change import to: import { AgentUnit } from "@weft/core";',
+        'AgentUnit operators not loaded. Import from "weft-core", not internal paths.',
+      action: 'Change import to: import { AgentUnit } from "weft-core";',
     });
     expect(err.code).toBe("SETUP_ERROR");
     expect(err.message).toContain("AgentUnit operators not loaded");

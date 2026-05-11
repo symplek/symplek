@@ -1,7 +1,7 @@
 ﻿/**
- * @fileoverview Team types for @weft/core
+ * @fileoverview Team types for weft-core
  * @description Type definitions for Team abstraction and TeamRegistry
- * @module @weft/core/teams/types
+ * @module weft-core/teams/types
  * @since 1.0.0-beta.2
  *
  * 📝 BUILD[F-048-01.07]: Team types for coordination teams

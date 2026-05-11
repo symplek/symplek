@@ -1,7 +1,7 @@
 /**
  * @fileoverview Entropy-Based Confidence Calculation
  * @description Tier 2a - Statistical confidence from vote distribution entropy
- * @module @weft/core/confidence/calculations/entropyConfidence
+ * @module weft-core/confidence/calculations/entropyConfidence
  * @since 2.0.0
  *
  * 📝 BUILD[01.05]: Entropy confidence from information theory research
@@ -24,7 +24,7 @@
  * - Empty votes: returns 0.0 (no data)
  */
 
-import type { Vote } from "@weft/core";
+import type { Vote } from "weft-core";
 import type { ConfidenceSignal } from "../types";
 
 /**

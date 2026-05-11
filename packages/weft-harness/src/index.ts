@@ -1,5 +1,5 @@
 /**
- * @module WeftHarness - Public API barrel for @weft/harness
+ * @module WeftHarness - Public API barrel for weft-harness
  * @description Exports all type contracts and error classes. The createHarness factory
  * implementation is provided by adapter modules (W1-B).
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc

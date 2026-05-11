@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Tests for zero-trust default implementation
  * @description Validates TrackedResult return by default and legacy mode
- * @module @weft/core/__tests__/zero-trust
+ * @module weft-core/__tests__/zero-trust
  * @since 2.0.0
  *
  * 📝 BUILD[01.05]: Zero-trust default implementation tests

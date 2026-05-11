@@ -1,5 +1,5 @@
 /**
- * Package Contract Smoke Test — @weft/core/server
+ * Package Contract Smoke Test — weft-core/server
  *
  * Proves the server-only subpath exports:
  * 1. Runtime AI utilities (ai, stream, providerRegistry)
@@ -25,7 +25,7 @@ import {
   WeftBuilder,
 } from "../server";
 
-describe("@weft/core/server — Package Contract Smoke", () => {
+describe("weft-core/server — Package Contract Smoke", () => {
   beforeEach(() => {
     aiMock.mockReset();
   });

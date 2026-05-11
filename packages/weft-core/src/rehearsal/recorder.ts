@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Trace Recorder for capturing execution traces
  * @description Records events with vector clocks, hashes, and metadata
- * @module @weft/core/rehearsal/recorder
+ * @module weft-core/rehearsal/recorder
  * @since 1.0.0
  *
  * 📝 BUILD[02.03]: Trace Recorder implementation

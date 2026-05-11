@@ -1,5 +1,5 @@
 /**
- * @weft/react
+ * weft-react
  * React hooks and components for Weft
  *
  * NOTE: useAI, useAIQuery, useAIStream are excluded from the browser bundle —

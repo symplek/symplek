@@ -1,4 +1,4 @@
-# @weft/cli
+# weft-cli
 
 Weft CLI - AI Agent Development Toolkit
 
@@ -6,10 +6,10 @@ Weft CLI - AI Agent Development Toolkit
 
 ```bash
 # Global install
-npm install -g @weft/cli
+npm install -g weft-cli
 
 # Or use npx
-npx @weft/cli --help
+npx weft-cli --help
 ```
 
 ## Usage

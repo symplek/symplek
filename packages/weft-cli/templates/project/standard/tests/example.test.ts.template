@@ -1,4 +1,4 @@
-import { AgentUnit, createContext, isTracked } from "@weft/core";
+import { AgentUnit, createContext, isTracked } from "weft-core";
 import { describe, expect, it } from "vitest";
 import { resilient, withProvenance } from "../src/tools/index.js";
 
@@ -6,7 +6,7 @@ import { resilient, withProvenance } from "../src/tools/index.js";
  * Smoke tests for {{name}}'s tool helpers.
  *
  * These run without an API key — they exercise the operator algebra only,
- * not real LLM calls. Add integration tests with `vi.mock("@weft/core/server")`
+ * not real LLM calls. Add integration tests with `vi.mock("weft-core/server")`
  * once you have agents that hit a provider.
  */
 

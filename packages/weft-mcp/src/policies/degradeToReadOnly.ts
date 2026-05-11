@@ -1,6 +1,6 @@
 /**
  * @fileoverview Policy: Untrusted servers degrade to read-only access
- * @module @weft/mcp/policies
+ * @module weft-mcp/policies
  * @since 0.1.0
  */
 

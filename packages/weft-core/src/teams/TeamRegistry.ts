@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview TeamRegistry - Global registry for named teams
  * @description Register teams once, invoke by name from anywhere
- * @module @weft/core/teams/TeamRegistry
+ * @module weft-core/teams/TeamRegistry
  * @since 1.0.0-beta.1
  *
  * 📝 BUILD[F-048-01.09]: TeamRegistry implementation
@@ -25,7 +25,7 @@ import type { TeamResult } from "./types";
  *
  * @example Basic Usage
  * ```typescript
- * import { teams, Team } from '@weft/core';
+ * import { teams, Team } from 'weft-core';
  *
  * // Register teams at app startup
  * const qaTeam = Team.create({ name: 'qa', mode: 'debate', agents: [...] });
@@ -185,7 +185,7 @@ export class TeamRegistry {
  *
  * @example
  * ```typescript
- * import { teams, Team } from '@weft/core';
+ * import { teams, Team } from 'weft-core';
  *
  * // Register
  * teams.register(Team.create({ name: 'qa', ... }));

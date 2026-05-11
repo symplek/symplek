@@ -1,5 +1,5 @@
 /**
- * @module facade - Server-side callable namespace for @weft/core
+ * @module facade - Server-side callable namespace for weft-core
  * @description Real AI execution facade — SERVER-ONLY (Node.js / Convex Actions).
  *   Exports `Weft` as a callable namespace with `.run()`, `.stream()`, `.agent()`,
  *   `.configure()`, and `.providers()` methods, while preserving the direct

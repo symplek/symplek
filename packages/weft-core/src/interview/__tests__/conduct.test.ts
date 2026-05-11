@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Conduct Execution Tests
  * @description Tests for .conduct() operator execution and interview loop behavior
- * @module @weft/core/interview/__tests__/conduct.test
+ * @module weft-core/interview/__tests__/conduct.test
  * @since 1.0.0-beta.3
  *
  * 📝 BUILD[Weft-interview-operator]: Story 03-02 - Execution Tests

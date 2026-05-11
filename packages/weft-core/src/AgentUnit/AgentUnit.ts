@@ -152,7 +152,7 @@ export class AgentUnit<T> {
    *
    * @example
    * ```typescript
-   * import { AgentUnit, createContext } from "@weft/core";
+   * import { AgentUnit, createContext } from "weft-core";
    *
    * const ctx = createContext();
    * const unit = AgentUnit.fromPromise(fetch("https://api.example.com/data").then(r => r.text()));
@@ -226,7 +226,7 @@ export class AgentUnit<T> {
    *
    * @example
    * ```typescript
-   * import { AgentUnit, createContext } from "@weft/core";
+   * import { AgentUnit, createContext } from "weft-core";
    *
    * const ctx = createContext();
    * const unit = AgentUnit.fail<string>(new Error("Not available"))
@@ -310,7 +310,7 @@ export class AgentUnit<T> {
    *
    * @example
    * ```typescript
-   * import { AgentUnit, createContext } from "@weft/core";
+   * import { AgentUnit, createContext } from "weft-core";
    *
    * const ctx = createContext();
    * const result = await AgentUnit.of("input")
@@ -332,7 +332,7 @@ export class AgentUnit<T> {
    *
    * @example
    * ```typescript
-   * import { AgentUnit, createContext } from "@weft/core";
+   * import { AgentUnit, createContext } from "weft-core";
    *
    * const ctx = createContext();
    * const result = await AgentUnit.of("hello")
@@ -404,7 +404,7 @@ export class AgentUnit<T> {
    *
    * @example
    * ```typescript
-   * import { AgentUnit, createContext } from "@weft/core";
+   * import { AgentUnit, createContext } from "weft-core";
    *
    * const ctx = createContext();
    * const result = await AgentUnit.race([
@@ -482,8 +482,8 @@ export class AgentUnit<T> {
       throw new WeftError({
         code: "SETUP_ERROR",
         message:
-          'AgentUnit operators not loaded. Import from "@weft/core", not internal paths.',
-        action: 'Change import to: import { AgentUnit } from "@weft/core";',
+          'AgentUnit operators not loaded. Import from "weft-core", not internal paths.',
+        action: 'Change import to: import { AgentUnit } from "weft-core";',
       });
     }
     const trustMode: TrustMode = options?.trustMode ?? "zero-trust";
@@ -513,7 +513,7 @@ export class AgentUnit<T> {
    *
    * @example
    * ```typescript
-   * import { AgentUnit } from "@weft/core";
+   * import { AgentUnit } from "weft-core";
    *
    * const unit = AgentUnit.of("hello").map((s) => s.toUpperCase()).retry(2);
    * const meta = unit.getMetadata();

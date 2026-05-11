@@ -1,5 +1,5 @@
-import { ai, type StreamOptions } from "@weft/core/server";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ai, type StreamOptions } from "weft-core/server";
 
 /**
  * Options for the useAIStream hook.

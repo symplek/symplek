@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Edge case tests for Dependency Scheduler
- * @module @weft/core/rehearsal/__tests__/scheduler.edge
+ * @module weft-core/rehearsal/__tests__/scheduler.edge
  */
 
 import { describe, expect, it } from "vitest";

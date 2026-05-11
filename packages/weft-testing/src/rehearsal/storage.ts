@@ -1,7 +1,7 @@
 /**
  * @fileoverview File storage for trace persistence
  * @description Save and load execution traces with compression support
- * @module @weft/core/rehearsal/storage
+ * @module weft-core/rehearsal/storage
  * @since 1.0.0
  *
  * 📝 BUILD[03.01]: File Storage implementation

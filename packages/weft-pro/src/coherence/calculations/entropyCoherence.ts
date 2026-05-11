@@ -1,7 +1,7 @@
 /**
  * @fileoverview Entropy-Based Coherence Calculation
  * @description Measures coherence from decision distribution entropy
- * @module @weft/core/coherence/calculations/entropyCoherence
+ * @module weft-core/coherence/calculations/entropyCoherence
  * @since 2.1.0
  *
  * 📝 BUILD[STORY-01.04]: Entropy coherence implementation
@@ -18,7 +18,7 @@
  * - H_max = log₂(n) where n = number of unique decisions
  */
 
-import type { Vote } from "@weft/core";
+import type { Vote } from "weft-core";
 import { DEFAULT_COHERENCE_WEIGHTS } from "../config";
 import type { CoherenceSignal } from "../types";
 

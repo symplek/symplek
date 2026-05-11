@@ -27,5 +27,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **OC-0**: Import path cleanup for published package layout and consumer ergonomics.
 
-[Unreleased]: https://github.com/aWeft13/Weft/compare/@weft/core@1.0.0-beta.1...HEAD
-[1.0.0-beta.1]: https://github.com/aWeft13/Weft/releases/tag/@weft/core@1.0.0-beta.1
+[Unreleased]: https://github.com/aWeft13/Weft/compare/weft-core@1.0.0-beta.1...HEAD
+[1.0.0-beta.1]: https://github.com/aWeft13/Weft/releases/tag/weft-core@1.0.0-beta.1

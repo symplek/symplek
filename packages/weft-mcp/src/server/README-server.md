@@ -85,7 +85,7 @@ Add to `.claude/settings.json`:
   "mcpServers": {
     "weft": {
       "command": "node",
-      "args": ["./node_modules/@weft/mcp/dist/server/index.js"],
+      "args": ["./node_modules/weft-mcp/dist/server/index.js"],
       "env": {}
     }
   }
@@ -98,7 +98,7 @@ Or via stdio transport (W3-B):
   "mcpServers": {
     "weft": {
       "command": "npx",
-      "args": ["@weft/mcp"],
+      "args": ["weft-mcp"],
       "env": {}
     }
   }

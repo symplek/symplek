@@ -1,7 +1,7 @@
 /**
  * @fileoverview Dependency Scheduler for deterministic event ordering
  * @description Topological sort of trace events using vector clocks
- * @module @weft/core/rehearsal/scheduler
+ * @module weft-core/rehearsal/scheduler
  * @since 1.0.0
  *
  * 📝 BUILD[01.03]: Dependency Scheduler for deterministic ordering

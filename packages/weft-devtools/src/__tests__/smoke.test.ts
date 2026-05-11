@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ExecutionStep, StoredExecution } from "../services/persistence";
 
-describe("@weft/devtools smoke", () => {
+describe("weft-devtools smoke", () => {
   it("StoredExecution shape matches expected contract", () => {
     const execution: StoredExecution = {
       executionId: "exec-001",

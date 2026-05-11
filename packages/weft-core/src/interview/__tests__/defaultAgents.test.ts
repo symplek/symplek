@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Default Agents Tests
  * @description Tests for schema-driven default agent generation
- * @module @weft/core/interview/__tests__/defaultAgents.test
+ * @module weft-core/interview/__tests__/defaultAgents.test
  * @since 1.0.0-beta.3
  *
  * 📝 BUILD[Weft-interview-operator]: Story 03-03 - Default Agents Tests

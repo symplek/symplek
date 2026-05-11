@@ -1,10 +1,10 @@
 /**
- * @fileoverview Public API exports for @weft/pro
+ * @fileoverview Public API exports for weft-pro
  * @description Commercial license - Advanced multi-agent features
- * @module @weft/pro
+ * @module weft-pro
  * @since 1.0.0-beta.1
  *
- * 📝 BUILD[05.05]: Public API for @weft/pro package
+ * 📝 BUILD[05.05]: Public API for weft-pro package
  *
  * @remarks
  * This package provides advanced features requiring a commercial license:
@@ -13,7 +13,7 @@
  * - Agent antibodies (pattern detection, quarantine, learning)
  * - Trusted traveler lanes
  *
- * Requires @weft/core as peer dependency.
+ * Requires weft-core as peer dependency.
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -57,13 +57,13 @@ export type {
 } from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OBSERVABILITY EXPORTS — MOVED TO @weft/core (Phase 0 of opencore release)
+// OBSERVABILITY EXPORTS — MOVED TO weft-core (Phase 0 of opencore release)
 // ─────────────────────────────────────────────────────────────────────────────
 // `observable`, `getTraces`, `createOperatorSpan`, `trackCost`, `trackError`,
 // `configureObservability`, `getObservabilityConfig`, `clearTraces`, and the
 // `TraceEntry`, `TraceCollector`, `Span`, `ObservabilityOptions`, and
-// `ObservabilityVerbosity` types are now exported from @weft/core.
-// Import from "@weft/core" instead.
+// `ObservabilityVerbosity` types are now exported from weft-core.
+// Import from "weft-core" instead.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TRUST EXPORTS
@@ -80,7 +80,7 @@ export type {
 } from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// COHERENCE MODULE EXPORTS (Wave 3 — moved from @weft/core)
+// COHERENCE MODULE EXPORTS (Wave 3 — moved from weft-core)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type {
@@ -122,7 +122,7 @@ export {
 } from "./coherence";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CONFIDENCE MODULE EXPORTS (Wave 3 — moved from @weft/core)
+// CONFIDENCE MODULE EXPORTS (Wave 3 — moved from weft-core)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type {
@@ -160,7 +160,7 @@ export {
 } from "./confidence";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// INTERVIEW MODULE EXPORTS (Wave 3 — moved from @weft/core)
+// INTERVIEW MODULE EXPORTS (Wave 3 — moved from weft-core)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type {
@@ -191,27 +191,27 @@ export {
 } from "./interview";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SOLO MODULE EXPORTS (Wave 3 — moved from @weft/core)
+// SOLO MODULE EXPORTS (Wave 3 — moved from weft-core)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export * from "./solo";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TEAMS MODULE EXPORTS (Wave 3 — moved from @weft/core)
+// TEAMS MODULE EXPORTS (Wave 3 — moved from weft-core)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type { TeamConfig, TeamMode, TeamResult } from "./teams";
 export { Team, TeamRegistry, teams } from "./teams";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CONTRACT EXPORTS (Wave 3 — moved from @weft/core)
+// CONTRACT EXPORTS (Wave 3 — moved from weft-core)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type { ContractMismatch, ContractOptions } from "./contract";
 export { ContractError, defineContract } from "./contract";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CHANGE-KERNEL EXPORTS (Wave 3 — moved from @weft/core)
+// CHANGE-KERNEL EXPORTS (Wave 3 — moved from weft-core)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export * from "./change-kernel";
@@ -223,7 +223,7 @@ export * from "./change-kernel";
 // normalizeWeights has an alias in coherence (normalizeCoherenceWeights)
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DEBATE / DIALECTIC TYPES (Wave 3 — moved from @weft/core)
+// DEBATE / DIALECTIC TYPES (Wave 3 — moved from weft-core)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type {
@@ -246,7 +246,7 @@ export type {
 } from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PREMIUM OPERATOR FACTORIES (Wave 3 — moved from @weft/core)
+// PREMIUM OPERATOR FACTORIES (Wave 3 — moved from weft-core)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export {

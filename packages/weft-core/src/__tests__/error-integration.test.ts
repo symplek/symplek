@@ -1,7 +1,7 @@
 /**
  * @fileoverview Error Integration Tests for AgentUnit
  * @description Tests for Story 01.03: AgentUnit Error Integration
- * @module @weft/core/__tests__/error-integration
+ * @module weft-core/__tests__/error-integration
  * @since 1.0.0-beta.1
  *
  * 📝 BUILD[01.03]: Error integration tests

@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Coherence Module Barrel Export
  * @description Public API for ensemble coherence measurement
- * @module @weft/core/coherence
+ * @module weft-core/coherence
  * @since 2.1.0
  *
  * 📝 BUILD[STORY-01.05]: Main barrel export for coherence module
@@ -16,7 +16,7 @@
  *   calculateCompositeCoherence,
  *   COHERENCE_THRESHOLDS,
  *   type EnsembleCoherence,
- * } from '@weft/core/coherence';
+ * } from 'weft-core/coherence';
  *
  * const coherence = calculateCompositeCoherence({ votes: consensusResult.votes });
  * if (coherence.composite >= COHERENCE_THRESHOLDS.standard) {

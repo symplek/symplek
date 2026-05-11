@@ -5,10 +5,10 @@
   "type": "module",
   "description": "Weft — composable AI agents for TypeScript. Workspace root.",
   "scripts": {
-    "build": "pnpm --filter \"@weft/*\" run build",
-    "test": "pnpm --filter \"@weft/*\" test",
-    "lint": "pnpm --filter \"@weft/*\" run lint",
-    "typecheck": "pnpm --filter \"@weft/*\" run typecheck",
+    "build": "pnpm --filter \"weft-*\" run build",
+    "test": "pnpm --filter \"weft-*\" test",
+    "lint": "pnpm --filter \"weft-*\" run lint",
+    "typecheck": "pnpm --filter \"weft-*\" run typecheck",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "pnpm build && changeset publish"

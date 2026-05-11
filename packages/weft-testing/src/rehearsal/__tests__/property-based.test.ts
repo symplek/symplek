@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Property-based tests for Rehearsal Mode
- * @module @weft/core/rehearsal/__tests__/property-based
+ * @module weft-core/rehearsal/__tests__/property-based
  */
 
 import { beforeAll, describe, expect, it } from "vitest";

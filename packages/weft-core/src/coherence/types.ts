@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Coherence Type Definitions
  * @description Type definitions for ensemble coherence measurement
- * @module @weft/core/coherence/types
+ * @module weft-core/coherence/types
  * @since 2.1.0
  *
  * 📝 BUILD[STORY-01.01]: Core type definitions for coherence calculations

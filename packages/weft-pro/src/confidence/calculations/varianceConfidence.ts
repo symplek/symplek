@@ -1,7 +1,7 @@
 /**
  * @fileoverview Variance-Based Confidence Calculation
  * @description Tier 2b - Statistical confidence from numeric prediction variance
- * @module @weft/core/confidence/calculations/varianceConfidence
+ * @module weft-core/confidence/calculations/varianceConfidence
  * @since 2.0.0
  *
  * 📝 BUILD[01.06]: Variance confidence from research on numeric predictions
@@ -23,7 +23,7 @@
  * - Empty/single prediction: returns 1.0 (no variance)
  */
 
-import type { Vote } from "@weft/core";
+import type { Vote } from "weft-core";
 import { DEFAULT_MAX_VARIANCE } from "../config";
 import type { ConfidenceSignal } from "../types";
 

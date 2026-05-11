@@ -6,8 +6,8 @@
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */
 
-import { createContext } from "@weft/core";
 import { describe, expect, it, vi } from "vitest";
+import { createContext } from "weft-core";
 import { ContractViolationError } from "../errors";
 import type { SdkSession } from "../operators/execute";
 import { execute } from "../operators/execute";

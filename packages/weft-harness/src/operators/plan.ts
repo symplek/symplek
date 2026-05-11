@@ -1,6 +1,6 @@
 /**
  * @module PlanOperator
- * @description plan() operator for @weft/harness — runs the Claude Agent SDK in read-only
+ * @description plan() operator for weft-harness — runs the Claude Agent SDK in read-only
  * mode, accumulates tool calls, and produces a deterministically-IDed PlanArtifact wrapped
  * in TrackedResult<PlanArtifact> inside an AgentUnit. When the SDK is not installed the
  * operator falls back to a stub plan built from declared tools.
@@ -8,8 +8,8 @@
  */
 
 import { createHash } from "node:crypto";
-import type { TrackedResult } from "@weft/core";
-import { AgentUnit, TRACKED_MARKER } from "@weft/core";
+import type { TrackedResult } from "weft-core";
+import { AgentUnit, TRACKED_MARKER } from "weft-core";
 import { LowProvenanceError } from "../errors";
 import type {
   HarnessConfig,
@@ -82,7 +82,7 @@ function heuristicTier(intent: string, tools: readonly string[]): ImpactTier {
 
 /**
  * Classifies the impact tier for a plan. Attempts to delegate to
- * `@weft/pro`'s changeKernel classifier when available; otherwise falls back
+ * `weft-pro`'s changeKernel classifier when available; otherwise falls back
  * to a local heuristic so the harness remains functional without the pro pkg.
  */
 async function classifyImpactTier(
@@ -92,13 +92,13 @@ async function classifyImpactTier(
   try {
     // Use a string variable so TypeScript cannot statically resolve this
     // optional peer dep — the import throws at runtime if absent.
-    const specifier: string = "@weft/pro";
+    const specifier: string = "weft-pro";
     const mod = (await import(specifier)) as any;
     if (typeof mod?.changeKernel?.classify === "function") {
       return (await mod.changeKernel.classify(intent, tools)) as ImpactTier;
     }
   } catch {
-    // @weft/pro not installed — heuristic follows
+    // weft-pro not installed — heuristic follows
   }
   return heuristicTier(intent, tools);
 }
