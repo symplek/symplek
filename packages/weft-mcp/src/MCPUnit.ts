@@ -23,7 +23,10 @@ import {
   createMCPEvidence,
   type MCPEvidenceData,
 } from "./evidence/MCPEvidence";
-import { TrustPolicyEngine } from "./policies/TrustPolicyEngine";
+import {
+  createDefaultPolicyEngine,
+  TrustPolicyEngine,
+} from "./policies/TrustPolicyEngine";
 import type { MCPPolicyVerdict, MCPTrustPolicy } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -32,6 +35,16 @@ import type { MCPPolicyVerdict, MCPTrustPolicy } from "./types";
 
 export interface MCPUnitConfig {
   transport: MCPTransportConfig;
+  /**
+   * Trust policies to evaluate on every tool call.
+   *
+   * - `undefined` (default): safe defaults — `createDefaultPolicyEngine()`
+   *   pre-loads `allowTrustedOnly`, `requireAttestation`, `requireTwoSources`,
+   *   `degradeToReadOnly`. Recommended for production.
+   * - `MCPTrustPolicy[]`: explicit policy list (use `[]` to opt out of all
+   *   policy enforcement — every call returns `allow`. This is an explicit
+   *   trust-everything mode, intended for tests and trusted internal tools).
+   */
   policies?: MCPTrustPolicy[];
   /** Default per-call timeout in ms (falls back to transport-level default). */
   defaultTimeout?: number;
@@ -52,7 +65,14 @@ export class MCPUnit {
   private constructor(config: MCPUnitConfig) {
     this._config = config;
     this.client = createTransport(config.transport);
-    this.policyEngine = new TrustPolicyEngine(config.policies);
+    // Safe default: when callers omit `policies` entirely, pre-load the four
+    // built-in trust policies. Callers who want trust-everything must pass
+    // an explicit empty array (`policies: []`) — making that choice visible
+    // in code and at code review time.
+    this.policyEngine =
+      config.policies === undefined
+        ? createDefaultPolicyEngine()
+        : new TrustPolicyEngine(config.policies);
   }
 
   static create(config: MCPUnitConfig): MCPUnit {

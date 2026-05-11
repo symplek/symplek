@@ -17,26 +17,24 @@ export interface CostContext {
 }
 
 /**
- * Capture the trace produced during `fn()` without relying on the global
- * `ai.lastTrace()` singleton, which races under concurrent Convex actions.
+ * Capture the trace produced during `fn()` using AsyncLocalStorage-backed
+ * per-invocation scoping. Two concurrent Convex actions running in the same
+ * Node.js process will not see each other's traces.
  *
- * ⚠️ FIX-GUARD[FP-MIDDLEWARE-LASTTRACE-RACE-20260313]: Replaced global
- * ai.lastTrace() reads with per-invocation onTrace callback to prevent
- * cross-action trace misattribution in concurrent Node.js processes.
+ * ⚠️ FIX-GUARD[FP-MIDDLEWARE-LASTTRACE-RACE-20260313]: First attempt used
+ * `ai.lastTrace()`, then switched to broadcast `ai.onTrace()` — both raced
+ * under concurrent withAI() calls because the trace manager is a process
+ * global. Final fix: `ai.withScope(fn)` returns only the traces produced
+ * inside `fn`'s async-local context. If multiple traces fire during one
+ * middleware invocation, we report the latest (matches prior semantics for
+ * single-trace operations, which is the common case).
  */
 async function withTraceCaptured<T>(
   fn: () => Promise<T>,
 ): Promise<{ result: T; trace: Trace | null }> {
-  let captured: Trace | null = null;
-  const unsubscribe = ai.onTrace((t: Trace) => {
-    captured = t;
-  });
-  try {
-    const result = await fn();
-    return { result, trace: captured };
-  } finally {
-    unsubscribe();
-  }
+  const { result, traces } = await ai.withScope(fn);
+  const trace = traces.length > 0 ? (traces[traces.length - 1] ?? null) : null;
+  return { result, trace };
 }
 
 /**

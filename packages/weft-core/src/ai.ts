@@ -261,6 +261,16 @@ export interface AIFunction {
   lastTrace: () => Trace | undefined;
   /** Register a trace callback. Returns an unsubscribe function. */
   onTrace: (callback: (trace: Trace) => void) => () => void;
+  /**
+   * Run `fn` inside a trace scope and return its result together with every
+   * trace recorded during its execution. Use this for per-invocation trace
+   * capture in concurrent hosts (Convex actions, HTTP handlers) — the
+   * broadcast `onTrace` subscription pattern cross-wires between concurrent
+   * calls in the same process.
+   */
+  withScope: <T>(
+    fn: () => Promise<T>,
+  ) => Promise<{ result: T; traces: Trace[] }>;
 }
 
 /**
@@ -275,6 +285,7 @@ export const ai: AIFunction = Object.assign(
     lastTrace: () => traceManager.lastTrace(),
     onTrace: (callback: (trace: Trace) => void) =>
       traceManager.onTrace(callback),
+    withScope: <T>(fn: () => Promise<T>) => traceManager.withScope(fn),
   },
 );
 

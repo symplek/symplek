@@ -1,6 +1,24 @@
 /**
  * @fileoverview Tracing and debugging for AI calls.
+ *
+ * Two delivery paths for traces, intentional and complementary:
+ *
+ *  1. **Broadcast subscribers** via `onTrace(cb)` — every recorded trace
+ *     fires every subscribed callback. Good for global instrumentation
+ *     (debug logging, dashboards). DANGEROUS for per-invocation capture
+ *     under concurrency: with two concurrent `withAI()` calls in the same
+ *     Node process, both subscribers see both traces and cross-wire.
+ *
+ *  2. **Async-local scope** via `withScope(fn)` — runs `fn` inside an
+ *     AsyncLocalStorage context that collects only the traces produced
+ *     during `fn`'s execution. Concurrent scopes are isolated, so a
+ *     Convex action serving user A never captures user B's trace.
+ *
+ * Hosts that run Weft calls per-request (Convex actions, HTTP handlers,
+ * queue workers) MUST use `withScope` instead of subscribing via `onTrace`.
  */
+
+import { AsyncLocalStorage } from "node:async_hooks";
 
 export interface Trace {
   id: string;
@@ -19,10 +37,17 @@ export interface Trace {
 
 export type TraceCallback = (trace: Trace) => void;
 
+interface TraceScope {
+  traces: Trace[];
+}
+
 class TraceManager {
   private _debug = false;
   private _lastTrace: Trace | null = null;
   private _callbacks: TraceCallback[] = [];
+  // AsyncLocalStorage backing for `withScope`. Each scope has its own
+  // trace buffer; concurrent scopes are fully isolated.
+  private readonly _scope = new AsyncLocalStorage<TraceScope>();
 
   get debug(): boolean {
     return this._debug;
@@ -44,11 +69,35 @@ class TraceManager {
     };
   }
 
+  /**
+   * Run `fn` inside a trace scope and return its result together with every
+   * trace recorded during its execution. Traces produced outside this scope
+   * are not captured.
+   *
+   * @example
+   *   const { result, traces } = await ai.withScope(() => userARequest());
+   *   // `traces` contains only traces produced during userARequest(), even
+   *   // if userBRequest() was running concurrently in the same process.
+   */
+  async withScope<T>(
+    fn: () => Promise<T>,
+  ): Promise<{ result: T; traces: Trace[] }> {
+    const scope: TraceScope = { traces: [] };
+    const result = await this._scope.run(scope, fn);
+    return { result, traces: scope.traces };
+  }
+
   /** @internal */
   record(trace: Trace): void {
     this._lastTrace = trace;
 
-    // Notify callbacks
+    // Per-invocation capture — isolated across concurrent withScope calls.
+    const scope = this._scope.getStore();
+    if (scope !== undefined) {
+      scope.traces.push(trace);
+    }
+
+    // Broadcast subscribers (preserves existing onTrace contract).
     for (const callback of this._callbacks) {
       try {
         callback(trace);
@@ -57,7 +106,6 @@ class TraceManager {
       }
     }
 
-    // Log to console if debug is enabled
     if (this._debug) {
       this.logToConsole(trace);
     }

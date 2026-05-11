@@ -131,10 +131,6 @@ function getModelImport(model: SupportedModel): ModelImportInfo {
   return MODEL_IMPORTS[model];
 }
 
-function escapeTemplate(str: string): string {
-  return str.replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
-}
-
 function toCamelCase(str: string): string {
   return str.replace(/-([a-z])/g, (_, char: string) => char.toUpperCase());
 }
@@ -142,6 +138,56 @@ function toCamelCase(str: string): string {
 function toPascalCase(str: string): string {
   const camel = toCamelCase(str);
   return camel.charAt(0).toUpperCase() + camel.slice(1);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SAFE EMITTERS — defend the generated code against injection from the
+// YAML source.
+//
+// Every value that crosses from YAML into the emitted TypeScript MUST pass
+// through one of these helpers. The previous `'${field}'` style template
+// interpolation was unsafe: a YAML name like `x'); evil(); //` produced
+// runnable malicious TS.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Valid JavaScript identifier (used for exported symbols and function refs). */
+const JS_IDENTIFIER_RE = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
+
+/**
+ * Emit a string value as a safe JS string literal. JSON.stringify produces
+ * a double-quoted JS string with all needed escapes (quotes, backslashes,
+ * newlines, unicode, etc.) — strictly safer than hand-rolled quoting.
+ */
+function emitString(value: string): string {
+  return JSON.stringify(value);
+}
+
+/**
+ * Emit a number as a JS numeric literal. Rejects non-finite values to
+ * prevent `NaN`/`Infinity` literals and to catch type-shape drift early.
+ */
+function emitNumber(value: number, field: string): string {
+  if (!Number.isFinite(value)) {
+    throw new Error(
+      `Field "${field}" must be a finite number; got ${String(value)}`,
+    );
+  }
+  return JSON.stringify(value);
+}
+
+/**
+ * Validate a string is a safe JavaScript identifier and return it
+ * unchanged. Throws on any character outside `/^[a-zA-Z_$][a-zA-Z0-9_$]*$/`.
+ * Use this for every value that's emitted UNQUOTED into the generated TS
+ * (export names, function-name references, type names).
+ */
+function emitIdentifier(value: string, field: string): string {
+  if (!JS_IDENTIFIER_RE.test(value)) {
+    throw new Error(
+      `Field "${field}" is not a valid JavaScript identifier: "${value}"`,
+    );
+  }
+  return value;
 }
 
 /**
@@ -224,48 +270,55 @@ function generateTypeScript(
   lines.push("// Do not edit directly - regenerate with: npx Weft generate");
   lines.push("");
 
-  // Imports
-  lines.push("import { AgentUnit } from '@weft/core';");
-  lines.push(`import { ${modelInfo.fn} } from '${modelInfo.pkg}';`);
+  // Validate identifiers up-front so failures surface before any code is emitted.
+  const safeExportName = emitIdentifier(exportName, "exportName");
+  // `modelInfo.fn` and `modelInfo.pkg` come from a static lookup table
+  // (MODEL_IMPORTS) keyed by a value that already passed `isSupportedModel`,
+  // so they're trusted by construction. Still validate the fn name as an
+  // identifier — defence in depth against a future table-edit mistake.
+  const safeModelFn = emitIdentifier(modelInfo.fn, "modelInfo.fn");
 
-  // Tool import comments
+  // Imports — modelInfo.pkg is a fixed npm package name, safe to emit
+  // as a string literal via emitString.
+  lines.push("import { AgentUnit } from '@weft/core';");
+  lines.push(`import { ${safeModelFn} } from ${emitString(modelInfo.pkg)};`);
+
+  // Tool import comments — tool names emitted as JSON-quoted strings so a
+  // YAML tool name like `*/ evil()` can't terminate the comment line.
   if (config.tools && config.tools.length > 0) {
     const toolNames = config.tools.map((tool) =>
       isToolConfig(tool) ? tool.name : tool,
     );
-    lines.push(`// TODO: Import tools: ${toolNames.join(", ")}`);
+    lines.push(
+      `// TODO: Import tools: ${toolNames.map((n) => emitString(n)).join(", ")}`,
+    );
   }
 
   lines.push("");
 
-  // Agent definition
-  lines.push(`export const ${exportName} = AgentUnit.create({`);
-  lines.push(`  name: '${config.name}',`);
-  lines.push(`  model: ${modelInfo.fn}('${config.model}'),`);
+  // Agent definition. Every interpolated value is either an identifier
+  // (validated above) or a JSON-stringified literal — no raw concatenation.
+  lines.push(`export const ${safeExportName} = AgentUnit.create({`);
+  lines.push(`  name: ${emitString(config.name)},`);
+  lines.push(`  model: ${safeModelFn}(${emitString(config.model)}),`);
+  lines.push(`  systemPrompt: ${emitString(config.systemPrompt)},`);
 
-  // System prompt
-  const escapedPrompt = escapeTemplate(config.systemPrompt);
-  if (config.systemPrompt.includes("\n")) {
-    lines.push(`  systemPrompt: \`${escapedPrompt}\`,`);
-  } else {
-    lines.push(`  systemPrompt: '${escapedPrompt.replace(/'/g, "\\'")}',`);
-  }
-
-  // Optional fields
   if (config.description !== undefined) {
-    lines.push(`  description: '${config.description.replace(/'/g, "\\'")}',`);
+    lines.push(`  description: ${emitString(config.description)},`);
   }
 
   if (config.temperature !== undefined) {
-    lines.push(`  temperature: ${config.temperature},`);
+    lines.push(
+      `  temperature: ${emitNumber(config.temperature, "temperature")},`,
+    );
   }
 
   if (config.maxTokens !== undefined) {
-    lines.push(`  maxTokens: ${config.maxTokens},`);
+    lines.push(`  maxTokens: ${emitNumber(config.maxTokens, "maxTokens")},`);
   }
 
   if (config.timeout !== undefined) {
-    lines.push(`  timeout: ${config.timeout},`);
+    lines.push(`  timeout: ${emitNumber(config.timeout, "timeout")},`);
   }
 
   // Tools comment
@@ -273,16 +326,22 @@ function generateTypeScript(
     const toolNames = config.tools.map((tool) =>
       isToolConfig(tool) ? tool.name : tool,
     );
-    lines.push(`  // tools: [${toolNames.join(", ")}], // TODO: Wire up tools`);
+    lines.push(
+      `  // tools: [${toolNames.map((n) => emitString(n)).join(", ")}], // TODO: Wire up tools`,
+    );
   }
 
   lines.push("});");
   lines.push("");
 
-  // Type export
-  const typeName = `${toPascalCase(exportName)}Result`;
+  // Type export — typeName is derived from exportName which we already
+  // validated as an identifier; PascalCase of that is also a valid identifier.
+  const typeName = emitIdentifier(
+    `${toPascalCase(safeExportName)}Result`,
+    "typeName",
+  );
   lines.push(
-    `export type ${typeName} = Awaited<ReturnType<typeof ${exportName}.run>>;`,
+    `export type ${typeName} = Awaited<ReturnType<typeof ${safeExportName}.run>>;`,
   );
 
   // Add operator-enhanced version if operators are configured
@@ -291,19 +350,28 @@ function generateTypeScript(
 
     if (config.operators.retry) {
       const { maxAttempts = 3, backoffMs = 1000 } = config.operators.retry;
-      operatorChains.push(`.retry(${maxAttempts}, ${backoffMs})`);
+      operatorChains.push(
+        `.retry(${emitNumber(maxAttempts, "operators.retry.maxAttempts")}, ${emitNumber(backoffMs, "operators.retry.backoffMs")})`,
+      );
     }
 
     if (config.operators.timeout) {
       const { ms = 30000 } = config.operators.timeout;
-      operatorChains.push(`.timeout(${ms})`);
+      operatorChains.push(
+        `.timeout(${emitNumber(ms, "operators.timeout.ms")})`,
+      );
     }
 
     if (config.operators.fallback) {
       if (config.operators.fallback.agent) {
-        operatorChains.push(
-          `.fallback(${toCamelCase(config.operators.fallback.agent)})`,
+        // The fallback agent identifier becomes a bare reference in the
+        // emitted code. Validate that the camelCase form is a real JS
+        // identifier so a malicious YAML can't inject arbitrary code here.
+        const fallbackAgent = emitIdentifier(
+          toCamelCase(config.operators.fallback.agent),
+          "operators.fallback.agent",
         );
+        operatorChains.push(`.fallback(${fallbackAgent})`);
       } else if (config.operators.fallback.value !== undefined) {
         operatorChains.push(
           `.fallback(${JSON.stringify(config.operators.fallback.value)})`,
@@ -312,17 +380,24 @@ function generateTypeScript(
     }
 
     if (operatorChains.length > 0) {
-      const enhancedName = `${exportName}WithOperators`;
+      const enhancedName = emitIdentifier(
+        `${safeExportName}WithOperators`,
+        "enhancedName",
+      );
       lines.push("");
       lines.push("// Agent with operators configured");
-      lines.push(`export const ${enhancedName} = ${exportName}`);
+      lines.push(`export const ${enhancedName} = ${safeExportName}`);
       for (const chain of operatorChains) {
         lines.push(`  ${chain}`);
       }
       lines.push(";");
       lines.push("");
+      const enhancedTypeName = emitIdentifier(
+        `${toPascalCase(enhancedName)}Result`,
+        "enhancedTypeName",
+      );
       lines.push(
-        `export type ${toPascalCase(enhancedName)}Result = Awaited<ReturnType<typeof ${enhancedName}.run>>;`,
+        `export type ${enhancedTypeName} = Awaited<ReturnType<typeof ${enhancedName}.run>>;`,
       );
     }
   }

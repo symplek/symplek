@@ -52,6 +52,63 @@ export const DEFAULT_STORAGE_PATH = "__traces__";
  */
 export type TraceFileExtension = ".trace.json" | ".trace.json.gz";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PATH-SAFETY HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Trace ids accepted by FileStorage: alphanumerics, dashes, underscores.
+ * Length cap of 128 protects against pathological inputs and filesystem
+ * limits. Rejects path separators, parent-dir refs, leading dots, NUL,
+ * and shell metacharacters at the input boundary.
+ */
+const SAFE_TRACE_ID_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/;
+
+function assertSafeTraceId(id: string): void {
+  if (!SAFE_TRACE_ID_RE.test(id)) {
+    throw new Error(
+      `[FileStorage] invalid trace id "${id}": must match /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/`,
+    );
+  }
+}
+
+/**
+ * Strict containment check for path-shaped inputs. Splits on both `/` and
+ * `\` separators, rejects empty segments, `..` segments, and absolute paths
+ * whose first segment differs from `basePath`'s first segment.
+ */
+function assertContainedInBase(candidate: string, basePath: string): void {
+  const normalise = (p: string): string[] =>
+    p
+      .replace(/\\/g, "/")
+      .split("/")
+      .filter((seg) => seg.length > 0);
+
+  const candSegs = normalise(candidate);
+  const baseSegs = normalise(basePath);
+
+  if (candSegs.some((seg) => seg === ".." || seg === ".")) {
+    throw new Error(
+      `[FileStorage] path "${candidate}" contains parent-directory or current-directory segments`,
+    );
+  }
+
+  // Candidate must start with all of basePath's segments — i.e. be at
+  // basePath itself or in a subdirectory of it.
+  if (candSegs.length < baseSegs.length) {
+    throw new Error(
+      `[FileStorage] path "${candidate}" is shorter than basePath "${basePath}"`,
+    );
+  }
+  for (let i = 0; i < baseSegs.length; i++) {
+    if (candSegs[i] !== baseSegs[i]) {
+      throw new Error(
+        `[FileStorage] path "${candidate}" is not contained in basePath "${basePath}"`,
+      );
+    }
+  }
+}
+
 /**
  * Storage options.
  */
@@ -105,6 +162,11 @@ export class FileStorage {
    */
   async save<T>(trace: ExecutionTrace<T>, filename?: string): Promise<string> {
     const name = filename ?? trace.id;
+    // Strict id pattern: alphanumerics, dashes, underscores only. Rejects
+    // path separators, parent-dir refs, leading dots, and shell metacharacters.
+    // Any user-controlled trace.id or filename passes through this gate so
+    // a malicious value (e.g. "../../etc/passwd") never reaches the filesystem.
+    assertSafeTraceId(name);
     const extension: TraceFileExtension = this.compress
       ? ".trace.json.gz"
       : ".trace.json";
@@ -211,26 +273,42 @@ export class FileStorage {
   // These use Node.js fs in Node, or could use other APIs in browser
   // ─────────────────────────────────────────────────────────────────────────────
 
+  /**
+   * Resolve a user-supplied id or path to a safe filesystem path inside
+   * `basePath`. Synchronous so existing sync callsites (`load`, `exists`,
+   * `delete`) continue to work.
+   *
+   * Two accepted shapes:
+   *   1. A bare trace id matching `SAFE_TRACE_ID_RE` (alnum + `-_`),
+   *      resolved to `<basePath>/<id>.trace.json`.
+   *   2. A path string already containing a separator or trace extension
+   *      — must remain inside `basePath` once normalised, no `..` escapes,
+   *      no absolute paths outside the base.
+   *
+   * Any other shape (path traversal, absolute escape, shell metachars in
+   * the id segment) throws synchronously, before the path reaches the
+   * filesystem.
+   */
   private resolvePath(pathOrId: string): string {
-    // If already a full path, return as-is
-    if (
+    const looksLikePath =
       pathOrId.includes("/") ||
       pathOrId.includes("\\") ||
       pathOrId.endsWith(".json") ||
-      pathOrId.endsWith(".gz")
-    ) {
-      return pathOrId;
+      pathOrId.endsWith(".gz");
+
+    if (!looksLikePath) {
+      // Bare id — must pass the strict pattern, then we append extension.
+      assertSafeTraceId(pathOrId);
+      return `${this.basePath}/${pathOrId}.trace.json`;
     }
 
-    // Try different extensions
-    const extensions = [".trace.json", ".trace.json.gz"];
-    for (const ext of extensions) {
-      const _candidate = `${this.basePath}/${pathOrId}${ext}`;
-      // In a real implementation, we'd check if file exists
-      // For now, prefer .trace.json
-    }
-
-    return `${this.basePath}/${pathOrId}.trace.json`;
+    // Path form — normalise and assert containment in basePath. We do the
+    // containment check synchronously via string comparison after splitting
+    // on separators; realpath/symlink-follow would be defense-in-depth but
+    // would require making this method async (and the OS itself fails
+    // closed on most symlink-escape attempts via the underlying fs ops).
+    assertContainedInBase(pathOrId, this.basePath);
+    return pathOrId;
   }
 
   private async writeFile(filePath: string, content: string): Promise<void> {
