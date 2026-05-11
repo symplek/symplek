@@ -15,3 +15,6 @@ outputs/
 *.log
 .idea/
 .vscode/
+
+# Private planning / strategy — kept locally, not published.
+WEFT-RELEASE-PLAN.md
