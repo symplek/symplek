@@ -96,7 +96,7 @@ const result = await ai.experimental.generateTyped("Create data", zodSchema);
 | Activity logging to Convex tables | Exists but no production proof |
 | Cost tracking | Exists but no production proof |
 | `streamToMutation()` | Exists but no production proof |
-| ProSentinel-specific types | Not part of this package's API surface — removed in Waves 1–3 |
+| Upstream-app-specific types | Not part of this package's API surface — removed in Waves 1–3 |
 
 ---
 

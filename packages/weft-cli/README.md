@@ -1,4 +1,4 @@
-﻿# @weft/cli
+# @weft/cli
 
 Weft CLI - AI Agent Development Toolkit
 
