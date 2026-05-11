@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea
+    url: https://github.com/wefthq/weft/discussions
+    about: Use Discussions for questions, ideas, design conversations, and "how do I" support.
+  - name: Security report
+    url: https://github.com/wefthq/weft/blob/main/SECURITY.md
+    about: Security issues go to security@weft.dev, not GitHub issues.

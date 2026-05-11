@@ -1,0 +1,40 @@
+/**
+ * {{name}} - Weft Agent Project
+ * {{description}}
+ */
+import { AgentUnit } from "@Weft/core";
+import { searchTool, calculatorTool } from "./tools/index.js";
+
+// Environment configuration
+const isDev = process.env.NODE_ENV !== "production";
+const model = process.env.AI_MODEL ?? "{{model}}";
+
+async function main() {
+  console.log(`Starting {{name}} [${isDev ? "dev" : "prod"}]...`);
+
+  // Create an agent with tools and source tracking
+  const agent = AgentUnit.of({
+    name: "{{agentName}}",
+    model,
+    systemPrompt: `You are a helpful assistant for {{name}}.
+      You have access to search and calculator tools.`,
+    tools: [searchTool, calculatorTool],
+  });
+
+  // Run with source tracking (zero-trust mode)
+  const result = await agent.run({
+    prompt: process.argv[2] ?? "What can you help me with?",
+  });
+
+  console.log("Agent response:", result.value);
+
+  if (isDev) {
+    console.log("Source:", result.source);
+    console.log("Confidence:", result.confidence);
+  }
+}
+
+main().catch((error) => {
+  console.error("Fatal error:", error);
+  process.exit(1);
+});

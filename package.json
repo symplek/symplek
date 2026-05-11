@@ -1,0 +1,23 @@
+{
+  "name": "weft-workspace",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Weft — composable AI agents for TypeScript. Workspace root.",
+  "scripts": {
+    "build": "pnpm --filter \"@weft/*\" run build",
+    "test": "pnpm --filter \"@weft/*\" test",
+    "lint": "pnpm --filter \"@weft/*\" run lint",
+    "typecheck": "pnpm --filter \"@weft/*\" run typecheck",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "pnpm build && changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.0"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20"
+  }
+}

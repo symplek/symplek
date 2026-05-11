@@ -1,0 +1,34 @@
+{
+  "name": "{{name}}",
+  "version": "{{version}}",
+  "description": "{{description}}",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "keen generate && tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "test:ci": "vitest --run --coverage",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "docker:build": "docker build -t {{name}} .",
+    "docker:run": "docker run --rm -it {{name}}",
+    "ci": "npm run lint && npm run typecheck && npm run test:ci"
+  },
+  "dependencies": {
+    "@Weft/core": "^2.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.0",
+    "@types/node": "^20.11.0",
+    "@vitest/coverage-v8": "^2.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

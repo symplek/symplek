@@ -1,0 +1,96 @@
+# {{name}}
+
+{{description}}
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js >= 18.0.0
+- npm or pnpm
+
+### Installation
+
+```bash
+npm install
+```
+
+### Development
+
+```bash
+# Start development mode with hot reload
+npm run dev
+
+# Generate TypeScript from YAML agents
+npm run build
+
+# Run type checking
+npm run typecheck
+```
+
+### Testing
+
+```bash
+# Run tests
+npm test
+
+# Run tests with coverage
+npm run test:coverage
+```
+
+### Linting
+
+```bash
+# Check for issues
+npm run lint
+
+# Fix issues automatically
+npm run lint:fix
+```
+
+## Project Structure
+
+```
+{{name}}/
+├── agents/           # YAML agent definitions
+│   └── example.yaml
+├── src/
+│   ├── index.ts      # Entry point
+│   ├── tools/        # Tool implementations
+│   └── generated/    # Generated TypeScript (don't edit)
+├── tests/            # Test files
+├── keen.config.ts    # Weft configuration
+└── package.json
+```
+
+## Adding Agents
+
+1. Create a new YAML file in `agents/`:
+
+```yaml
+name: my-agent
+version: "1.0.0"
+model: gpt-4o
+system_prompt: |
+  Your agent's system prompt here.
+```
+
+2. Run `npm run build` to generate TypeScript
+
+3. Import and use in your code:
+
+```typescript
+import { myAgent } from "./generated/agents.js";
+
+const result = await myAgent.run({ prompt: "Hello!" });
+```
+
+## Documentation
+
+- [Weft Documentation](https://Weft.dev/docs)
+- [Agent Definition Guide](https://Weft.dev/docs/agents)
+- [Tool Development](https://Weft.dev/docs/tools)
+
+## License
+
+MIT

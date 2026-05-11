@@ -1,0 +1,83 @@
+/**
+ * Tests for {{name}}
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { AgentUnit } from "@Weft/core";
+import { searchTool, calculatorTool } from "../src/tools/index.js";
+
+describe("{{name}}", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe("Tools", () => {
+    describe("searchTool", () => {
+      it("returns results for a query", async () => {
+        const result = await searchTool.execute({ query: "test query" });
+        expect(result.results).toBeDefined();
+        expect(result.results.length).toBeGreaterThan(0);
+      });
+
+      it("includes query in results", async () => {
+        const query = "specific search";
+        const result = await searchTool.execute({ query });
+        expect(result.results[0].snippet).toContain(query);
+      });
+    });
+
+    describe("calculatorTool", () => {
+      it("evaluates simple expressions", async () => {
+        const result = await calculatorTool.execute({ expression: "2 + 2" });
+        expect(result.result).toBe(4);
+      });
+
+      it("evaluates complex expressions", async () => {
+        const result = await calculatorTool.execute({
+          expression: "(10 + 5) * 2",
+        });
+        expect(result.result).toBe(30);
+      });
+
+      it("handles invalid expressions gracefully", async () => {
+        const result = await calculatorTool.execute({
+          expression: "invalid",
+        });
+        expect(result.error).toBe("Invalid expression");
+      });
+
+      it("sanitizes dangerous input", async () => {
+        const result = await calculatorTool.execute({
+          expression: "process.exit()",
+        });
+        expect(result.error).toBe("Invalid expression");
+      });
+    });
+  });
+
+  describe("Agent", () => {
+    it("creates agent with correct config", () => {
+      const agent = AgentUnit.of({
+        name: "{{agentName}}",
+        model: "{{model}}",
+        systemPrompt: "Test prompt",
+      });
+
+      expect(agent).toBeDefined();
+    });
+
+    it("agent has tools attached", () => {
+      const agent = AgentUnit.of({
+        name: "{{agentName}}",
+        model: "{{model}}",
+        systemPrompt: "Test prompt",
+        tools: [searchTool, calculatorTool],
+      });
+
+      expect(agent).toBeDefined();
+    });
+  });
+});

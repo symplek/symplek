@@ -1,0 +1,60 @@
+/**
+ * Tool definitions for {{name}}
+ * Add your custom tools here
+ */
+import { defineTool } from "@Weft/core";
+
+/**
+ * Example search tool
+ */
+export const searchTool = defineTool({
+  name: "search",
+  description: "Search for information on a given topic",
+  parameters: {
+    type: "object",
+    properties: {
+      query: {
+        type: "string",
+        description: "The search query",
+      },
+    },
+    required: ["query"],
+  },
+  execute: async ({ query }) => {
+    // TODO: Implement actual search logic
+    console.log(`Searching for: ${query}`);
+    return {
+      results: [
+        { title: "Example result", snippet: `Results for: ${query}` },
+      ],
+    };
+  },
+});
+
+/**
+ * Example calculator tool
+ */
+export const calculatorTool = defineTool({
+  name: "calculator",
+  description: "Perform basic arithmetic calculations",
+  parameters: {
+    type: "object",
+    properties: {
+      expression: {
+        type: "string",
+        description: "Mathematical expression to evaluate (e.g., '2 + 2')",
+      },
+    },
+    required: ["expression"],
+  },
+  execute: async ({ expression }) => {
+    try {
+      // Safe evaluation for basic math only
+      const sanitized = expression.replace(/[^0-9+\-*/().]/g, "");
+      const result = Function(`"use strict"; return (${sanitized})`)();
+      return { result, expression: sanitized };
+    } catch {
+      return { error: "Invalid expression" };
+    }
+  },
+});

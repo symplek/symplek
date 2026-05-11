@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "skipLibCheck": true,
+    "moduleResolution": "node",
+    "strict": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "composite": false,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["src/index.ts"],
+  "exclude": ["node_modules", "dist", "src/__tests__/**/*"]
+}

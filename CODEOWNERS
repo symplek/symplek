@@ -1,0 +1,16 @@
+# CODEOWNERS — Weft
+
+# Default owner for everything in this repo. Replace with named owners once
+# the wefthq/maintainers team is populated on GitHub.
+* @wefthq/maintainers
+
+# Pro-tier package — gated by maintainer review of the BSL boundary.
+/packages/weft-pro/ @wefthq/maintainers
+
+# Release tooling.
+/.changeset/ @wefthq/maintainers
+/.github/workflows/ @wefthq/maintainers
+
+# Security-sensitive surface.
+/SECURITY.md @wefthq/maintainers
+/.github/dependabot.yml @wefthq/maintainers

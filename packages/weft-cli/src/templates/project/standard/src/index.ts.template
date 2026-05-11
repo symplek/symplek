@@ -1,0 +1,29 @@
+/**
+ * {{name}} - Weft Agent Project
+ * {{description}}
+ */
+import { AgentUnit } from "@Weft/core";
+import { searchTool, calculatorTool } from "./tools/index.js";
+
+async function main() {
+  console.log("Starting {{name}}...");
+
+  // Create an agent with tools
+  const agent = AgentUnit.of({
+    name: "{{agentName}}",
+    model: "{{model}}",
+    systemPrompt: `You are a helpful assistant for {{name}}.
+      You have access to search and calculator tools.`,
+    tools: [searchTool, calculatorTool],
+  });
+
+  // Run with source tracking (zero-trust mode)
+  const result = await agent.run({
+    prompt: "What is 42 * 7?",
+  });
+
+  console.log("Agent response:", result.value);
+  console.log("Source:", result.source);
+}
+
+main().catch(console.error);

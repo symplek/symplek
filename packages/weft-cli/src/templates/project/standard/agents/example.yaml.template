@@ -1,0 +1,27 @@
+# Example agent definition
+# See https://Weft.dev/docs/agents for full documentation
+
+name: {{agentName}}
+version: "1.0.0"
+
+model: {{model}}
+
+system_prompt: |
+  You are a helpful assistant for {{name}}.
+  Be concise, accurate, and friendly in your responses.
+  You have access to search and calculator tools.
+
+temperature: 0.7
+max_tokens: 2048
+
+# Tools the agent can use
+tools:
+  - name: search
+    description: Search for information on a topic
+  - name: calculator
+    description: Perform arithmetic calculations
+
+# Memory settings
+memory:
+  type: buffer
+  max_messages: 10

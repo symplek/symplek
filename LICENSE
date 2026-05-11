@@ -1,0 +1,34 @@
+# Licence
+
+Weft is published as a workspace of packages with **per-package licences**.
+
+## MIT — default
+
+The following packages are licensed under the **MIT Licence**. Each package has its own `LICENSE` file with the full text.
+
+- `@weft/core` — [`packages/weft-core/LICENSE`](packages/weft-core/LICENSE)
+- `@weft/react` — [`packages/weft-react/LICENSE`](packages/weft-react/LICENSE)
+- `@weft/convex` — [`packages/weft-convex/LICENSE`](packages/weft-convex/LICENSE)
+- `@weft/cli` — [`packages/weft-cli/LICENSE`](packages/weft-cli/LICENSE)
+- `@weft/mcp` — [`packages/weft-mcp/LICENSE`](packages/weft-mcp/LICENSE)
+- `@weft/harness` — [`packages/weft-harness/LICENSE`](packages/weft-harness/LICENSE)
+- `@weft/testing` — [`packages/weft-testing/LICENSE`](packages/weft-testing/LICENSE)
+- `@weft/devtools` — [`packages/weft-devtools/LICENSE`](packages/weft-devtools/LICENSE)
+
+Copyright (c) 2026 Weft Contributors.
+
+## BSL 1.1 — `@weft/pro`
+
+`@weft/pro` is licensed under the **Business Source Licence 1.1**.
+
+- **Change Date:** 2030-04-24
+- **Change Licence:** MIT
+- **Additional Use Grant:** You may use, copy, modify, and redistribute the licensed work, provided that you may not offer the licensed work to third parties as a hosted or managed service that competes with offerings from the Licensor.
+
+Full text: [`packages/weft-pro/LICENSE`](packages/weft-pro/LICENSE).
+
+On the Change Date (2030-04-24), the version of `@weft/pro` published as of that date automatically converts to MIT. Future versions remain under BSL until their own Change Dates.
+
+## Questions
+
+For commercial licensing inquiries about `@weft/pro`, email **licensing@weft.dev**.
