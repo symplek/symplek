@@ -15,7 +15,9 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts",
