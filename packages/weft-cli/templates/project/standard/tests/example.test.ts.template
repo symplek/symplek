@@ -1,0 +1,49 @@
+import { AgentUnit, createContext, isTracked } from "@weft/core";
+import { describe, expect, it } from "vitest";
+import { resilient, withProvenance } from "../src/tools/index.js";
+
+/**
+ * Smoke tests for {{name}}'s tool helpers.
+ *
+ * These run without an API key — they exercise the operator algebra only,
+ * not real LLM calls. Add integration tests with `vi.mock("@weft/core/server")`
+ * once you have agents that hit a provider.
+ */
+
+describe("{{name}} resilience helpers", () => {
+  it("returns the underlying value on success", async () => {
+    const ctx = createContext();
+    const unit = AgentUnit.of("ok");
+    const result = await resilient(unit, { maxAttempts: 1 }).run(ctx);
+    expect(result.value).toBe("ok");
+  });
+
+  it("falls back to the supplied default when the unit fails", async () => {
+    const ctx = createContext();
+    const unit = AgentUnit.fail<string>(new Error("simulated failure"));
+    const result = await resilient(unit, { fallback: "safe-default" }).run(
+      ctx,
+    );
+    expect(result.value).toBe("safe-default");
+  });
+});
+
+describe("{{name}} provenance helpers", () => {
+  it("wraps the value in a TrackedResult envelope", async () => {
+    const ctx = createContext();
+    const unit = AgentUnit.of("payload");
+    const result = await withProvenance(unit, {
+      source: "agent",
+      confidence: 0.95,
+      verifiedBy: "unit-test",
+    }).run(ctx);
+
+    // The result of .tracked() is itself a TrackedResult<TrackedResult<T>>
+    // — the outer envelope is added by .run() in zero-trust mode, the inner
+    // one is what `withProvenance` applied. We confirm both layers exist.
+    expect(result.value).toBeDefined();
+    expect(isTracked(result.value)).toBe(true);
+    expect(result.value.confidence).toBeCloseTo(0.95);
+    expect(result.value.source).toBe("agent");
+  });
+});

@@ -1,0 +1,73 @@
+/**
+ * Project-local helpers for {{name}}.
+ *
+ * Compose Weft operators into patterns specific to your project here so
+ * your business code stays declarative. Each helper is one operator chain.
+ */
+import {
+  type AgentUnit,
+  isTracked,
+  type ResultSource,
+  type TrackedResult,
+} from "@weft/core";
+
+export interface ProvenanceOptions {
+  /** Source category — one of Weft's `ResultSource` literals. */
+  source: ResultSource;
+  /** Caller's confidence in this value, in [0, 1]. */
+  confidence: number;
+  /** Optional identifier of the verifier (audit trail). */
+  verifiedBy?: string;
+}
+
+/**
+ * Wrap an `AgentUnit<T>` so its output carries provenance metadata.
+ *
+ * Downstream callers can introspect `result.value`, `result.source`,
+ * `result.confidence` — Weft's TrackedResult shape — without any extra
+ * plumbing.
+ */
+export function withProvenance<T>(
+  unit: AgentUnit<T>,
+  opts: ProvenanceOptions,
+): AgentUnit<TrackedResult<T>> {
+  return unit.tracked({
+    source: opts.source,
+    confidence: opts.confidence,
+    verifiedBy: opts.verifiedBy,
+  });
+}
+
+export interface ResilienceOptions<T> {
+  /** Max attempts including the first. Default 3. */
+  maxAttempts?: number;
+  /** Hard timeout in milliseconds. Default 15s. */
+  timeoutMs?: number;
+  /** Static fallback value if all attempts fail. */
+  fallback?: T;
+}
+
+/**
+ * Apply the standard resilience triad: retry on transient failure, hard
+ * timeout, fallback to a known-safe value if all else fails.
+ *
+ * @example
+ *   const safe = resilient(
+ *     Weft(prompt).toUnit(),
+ *     { maxAttempts: 3, timeoutMs: 10_000, fallback: "" },
+ *   );
+ */
+export function resilient<T>(
+  unit: AgentUnit<T>,
+  options: ResilienceOptions<T> = {},
+): AgentUnit<T> {
+  const { maxAttempts = 3, timeoutMs = 15_000, fallback } = options;
+  let chain = unit.retry(maxAttempts).timeout(timeoutMs);
+  if (fallback !== undefined) {
+    chain = chain.orElse(fallback);
+  }
+  return chain;
+}
+
+/** Re-export Weft's tracked-result type guard for convenience. */
+export { isTracked };

@@ -10,8 +10,7 @@
   "types": "./dist/index.d.ts",
   "files": [
     "bin",
-    "dist",
-    "templates"
+    "dist"
   ],
   "keywords": [
     "ai",
@@ -26,7 +25,7 @@
     "directory": "packages/weft-cli"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-templates.mjs",
     "dev": "tsc --watch",
     "lint": "biome check .",
     "typecheck": "tsc --noEmit",
