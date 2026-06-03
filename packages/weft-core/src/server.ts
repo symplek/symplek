@@ -11,6 +11,10 @@
 export type { AgentConfig } from "./agent";
 // ── Agent builder ────────────────────────────────────────────────────────────
 export { AgentBuilder } from "./agent";
+// ── AgentUnit (re-exported so consumers get one namespace) ───────────────────
+export type { AgentComputation, AgentUnitMetadata } from "./AgentUnit";
+export { AgentUnit } from "./AgentUnit";
+export { createContext } from "./context";
 export type { AIOptions, AIPrompt, AIResult } from "./ai";
 // ── AI runtime ──────────────────────────────────────────────────────────────
 export { ai } from "./ai";

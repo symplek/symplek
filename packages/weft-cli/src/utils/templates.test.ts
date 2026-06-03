@@ -116,7 +116,7 @@ Line 3: C`);
       const files = getProjectTierFiles("minimal");
       expect(files).toContain("package.json.template");
       expect(files).toContain("tsconfig.json.template");
-      expect(files).toContain("Weft.config.ts.template");
+      expect(files).toContain("src/weft.config.ts.template");
       expect(files).toContain("src/index.ts.template");
       expect(files).toContain("agents/example.yaml.template");
       expect(files.length).toBe(5);

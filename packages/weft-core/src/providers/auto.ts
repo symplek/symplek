@@ -4,6 +4,7 @@
  */
 
 import { WeftError } from "../errors";
+import { getGlobalConfig } from "../globalConfig";
 import type { ProviderId } from "./interface";
 import { providerRegistry } from "./registry";
 
@@ -24,15 +25,22 @@ export interface AIOptions {
  *
  * Priority ordering:
  * 1. Registry default provider (for tests and manual registration)
- * 2. Environment variables: OPENROUTER → OPENAI → ANTHROPIC → GOOGLE
+ * 2. Environment variables: OPENAI → ANTHROPIC → GOOGLE
  *
  * PREVENTION: Check registry first for test mocks and manual registration
  * Fixed: 2026-01-27 - Tests were failing because detectProvider()
  * ignored manually registered providers in the registry. Registry check
  * must happen before env var detection to support test scenarios.
  *
+ * NOTE: OPENROUTER_API_KEY is intentionally NOT detected here. The Wave-0
+ * implementation has no OpenRouter adapter — auto-detecting it would return
+ * "openrouter" which is absent from the provider registry and produces a
+ * confusing "provider not found" crash instead of the clear "no supported
+ * provider detected" error below.
+ * TODO(Wave 3 / Contract 2): restore OpenRouter once a base-URL-aware adapter exists.
+ *
  * @returns The detected ProviderId
- * @throws Error if no API keys are found
+ * @throws WeftError(PROVIDER_ERROR) if no supported API keys are found
  */
 export function detectProvider(): ProviderId {
   // PREVENTION: Check registry first for test mocks and manual registration
@@ -43,9 +51,10 @@ export function detectProvider(): ProviderId {
     return defaultProvider.id as ProviderId;
   }
 
-  // Fall back to environment variable detection
+  // Fall back to environment variable detection.
+  // OPENROUTER_API_KEY is intentionally excluded — no adapter exists yet.
+  // TODO(Wave 3 / Contract 2): restore OpenRouter once a base-URL-aware adapter exists.
   const keys = {
-    openrouter: process.env.OPENROUTER_API_KEY,
     openai: process.env.OPENAI_API_KEY,
     anthropic: process.env.ANTHROPIC_API_KEY,
     google: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
@@ -66,7 +75,6 @@ export function detectProvider(): ProviderId {
         "OPENAI_API_KEY=sk-proj-...",
         "# or ANTHROPIC_API_KEY=sk-ant-...",
         "# or GOOGLE_GENERATIVE_AI_API_KEY=AIza...",
-        "# or OPENROUTER_API_KEY=sk-or-...",
       ].join("\n"),
     });
   }
@@ -79,13 +87,12 @@ export function detectProvider(): ProviderId {
   }
 
   // Priority logic
-  if (keys.openrouter) return "openrouter";
   if (keys.openai) return "openai";
   if (keys.anthropic) return "anthropic";
   if (keys.google) return "google";
 
   // Should not be reachable due to check above
-  return foundKeys[0][0];
+  return foundKeys[0][0] as ProviderId;
 }
 
 /**
@@ -114,11 +121,17 @@ export function resolveModelFromContext(ctx?: {
 /**
  * Selects an appropriate model for a given task/prompt.
  *
- * Priority ordering:
- * 1. If options.model is provided (explicit or from context), use it.
- * 2. If options.quality is set (explicit or from context), map to model.
- * 3. Heuristics based on prompt complexity.
- * 4. Default to fast model.
+ * Priority ordering (Codex-corrected — supersedes Wave-0 Contract 1 draft):
+ * 1. Call-site explicit model (options.model, includes .model() override via resolveModelFromContext).
+ * 2. Global config model set via Weft.configure({ model }) — beats heuristics so a configured
+ *    Anthropic/Google model is not silently overridden by an OpenAI heuristic ID.
+ * 3. Quality heuristics (options.quality, prompt complexity).
+ * 4. Hardcoded default ("gpt-4o-mini").
+ *
+ * Rationale for order change: heuristics return hardcoded OpenAI model IDs ("gpt-4o",
+ * "gpt-4o-mini"). If those IDs are forwarded to a configured Anthropic or Google provider
+ * the request fails at the provider's API. The globally configured model is provider-aware
+ * (it was set by the same caller who configured the provider), so it must win over heuristics.
  *
  * @param prompt - The user prompt or task description
  * @param options - Optional generation options (may include context-injected overrides)
@@ -128,12 +141,19 @@ export function selectModelForTask(
   prompt: string,
   options?: AIOptions,
 ): string {
-  // 1. Explicit model choice (includes .model() override via resolveModelFromContext)
+  // 1. Explicit call-site model (includes .model() override via resolveModelFromContext)
   if (options?.model) {
     return options.model;
   }
 
-  // 2. Explicit quality choice (includes .quality() override via resolveModelFromContext)
+  // 2. Global config model — set via Weft.configure({ model }).
+  // Must precede heuristics: heuristics emit OpenAI-specific IDs that break non-OpenAI providers.
+  const globalModel = getGlobalConfig().model;
+  if (globalModel) {
+    return globalModel;
+  }
+
+  // 3. Explicit quality choice (includes .quality() override via resolveModelFromContext)
   if (options?.quality === "high") {
     return "gpt-4o";
   }
@@ -141,7 +161,7 @@ export function selectModelForTask(
     return "gpt-4o-mini";
   }
 
-  // 3. Heuristics
+  // 3b. Complexity heuristic — OpenAI model IDs, only safe when no globalModel is set.
   const isComplex =
     prompt.length > 500 ||
     /\b(analyze|complex|reason|think|evaluate|summarize|extract)\b/i.test(
@@ -152,6 +172,6 @@ export function selectModelForTask(
     return "gpt-4o";
   }
 
-  // 4. Default
+  // 4. Hardcoded default
   return "gpt-4o-mini";
 }

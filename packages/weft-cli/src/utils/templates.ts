@@ -107,7 +107,7 @@ export function getProjectTierFiles(tier: ProjectTier): string[] {
   const minimalFiles = [
     "package.json.template",
     "tsconfig.json.template",
-    "Weft.config.ts.template",
+    "src/weft.config.ts.template",
     "src/index.ts.template",
     "agents/example.yaml.template",
   ];

@@ -1,16 +1,17 @@
-﻿{
+{
   "name": "weft-cli",
   "version": "0.1.0",
   "description": "Weft CLI - AI Agent Development Toolkit",
   "license": "MIT",
   "bin": {
-    "Weft": "./bin/Weft.js"
+    "weft": "./bin/weft.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
     "bin",
-    "dist"
+    "dist",
+    "CHANGELOG.md"
   ],
   "keywords": [
     "ai",

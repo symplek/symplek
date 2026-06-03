@@ -57,12 +57,15 @@ export {
   type TemplateVars,
 } from "./utils/templates.js";
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { version } = require("../package.json") as { version: string };
+
 const program = new Command();
 
 program
-  .name("Weft")
+  .name("weft")
   .description("Weft CLI - AI Agent Development Toolkit")
-  .version("2.0.0")
+  .version(version)
   .showHelpAfterError(true)
   .showSuggestionAfterError(true);
 

@@ -5,7 +5,7 @@ and governance features require a commercial license.
 
 ---
 
-## Free tier — `@weft/core` (MIT)
+## Free tier — `weft-core` (MIT)
 
 `AgentUnit<T>` is the core primitive. All developer composition operators are available
 without any commercial license.
@@ -44,12 +44,12 @@ without any commercial license.
 | `trackCost(span, tokens, model?)` | Record token cost on a span |
 | `trackError(span, error)` | Record error metadata on a span |
 
-Moved from `@weft/pro` to `@weft/core` in the opencore release so developers can
+Moved from `weft-pro` to `weft-core` in the opencore release so developers can
 debug their agent compositions without a commercial license. Advanced observability
 (multi-agent trace aggregation, cost dashboards, distributed tracing) will live
-in `@weft/pro` when added.
+in `weft-pro` when added.
 
-### What's in `@weft/core`
+### What's in `weft-core`
 
 - `AgentUnit` class with all operators above
 - `WeftError` + error codes
@@ -62,7 +62,7 @@ in `@weft/pro` when added.
 
 ---
 
-## Pro tier — `@weft/pro` (Commercial license)
+## Pro tier — `weft-pro` (Commercial license)
 
 Features that serve **team coordination, governance, and observability at organisational scale**.
 
@@ -77,33 +77,33 @@ Features that serve **team coordination, governance, and observability at organi
 | **Coherence/Confidence modules** | Standalone calculation libraries (variance, entropy, composite) |
 
 > **Note on observability**: Basic observability (span recording, trace store, cost/error
-> tracking, manual span instrumentation, collector hook) moved to `@weft/core` in the opencore
-> release. `@weft/pro` will add advanced observability features (multi-agent trace aggregation,
+> tracking, manual span instrumentation, collector hook) moved to `weft-core` in the opencore
+> release. `weft-pro` will add advanced observability features (multi-agent trace aggregation,
 > cost dashboards, distributed tracing) when those are built.
 
 > **Note on operator vs. factory distinction**:
 >
 > `dialectic`, `debate`, `solo`, and `coherence` are **free-tier `AgentUnit` instance methods**
 > (e.g. `agent.dialectic(leader, advisors, options?)`). They are available on every `AgentUnit`
-> via prototype augmentation and require no commercial license. `@weft/pro` does **not** shadow
+> via prototype augmentation and require no commercial license. `weft-pro` does **not** shadow
 > or re-export these operators.
 >
-> What `@weft/pro` adds are **standalone computation factory functions** (e.g. `tacoConsensus`)
+> What `weft-pro` adds are **standalone computation factory functions** (e.g. `tacoConsensus`)
 > that wrap multi-round coordination patterns targeting team workflows. `tacoConsensus` is not
 > the same as `.consensus()` — it adds iterative round management and convergence control on
 > top of the free-tier primitive. Other pro factories (stigmergy, antibodies, trust) have no
 > free-tier equivalent at all.
 >
 > Rule of thumb: if you call it as `agent.someMethod()`, it is free-tier. If you import it
-> as a named function from `@weft/pro`, it is pro-tier.
+> as a named function from `weft-pro`, it is pro-tier.
 
 ---
 
 ## Decision rule
 
-> **Is the feature a developer primitive?** → `@weft/core` (free)
+> **Is the feature a developer primitive?** → `weft-core` (free)
 >
-> **Is it organisational / governance / operational observability?** → `@weft/pro` (commercial)
+> **Is it organisational / governance / operational observability?** → `weft-pro` (commercial)
 
 Multi-round TaCo is in pro because it requires iterative round management and convergence
 configuration that targets team workflows, not individual agent composition.

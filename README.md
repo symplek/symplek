@@ -6,17 +6,72 @@ Composable agent primitives for TypeScript.
 
 ## The problem
 
-Coordinating multiple LLM calls in TypeScript usually means writing 80+ lines of scaffolding: promise chains, error handling, retry logic, consensus aggregation, and result tracking — before you get to any actual agent logic.
+Coordinating multiple LLM calls in TypeScript usually means writing 80+ lines of scaffolding: promise chains, error handling, retry logic, consensus aggregation, and result tracking, before you get to any actual agent logic.
 
-Weft replaces that scaffolding with a small algebra. The same coordination patterns — retry, fallback, parallel consensus, iterative refinement — compose as method chains on a single type: `AgentUnit<T>`.
+Weft replaces that scaffolding with a small algebra. The same coordination patterns, retry, fallback, parallel consensus, iterative refinement, compose as method chains on a single type: `AgentUnit<T>`.
 
-**15 lines of Weft:**
+### Multi-agent consensus in 10 lines
+
+Three agents vote on whether a contract clause is fair. Parallel execution, weighted voting, confidence tracking, all composed:
 
 ```typescript
-import { AgentUnit, createContext } from "@weft/core";
+import { AgentUnit, createContext } from "weft-core";
 
 const ctx = createContext();
 
+const result = await AgentUnit.from(async () =>
+  "The contractor shall bear all costs arising from delays, regardless of cause."
+)
+  .consensus([
+    (clause) => analyseAsLegalExpert(clause),
+    (clause) => analyseAsContractor(clause),
+    (clause) => analyseAsMediator(clause),
+  ])
+  .run(ctx);
+
+console.log(result.value.approved);      // false
+console.log(result.value.agreementRate);  // 0.33
+console.log(result.value.votes);          // [{decision: 'reject', confidence: 0.92, ...}]
+```
+
+No agent registration. No routing config. No network topology. Hand it functions, get a consensus result with provenance.
+
+### Simple AI calls with the Weft facade
+
+For single-prompt work, the `Weft` callable is the fastest path:
+
+```typescript
+import { Weft } from "weft-core/server";
+
+Weft.configure({ provider: "anthropic", model: "claude-sonnet-4-20250514" });
+
+const result = await Weft("Summarise this contract in three bullet points");
+console.log(result.value);
+```
+
+### From single call to coordination: `.coordinate()`
+
+The facade and the coordination algebra connect through `.coordinate()`. Start simple, compose up:
+
+```typescript
+const result = await Weft("Analyse this contract clause for risk")
+  .coordinate()
+  .consensus([
+    (analysis) => reviewAsLegalCounsel(analysis),
+    (analysis) => reviewAsProjectManager(analysis),
+    (analysis) => reviewAsFinanceDirector(analysis),
+  ])
+  .retry(2)
+  .run(ctx);
+```
+
+One import. One namespace. The same chain handles AI execution, multi-agent coordination, and resilience.
+
+### Resilience without coordination
+
+If you just need retry, timeout, and fallback, that composes too:
+
+```typescript
 const result = await AgentUnit.from(async () => {
   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -29,8 +84,6 @@ const result = await AgentUnit.from(async () => {
   .timeout(10_000)
   .fallback(AgentUnit.of("Summary unavailable."))
   .run(ctx, { trustMode: "legacy" });
-
-console.log(result);
 ```
 
 **Equivalent without Weft: ~80 lines** of try/catch, `Promise.race`, setTimeout, custom error classes, and a `while` loop.
@@ -40,7 +93,7 @@ console.log(result);
 ## Install
 
 ```
-pnpm add @weft/core
+pnpm add weft-core
 ```
 
 Node 18+. No required peer dependencies for the core package.
@@ -51,15 +104,15 @@ Node 18+. No required peer dependencies for the core package.
 
 | Package | Description | License |
 |---|---|---|
-| `@weft/core` | `AgentUnit` algebra: operators, error handling, observability | MIT |
-| `@weft/react` | React hooks (`useWeftStream`, `AIErrorBoundary`) | MIT |
-| `@weft/convex` | Convex action bindings | MIT |
-| `@weft/cli` | Scaffolding and agent debugging CLI | MIT |
-| `@weft/mcp` | MCP server exposing Weft operations as tool calls | MIT |
-| `@weft/harness` | Unit-testing harness for AgentUnit compositions | MIT |
-| `@weft/testing` | Vitest utilities and mock factories | MIT |
-| `@weft/devtools` | Chrome DevTools extension bridge for agent traces | MIT |
-| `@weft/pro` | Organisational features: TaCo consensus, trust registry, antibodies | BSL 1.1 |
+| `weft-core` | `AgentUnit` algebra: operators, error handling, observability | MIT |
+| `weft-react` | React hooks (`useWeftStream`, `AIErrorBoundary`) | MIT |
+| `weft-convex` | Convex action bindings | MIT |
+| `weft-cli` | Scaffolding and agent debugging CLI | MIT |
+| `weft-mcp` | MCP server exposing Weft operations as tool calls | MIT |
+| `weft-harness` | Unit-testing harness for AgentUnit compositions | MIT |
+| `weft-testing` | Vitest utilities and mock factories | MIT |
+| `weft-devtools` | Chrome DevTools extension bridge for agent traces | MIT |
+| `weft-pro` | Organisational features: TaCo consensus, trust registry, antibodies | BSL 1.1 |
 
 ---
 
@@ -98,7 +151,7 @@ All operators on `AgentUnit<T>` are free (MIT). The full list:
 - `.track(opts?)` — source-tracking wrapper
 - `.tap(fn)` — side-effect without modifying value
 
-**Observability** (also free, in `@weft/core`)
+**Observability** (also free, in `weft-core`)
 - `observable(unit, opts?)` — emit trace entries for a unit
 - `createOperatorSpan(type, name, parentSpanId?)` — manual span timing
 - `getTraces()` / `clearTraces()` — in-memory trace store
@@ -127,7 +180,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Short version: this repo is a distributi
 
 ## Licence
 
-`@weft/core` and all packages except `@weft/pro` are MIT.  
-`@weft/pro` is [Business Source License 1.1](packages/weft-pro/LICENSE) — source-available; converts to MIT on 2030-04-24.
+`weft-core` and all packages except `weft-pro` are MIT.  
+`weft-pro` is [Business Source License 1.1](packages/weft-pro/LICENSE) — source-available; converts to MIT on 2030-04-24.
 
 See [LICENSE](LICENSE) for the full per-package breakdown.

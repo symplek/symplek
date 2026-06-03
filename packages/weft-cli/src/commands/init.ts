@@ -90,7 +90,7 @@ async function getProjectName(options: CommandOptions): Promise<string> {
   }
 
   if (options.yes) {
-    return "my-Weft-project";
+    return "my-weft-project";
   }
 
   const { name } = await inquirer.prompt([
@@ -98,7 +98,7 @@ async function getProjectName(options: CommandOptions): Promise<string> {
       type: "input",
       name: "name",
       message: "Project name:",
-      default: "my-Weft-project",
+      default: "my-weft-project",
       validate: (input: string) => {
         if (!input.trim()) {
           return "Project name is required";
@@ -380,11 +380,11 @@ export function printSuccess(config: ProjectConfig): void {
   console.log(chalk.dim("Useful commands:"));
   console.log(chalk.dim(`  ${runCmd} build     Build your agents`));
   console.log(chalk.dim(`  ${runCmd} test      Run tests`));
-  console.log(chalk.dim(`  Weft add agent    Add a new agent`));
+  console.log(chalk.dim(`  weft add agent    Add a new agent`));
   console.log();
   console.log(
     chalk.dim("Documentation: ") +
-      chalk.blue.underline("https://Weft.dev/docs"),
+      chalk.blue.underline("https://weft.dev/docs"),
   );
   console.log();
 }

@@ -24,7 +24,7 @@
  *   fix the drift in the canonical or mirror source, then re-run.
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WeftBuilder } from "../builder";
@@ -37,6 +37,13 @@ import type { AgentContext, RetryOptions } from "../types";
 // ─── Canonical source file paths (for structural fallbacks) ──────────────────
 // Four levels up from src/__tests__: src/__tests__ → src → weft-core → packages → repo root
 const REPO_ROOT = resolve(__dirname, "../../../../");
+
+// ─── Skip-guard: canonical source only exists in the upstream private monorepo.
+// In this published package repo, convex/lib/agent_framework/ is absent.
+// All suites below are wrapped with describe.skipIf so they self-skip here
+// and still run in full in the upstream checkout where the canonical half is present.
+const CANONICAL_DIR = resolve(REPO_ROOT, "convex/lib/agent_framework");
+const canonicalPresent = existsSync(CANONICAL_DIR);
 
 function readCanonical(relativePath: string): string {
   return readFileSync(resolve(REPO_ROOT, relativePath), "utf8");
@@ -89,7 +96,7 @@ function _extractTypeMembers(source: string, typeName: string): string[] {
 // 1. AgentUnit
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("AgentUnit — canonical ↔ mirror contract", () => {
+describe.skipIf(!canonicalPresent)("AgentUnit — canonical ↔ mirror contract", () => {
   const ctx: AgentContext = createContext();
 
   // Silence legacy deprecation warnings emitted by .run(ctx, {trustMode:'legacy'})
@@ -474,7 +481,7 @@ describe("AgentUnit — canonical ↔ mirror contract", () => {
 // 2. WeftError
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("WeftError — canonical ↔ mirror contract", () => {
+describe.skipIf(!canonicalPresent)("WeftError — canonical ↔ mirror contract", () => {
   // ── 2a. ErrorCode taxonomy parity ─────────────────────────────────────────
 
   describe("ErrorCode taxonomy", () => {
@@ -712,7 +719,7 @@ describe("WeftError — canonical ↔ mirror contract", () => {
 // 3. WeftBuilder
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("WeftBuilder — canonical ↔ mirror contract", () => {
+describe.skipIf(!canonicalPresent)("WeftBuilder — canonical ↔ mirror contract", () => {
   /**
    * STRUCTURAL-FALLBACK (canonical side):
    * The canonical WeftBuilder in convex/lib/agent_framework/weft/facades/shared.ts
@@ -860,7 +867,7 @@ describe("WeftBuilder — canonical ↔ mirror contract", () => {
 // 4. RetryOptions
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("RetryOptions — canonical ↔ mirror contract", () => {
+describe.skipIf(!canonicalPresent)("RetryOptions — canonical ↔ mirror contract", () => {
   /**
    * TWO RetryOptions exist and they are intentionally different:
    *
@@ -1040,7 +1047,7 @@ describe("RetryOptions — canonical ↔ mirror contract", () => {
 //    (flagged for maintainer review)
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("Additional shared concepts — maintainer flags", () => {
+describe.skipIf(!canonicalPresent)("Additional shared concepts — maintainer flags", () => {
   /**
    * These types/functions appear in both codebases but are not listed in the
    * WEFT-ARCHITECTURE.md §"Shared concepts" table. They may warrant explicit

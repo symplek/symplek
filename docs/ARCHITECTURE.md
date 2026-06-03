@@ -9,9 +9,9 @@ Weft has two codebases:
 | Layer | Where | Role |
 |---|---|---|
 | Canonical source | A private upstream monorepo | Where Weft is developed day-to-day, alongside an application that consumes it. Not open-sourced. |
-| Distribution mirror | This repo (`wefthq/weft`) | What gets published to npm under `@weft/*`. The source of truth for everything you can `pnpm add`. |
+| Distribution mirror | This repo (`wefthq/weft`) | What gets published to npm as `weft-*`. The source of truth for everything you can `pnpm add`. |
 
-The canonical source uses a runtime-specific module resolver that cannot be consumed by standard Node.js bundlers. The mirror strips those runtime bindings and exposes only the environment-agnostic core, so any consumer can `pnpm add @weft/core` without bringing in our internal runtime.
+The canonical source uses a runtime-specific module resolver that cannot be consumed by standard Node.js bundlers. The mirror strips those runtime bindings and exposes only the environment-agnostic core, so any consumer can `pnpm add weft-core` without bringing in our internal runtime.
 
 Sync is **manual, per-release**. See [`SYNC.md`](../SYNC.md) at the repo root.
 
@@ -19,15 +19,15 @@ Sync is **manual, per-release**. See [`SYNC.md`](../SYNC.md) at the repo root.
 
 | Package | Licence | What it does |
 |---|---|---|
-| `@weft/core` | MIT | `AgentUnit`, composition operators, basic observability, providers |
-| `@weft/pro` | BSL 1.1 | TaCo consensus, antibodies, trust registry, dashboards |
-| `@weft/react` | MIT | React hooks for streaming and error boundaries |
-| `@weft/convex` | MIT | Convex bindings (wraps `@weft/core/server`) |
-| `@weft/cli` | MIT | Scaffolding, debugging |
-| `@weft/mcp` | MIT | MCP server exposing Weft as tool calls |
-| `@weft/harness` | MIT | Replay / rehearse / fault-injection for tests |
-| `@weft/devtools` | MIT | Trace and span inspection |
-| `@weft/testing` | MIT | Vitest utilities, mock factories, deterministic providers |
+| `weft-core` | MIT | `AgentUnit`, composition operators, basic observability, providers |
+| `weft-pro` | BSL 1.1 | TaCo consensus, antibodies, trust registry, dashboards |
+| `weft-react` | MIT | React hooks for streaming and error boundaries |
+| `weft-convex` | MIT | Convex bindings (wraps `weft-core/server`) |
+| `weft-cli` | MIT | Scaffolding, debugging |
+| `weft-mcp` | MIT | MCP server exposing Weft as tool calls |
+| `weft-harness` | MIT | Replay / rehearse / fault-injection for tests |
+| `weft-devtools` | MIT | Trace and span inspection |
+| `weft-testing` | MIT | Vitest utilities, mock factories, deterministic providers |
 
 ## Shared concepts
 
@@ -84,14 +84,14 @@ Why: the mirror builder exists to be tree-shakeable and runtime-free. The canoni
 
 ```typescript
 // External consumers — what you'll do:
-import { AgentUnit, Weft } from "@weft/core/server";
+import { AgentUnit, Weft } from "weft-core/server";
 
 // React components:
-import { AIErrorBoundary } from "@weft/react";
-import type { WeftErrorDetail } from "@weft/core";
+import { AIErrorBoundary } from "weft-react";
+import type { WeftErrorDetail } from "weft-core";
 ```
 
-`@weft/core` is browser-safe. `@weft/core/server` pulls in provider SDKs and is Node-only.
+`weft-core` is browser-safe. `weft-core/server` pulls in provider SDKs and is Node-only.
 
 ## Pre-1.0 stance
 

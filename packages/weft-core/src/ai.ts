@@ -9,6 +9,7 @@ import { createAgent } from "./agent/agent";
 // consensus.ts — it had incompatible Vote/ConsensusResult types vs types.ts.
 // AgentUnit uses operators.ts consensus (createConsensusComputation) instead.
 import { WeftError } from "./errors";
+import { getInitPromise, clearInitPromise } from "./globalConfig";
 import { parallel } from "./parallel";
 import type { AIOptions as BaseAIOptions } from "./providers/auto";
 import { detectProvider, selectModelForTask } from "./providers/auto";
@@ -108,6 +109,15 @@ async function aiImplementation<T extends z.ZodType = any>(
   prompt: string,
   options?: AIOptions<T>,
 ): Promise<AIResult<T>> {
+  // Await the deferred provider bootstrap enqueued by Weft.configure().
+  // See OQ-1 resolution in wave-0-design.md: configure() is void/synchronous;
+  // the async adapter registration is settled here before the first execution.
+  const initP = getInitPromise();
+  if (initP) {
+    await initP;
+    clearInitPromise();
+  }
+
   const startTime = Date.now();
   try {
     // 1. Detect provider if not specified

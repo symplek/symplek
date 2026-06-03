@@ -53,7 +53,7 @@ export interface ResilienceOptions<T> {
  *
  * @example
  *   const safe = resilient(
- *     Weft(prompt).toUnit(),
+ *     Weft(prompt).coordinate(),
  *     { maxAttempts: 3, timeoutMs: 10_000, fallback: "" },
  *   );
  */

@@ -29,7 +29,7 @@ A useful bug report includes:
 1. A **minimal reproduction** — the shortest code that triggers the problem. A link to a StackBlitz or a plain Node script is ideal.
 2. What you expected to happen.
 3. What actually happened, including the full error message and stack trace.
-4. Your environment: Node version, package versions (`pnpm list @weft/core`).
+4. Your environment: Node version, package versions (`pnpm list weft-core`).
 
 We cannot investigate bugs that don't have a reproduction. "It throws sometimes" is not actionable.
 
@@ -39,7 +39,7 @@ We cannot investigate bugs that don't have a reproduction. "It throws sometimes"
 
 **Open a Discussion before opening a PR.**
 
-Feature PRs without prior Discussion agreement are closed without review. This is not a gate to slow you down — it's to avoid the situation where you invest time writing code for something we've already decided not to support, or something that belongs in `@weft/pro` rather than `@weft/core`.
+Feature PRs without prior Discussion agreement are closed without review. This is not a gate to slow you down — it's to avoid the situation where you invest time writing code for something we've already decided not to support, or something that belongs in `weft-pro` rather than `weft-core`.
 
 The Discussion process is:
 
@@ -48,9 +48,9 @@ The Discussion process is:
 3. If maintainers agree it fits the scope and tier, we'll say so explicitly in the thread.
 4. Then open a PR that references the Discussion.
 
-Features in scope for `@weft/core`: developer-facing primitives that make AgentUnit composition easier or more expressive. Free forever.
+Features in scope for `weft-core`: developer-facing primitives that make AgentUnit composition easier or more expressive. Free forever.
 
-Features in scope for `@weft/pro`: organisational coordination, governance, and advanced observability. Commercial licence.
+Features in scope for `weft-pro`: organisational coordination, governance, and advanced observability. Commercial licence.
 
 Features out of scope for this repo: anything that requires the upstream application's Convex runtime, scheduler, or database bindings.
 
@@ -61,8 +61,8 @@ Features out of scope for this repo: anything that requires the upstream applica
 We use [Biome](https://biomejs.dev/) for formatting and linting. No ESLint, no Prettier.
 
 ```
-pnpm --filter "@weft/*" run lint
-pnpm --filter "@weft/*" run typecheck
+pnpm --filter "weft-*" run lint
+pnpm --filter "weft-*" run typecheck
 ```
 
 Match the style of the surrounding code. We are not prescriptive about every micro-preference, but the formatter is non-negotiable — CI will fail on format violations.
@@ -96,8 +96,8 @@ Every merged commit that affects a published package needs a changeset. See [.ch
 
 ```
 pnpm install --frozen-lockfile
-pnpm --filter "@weft/*" run build
-pnpm --filter "@weft/*" test
+pnpm --filter "weft-*" run build
+pnpm --filter "weft-*" test
 ```
 
 The test suite includes canonical ↔ mirror contract tests that read source files from a relative path (`../../../../convex/lib/agent_framework/`). When running in this mirror repo without the upstream canonical source present, those structural fallback tests will fail. That is expected — they exist to guard against drift in the ProSentinel monorepo context. The runtime behaviour tests (which do not read canonical source files) will pass.
@@ -109,7 +109,7 @@ If you are writing a new test, add it to the appropriate package under `src/__te
 ## What not to send
 
 - PRs that add dependencies on `convex`, `@convex-dev/*`, or any Convex-specific runtime type. Those belong upstream.
-- PRs that modify `@weft/pro` in a way that weakens the tier boundary. The boundary between free and commercial is a deliberate product decision, not an implementation accident.
+- PRs that modify `weft-pro` in a way that weakens the tier boundary. The boundary between free and commercial is a deliberate product decision, not an implementation accident.
 - PRs against the `dev` branch. Target `main`.
 - Large refactors without prior Discussion agreement. Refactors that touch the core algebra are high-risk and require careful review against the canonical source.
 

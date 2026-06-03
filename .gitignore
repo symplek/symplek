@@ -18,3 +18,10 @@ outputs/
 
 # Private planning / strategy — kept locally, not published.
 WEFT-RELEASE-PLAN.md
+.claude/logs/
+.claude/agent-memory/
+.claude/.allow-director-research
+outputs/.context/
+outputs/.improvements/
+outputs/.ouroboros/
+outputs/.project-registry/

@@ -40,8 +40,23 @@ export interface WeftOptions<T = unknown> {
 /**
  * Lazy builder wrapping real AI execution via ai().
  *
- * - `await Weft("task")` — runs the prompt through the provider pipeline
- * - `Weft("task").toUnit()` — escape hatch to full AgentUnit composition
+ * - `await Weft("task")` runs the prompt through the provider pipeline.
+ * - `Weft("task").coordinate()` bridges into the full AgentUnit algebra,
+ *   so coordination operators like `.consensus()`, `.debate()`, and
+ *   `.dialectic()` compose directly onto a facade call.
+ * - `Weft("task").toUnit()` is an alias for `.coordinate()`.
+ *
+ * @example
+ * ```typescript
+ * // Simple call
+ * const result = await Weft("Summarise this");
+ *
+ * // Bridge to multi-agent coordination
+ * const consensus = await Weft("Analyse this clause")
+ *   .coordinate()
+ *   .consensus([legal, contractor, mediator])
+ *   .run(ctx);
+ * ```
  */
 export class WeftBuilder<T = unknown> implements PromiseLike<TrackedResult<T>> {
   private readonly task: string;
@@ -53,18 +68,30 @@ export class WeftBuilder<T = unknown> implements PromiseLike<TrackedResult<T>> {
     this.options = options ?? {};
   }
 
-  /** Escape hatch — returns an AgentUnit backed by real AI execution. */
-  toUnit(): AgentUnit<T> {
+  /**
+   * Bridge into the full AgentUnit coordination algebra.
+   * Returns an AgentUnit backed by real AI execution, ready for
+   * `.consensus()`, `.debate()`, `.dialectic()`, and all other operators.
+   */
+  coordinate(): AgentUnit<T> {
     if (this._unit === null) {
       this._unit = this.buildUnit();
     }
     return this._unit;
   }
 
+  /**
+   * Alias for `.coordinate()`.
+   * @deprecated Prefer `.coordinate()` for clarity. Will be removed in v2.
+   */
+  toUnit(): AgentUnit<T> {
+    return this.coordinate();
+  }
+
   /** Execute the underlying AgentUnit and return its tracked result. */
   async run(): Promise<TrackedResult<T>> {
     const ctx = createContext();
-    return this.toUnit().run(ctx);
+    return this.coordinate().run(ctx);
   }
 
   then<TResult1 = TrackedResult<T>, TResult2 = never>(

@@ -24,8 +24,8 @@ The Convex runtime uses a custom module resolver that cannot be consumed by stan
 | AgentUnit and operators | Full production set | Core portable set |
 | Convex scheduler integration | Yes (`ctx.scheduler`) | No (use your own runtime) |
 | Weft facades (design/review/research) | Full | Subset in `weft-core` |
-| React hooks | No | `@weft/react` |
-| CLI tooling | No | `@weft/cli` |
+| React hooks | No | `weft-react` |
+| CLI tooling | No | `weft-cli` |
 
 ## Package structure
 
@@ -34,7 +34,7 @@ The Convex runtime uses a custom module resolver that cannot be consumed by stan
 | `weft-core` | MIT | Core `AgentUnit`, composition operators, and basic observability — free forever |
 | `weft-pro` | BSL 1.1 | Organisational features: TaCo, trust registry, antibodies |
 | `weft-react` | MIT | React hooks (`useSwarmConsensus`, `useWeftStream`, `AIErrorBoundary`) |
-| `weft-convex` | MIT | Convex bindings — wraps `@weft/core/server` for Convex actions |
+| `weft-convex` | MIT | Convex bindings — wraps `weft-core/server` for Convex actions |
 | `weft-cli` | MIT | Developer CLI for scaffolding and agent debugging |
 | `weft-mcp` | MIT | MCP server exposing Weft operations as tool calls |
 | `weft-harness` | MIT | Testing harness for unit-testing AgentUnit compositions |
@@ -84,7 +84,7 @@ Sync is **manual and per-release** — there is no automated sync enforcement be
 
 ## Import rules
 
-The Convex bundler cannot resolve `@weft/core` workspace packages. Always use relative imports inside `convex/`.
+The Convex bundler cannot resolve `weft-core` workspace packages. Always use relative imports inside `convex/`.
 
 ```typescript
 // In convex/ files (canonical source):
@@ -92,18 +92,18 @@ import { AgentUnit } from "../../lib/agent_framework/algebra";
 import { WeftError } from "../../lib/agent_framework/core/weftErrors";
 
 // Never in convex/ files (fails at Convex bundler):
-import { AgentUnit } from "@weft/core";
+import { AgentUnit } from "weft-core";
 
 // In packages/ or external consumers (distribution mirror):
-import { AgentUnit } from "@weft/core";
-import { ai } from "@weft/core/server";
+import { AgentUnit } from "weft-core";
+import { ai } from "weft-core/server";
 
 // In React components:
-import { AIErrorBoundary } from "@weft/react";
-import type { WeftErrorDetail } from "@weft/core";
+import { AIErrorBoundary } from "weft-react";
+import type { WeftErrorDetail } from "weft-core";
 ```
 
-The `.cursor/scripts/common/utils/check-weft-imports.ps1` guard enforces this rule inside the monorepo: it blocks `@weft/core` imports from `convex/` files.
+The tier-boundary CI job enforces this rule inside the monorepo: it blocks `weft-core` imports from `convex/` files.
 
 ## Which API to use
 
@@ -111,6 +111,6 @@ The `.cursor/scripts/common/utils/check-weft-imports.ps1` guard enforces this ru
 |---|---|
 | A Convex action in `convex/agents/` | `convex/lib/agent_framework` (canonical) |
 | A Convex query/mutation | `convex/lib/agent_framework` (types only) |
-| An external package or CLI tool | `@weft/core` / `@weft/core/server` |
-| A React component consuming Weft | `@weft/react` + `@weft/core` types |
-| Middleware for Convex actions | `@weft/convex` (wraps `@weft/core/server`) |
+| An external package or CLI tool | `weft-core` / `weft-core/server` |
+| A React component consuming Weft | `weft-react` + `weft-core` types |
+| Middleware for Convex actions | `weft-convex` (wraps `weft-core/server`) |

@@ -4,6 +4,7 @@
  */
 
 import { WeftError } from "./errors";
+import { clearInitPromise, getInitPromise } from "./globalConfig";
 import {
   type AIMessage,
   detectProvider,
@@ -42,6 +43,17 @@ export async function* stream(
   prompt: string,
   options?: StreamOptions,
 ): AsyncGenerator<string> {
+  // Drain the deferred provider bootstrap enqueued by Weft.configure().
+  // Mirrors the same drain in ai.ts (aiImplementation). Without this, a caller
+  // who does `Weft.configure({ provider, apiKey }); Weft.stream(...)` will
+  // call detectProvider() before the configured adapter is registered and fail
+  // with "provider not found".
+  const initP = getInitPromise();
+  if (initP) {
+    await initP;
+    clearInitPromise();
+  }
+
   const signal = options?.signal;
 
   // Check if already aborted

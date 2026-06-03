@@ -62,26 +62,30 @@ console.log(result.value); // "Paris"
 ### Step 2 — Agents in parallel
 
 ```typescript
-import { AgentUnit, createContext } from "weft-core";
+import { Weft, AgentUnit, createContext } from "weft-core/server";
 
 const ctx = createContext();
 
 const result = await AgentUnit.zipAll([
-  AgentUnit.from(async () => "analysis: low risk"),
-  AgentUnit.from(async () => "recommendation: proceed"),
+  Weft.unit(async () => "analysis: low risk"),
+  Weft.unit(async () => "recommendation: proceed"),
 ]).map(([analysis, rec]) => ({ analysis, recommendation: rec })).run(ctx);
 
 console.log(result.value); // { analysis: "analysis: low risk", recommendation: "proceed" }
 ```
 
+`Weft.unit(fn)` is the bridge from facade to composition — same as `AgentUnit.from(fn)`, but reachable from the namespace you already imported.
+
 ### Step 3 — Consensus vote
 
 ```typescript
-import { AgentUnit, createContext } from "weft-core";
+import { Weft, createContext } from "weft-core/server";
 
 const ctx = createContext();
 
-const voted = await AgentUnit.of("Ship the feature")
+// Start from a Weft(task) call and flow into multi-agent coordination via .coordinate()
+const voted = await Weft("Should we ship the feature?")
+  .coordinate()
   .consensus([
     (_) => ({ decision: "approve" as const, confidence: 0.9 }),
     (_) => ({ decision: "approve" as const, confidence: 0.8 }),
@@ -93,21 +97,31 @@ console.log(voted.value.approved);  // true
 console.log(voted.value.consensus); // "reached"
 ```
 
+Or start from a plain value with `Weft.of`:
+
+```typescript
+const voted = await Weft.of("Ship the feature")
+  .consensus([voter1, voter2, voter3])
+  .run(ctx);
+```
+
 ### Step 4 — Resilience
 
 ```typescript
-import { AgentUnit, createContext } from "weft-core";
+import { Weft, createContext } from "weft-core/server";
 
 const ctx = createContext();
 
-const robust = AgentUnit
-  .from(async () => callExternalAPI())
+const robust = Weft
+  .unit(async () => callExternalAPI())
   .retry(3)
   .timeout(10_000)
-  .fallback(AgentUnit.of({ cached: true, result: "default response" }));
+  .fallback(Weft.of({ cached: true, result: "default response" }));
 
 const result = await robust.run(ctx);
 ```
+
+One import. `Weft(task)` for the simple case, `Weft.unit(fn)` / `Weft.of(value)` / `.coordinate()` to flow into consensus, parallel, retry, fallback. No second namespace to discover.
 
 ---
 
@@ -118,7 +132,7 @@ const result = await robust.run(ctx);
 | `AgentUnit` | `weft-core` | Lazy agent monad — `.from()`, `.of()`, `.map()`, `.flatMap()`, `.zipAll()`, `.race()` |
 | `createContext` | `weft-core` | Create an `AgentContext` for `.run()` calls (zero-arg works) |
 | `WeftError` | `weft-core` | Structured error with `.code`, `.message`, `.action` fields |
-| `Weft` | `weft-core/server` | Zero-boilerplate facade — `Weft(task)`, `.run()`, `.stream()`, `.agent()`, `.configure()`, `.providers()` |
+| `Weft` | `weft-core/server` | Zero-boilerplate facade — `Weft(task)`, `.run()`, `.stream()`, `.agent()`, `.unit()`, `.of()`, `.configure()`, `.providers()` |
 
 ---
 

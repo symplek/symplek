@@ -52,19 +52,25 @@ describe("weft-core/server — Package Contract Smoke", () => {
       expect(WeftBuilder).toBeDefined();
     });
 
-    it("Weft() returns a WeftBuilder with run/toUnit/then methods", () => {
+    it("Weft() returns a WeftBuilder with run/coordinate/toUnit/then methods", () => {
       const builder = Weft("test task");
       expect(builder).toBeInstanceOf(WeftBuilder);
+      expect(typeof builder.coordinate).toBe("function");
       expect(typeof builder.toUnit).toBe("function");
       expect(typeof builder.run).toBe("function");
       expect(typeof builder.then).toBe("function");
     });
 
-    it("toUnit() returns an AgentUnit backed by a real computation (not a static string)", () => {
-      const unit = Weft("test task").toUnit();
+    it("coordinate() returns an AgentUnit backed by a real computation (not a static string)", () => {
+      const unit = Weft("test task").coordinate();
       expect(typeof unit.run).toBe("function");
       expect(typeof unit.map).toBe("function");
       expect(typeof unit.flatMap).toBe("function");
+    });
+
+    it("toUnit() is an alias for coordinate() returning the same instance", () => {
+      const builder = Weft("test task");
+      expect(builder.coordinate()).toBe(builder.toUnit());
     });
 
     it("routes Weft().run() through ai() and returns the AI result instead of echoing the task", async () => {

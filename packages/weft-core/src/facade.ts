@@ -14,10 +14,25 @@
 import type { z } from "zod";
 import type { AgentConfig } from "./agent";
 import { AgentBuilder, createAgent } from "./agent";
+import { AgentUnit } from "./AgentUnit";
+import type { AgentComputation } from "./AgentUnit";
 import { WeftBuilder } from "./builder";
+import { WeftError } from "./errors";
+import {
+  getGlobalConfig,
+  mergeGlobalConfig,
+  resetAll,
+  setInitPromise,
+} from "./globalConfig";
+// TODO(Wave 3 / Contract 2): replace these static imports with lazy dynamic imports
+// once the per-adapter lazy-load pattern lands. For now, factories are synchronous.
+import { createAnthropicProvider } from "./providers/anthropic";
+import { createGoogleProvider } from "./providers/google";
+import { createOpenAIProvider } from "./providers/openai";
 import { providerRegistry } from "./providers/registry";
 import type { StreamOptions } from "./streaming";
 import { stream } from "./streaming";
+import { traceManager } from "./trace";
 import type { TrackedResult } from "./types";
 
 export type { WeftOptions } from "./builder";
@@ -80,6 +95,26 @@ export interface WeftFunction {
   stream(task: string, options?: StreamOptions): AsyncGenerator<string>;
   /** Create a fluent AgentBuilder with per-agent configuration. */
   agent(config?: AgentConfig): AgentBuilder;
+  /**
+   * Bridge into AgentUnit composition from the Weft namespace. Equivalent to
+   * `AgentUnit.from(computation)` — lets you reach `.consensus()`, `.zipAll()`,
+   * `.retry()`, etc. without a second import. Complements `Weft(task).coordinate()`
+   * which bridges from a Weft(task) call into the same AgentUnit composition.
+   *
+   * @example
+   * ```typescript
+   * const decision = await Weft.unit(async () => "Ship the feature")
+   *   .consensus([voter1, voter2, voter3])
+   *   .run(ctx);
+   * ```
+   */
+  unit<T>(computation: AgentComputation<T>): AgentUnit<T>;
+  /**
+   * Lift a plain value into an AgentUnit. Equivalent to `AgentUnit.of(value)`.
+   * Useful as the start of a composition chain when you don't need an async
+   * computation up front.
+   */
+  of<T>(value: T): AgentUnit<T>;
   /** Store one-time global configuration (provider, model, apiKey, debug). */
   configure(options: WeftConfigOptions): void;
   /** List all known providers and their configured status. */
@@ -87,10 +122,80 @@ export interface WeftFunction {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GLOBAL CONFIG SINGLETON
+// GLOBAL CONFIG SINGLETON + INIT PROMISE
 // ─────────────────────────────────────────────────────────────────────────────
 
-let _globalConfig: WeftConfigOptions = {};
+// _globalConfig is now held in ./globalConfig.ts to avoid circular imports.
+// facade.ts writes via mergeGlobalConfig(); providers/auto.ts reads via getGlobalConfig().
+
+// _initPromise slot lives in ./globalConfig.ts (setInitPromise / getInitPromise / clearInitPromise).
+// Keeping it there prevents the facade.ts → ai.ts → facade.ts circular import that would arise
+// if ai.ts imported _initPromise directly from here.
+
+/**
+ * The supported provider names. Unknown names produce a `PROVIDER_ERROR`.
+ *
+ * NOTE: "openrouter" is intentionally absent. The OpenAI-compatible adapter does NOT
+ * accept a baseURL override in the current Wave-0 implementation, so constructing it
+ * with an OpenRouter key would silently route requests to api.openai.com and fail.
+ * A dedicated OpenRouter adapter is planned for Wave 3 / Contract 2. Until then,
+ * configure({ provider: "openrouter" }) throws a clear PROVIDER_ERROR so callers
+ * get an actionable message instead of a silent mis-route.
+ */
+const SUPPORTED_PROVIDERS = ["openai", "anthropic", "google"] as const;
+type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number];
+
+/**
+ * Bootstrap the provider adapter and register it as the registry default.
+ * Called inside `_configure()` via `_initPromise` to keep `configure()` void.
+ *
+ * Note: for Wave 0, factories are called synchronously (they use static imports).
+ * Wave 3 / Contract 2 will make this truly async via lazy dynamic imports.
+ */
+async function _bootstrapProvider(
+  provider: string,
+  apiKey: string,
+): Promise<void> {
+  // TODO(Wave 3 / Contract 2): switch each branch to: const mod = await import("./providers/<name>"); mod.create<Name>Provider(apiKey)
+  switch (provider as SupportedProvider) {
+    case "openai": {
+      const p = createOpenAIProvider(apiKey);
+      providerRegistry.register(p, true);
+      break;
+    }
+    case "anthropic": {
+      const p = createAnthropicProvider(apiKey);
+      providerRegistry.register(p, true);
+      break;
+    }
+    case "google": {
+      const p = createGoogleProvider(apiKey);
+      providerRegistry.register(p, true);
+      break;
+    }
+    default: {
+      // This branch is unreachable at runtime — provider was validated synchronously
+      // in _configure(). It is retained here as a defensive guard for Wave 3 refactors.
+      throw new WeftError({
+        code: "PROVIDER_ERROR",
+        why: `Unknown provider "${String(provider)}". Supported providers: ${SUPPORTED_PROVIDERS.join(", ")}.`,
+        fix: {
+          description: `Use one of the supported provider identifiers.`,
+          docsUrl: "https://github.com/weft-ai/weft-core#provider-setup",
+        },
+        example: `Weft.configure({ provider: "openai", apiKey: process.env.OPENAI_API_KEY })`,
+      });
+    }
+  }
+}
+
+/**
+ * Reset global config + init promise to empty/null. Used in tests.
+ * @internal
+ */
+export function _resetForTesting(): void {
+  resetAll();
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NAMESPACE METHOD IMPLEMENTATIONS
@@ -108,8 +213,42 @@ function _agent(config?: AgentConfig): AgentBuilder {
 }
 
 function _configure(options: WeftConfigOptions): void {
-  _globalConfig = { ..._globalConfig, ...options };
+  // Validate provider name synchronously so callers get immediate feedback
+  // even though the bootstrap itself is deferred.
+  if (
+    options.provider !== undefined &&
+    !SUPPORTED_PROVIDERS.includes(options.provider as SupportedProvider)
+  ) {
+    throw new WeftError({
+      code: "PROVIDER_ERROR",
+      why: `Unknown provider "${options.provider}". Supported providers: ${SUPPORTED_PROVIDERS.join(", ")}.`,
+      fix: {
+        description: `Use one of the supported provider identifiers.`,
+        docsUrl: "https://github.com/weft-ai/weft-core#provider-setup",
+      },
+      example: `Weft.configure({ provider: "openai", apiKey: process.env.OPENAI_API_KEY })`,
+    });
+  }
+
+  // Merge options (second call wins per field — contract obligation 4).
+  mergeGlobalConfig(options);
+
+  // Apply debug immediately — no async needed.
+  if (options.debug !== undefined) {
+    traceManager.debug = options.debug;
+  }
+
+  // Enqueue provider bootstrap so configure() remains void/synchronous at
+  // the call site while ai() awaits completion before first execution.
+  // See OQ-1 resolution in wave-0-design.md. Read the merged config after
+  // mergeGlobalConfig() so accumulated fields (e.g. apiKey from a prior call)
+  // are visible.
+  const merged = getGlobalConfig();
+  if (merged.provider && merged.apiKey) {
+    setInitPromise(_bootstrapProvider(merged.provider, merged.apiKey));
+  }
 }
+
 
 const KNOWN_PROVIDERS: ReadonlyArray<{
   id: string;
@@ -119,7 +258,7 @@ const KNOWN_PROVIDERS: ReadonlyArray<{
   { id: "openai", name: "OpenAI", envKey: "OPENAI_API_KEY" },
   { id: "anthropic", name: "Anthropic", envKey: "ANTHROPIC_API_KEY" },
   { id: "google", name: "Google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY" },
-  { id: "openrouter", name: "OpenRouter", envKey: "OPENROUTER_API_KEY" },
+  // openrouter omitted — not yet supported via configure(); see SUPPORTED_PROVIDERS note above.
 ];
 
 function _providers(): ProviderInfo[] {
@@ -165,11 +304,23 @@ function _weftFn<T = string>(
  *
  * @example
  * ```typescript
- * // Direct call
- * const result = await Weft('task');
+ * // Simple AI call
+ * const result = await Weft('Summarise this document');
  *
- * // Explicit run
- * const result = await Weft.run('task');
+ * // Bridge to coordination via .coordinate() (from a Weft(task) call)
+ * const consensus = await Weft('Analyse this clause')
+ *   .coordinate()
+ *   .consensus([reviewer1, reviewer2, reviewer3])
+ *   .run(ctx);
+ *
+ * // Or bridge directly from the namespace with Weft.unit / Weft.of
+ * const decision = await Weft.unit(async () => "Ship the feature")
+ *   .consensus([voter1, voter2, voter3])
+ *   .run(ctx);
+ *
+ * const voted = await Weft.of("Ship the feature")
+ *   .consensus([voter1, voter2, voter3])
+ *   .run(ctx);
  *
  * // Streaming
  * for await (const chunk of Weft.stream('task')) { process.stdout.write(chunk); }
@@ -178,7 +329,7 @@ function _weftFn<T = string>(
  * const result = await Weft.agent({ model: 'gpt-4o' }).prompt('Summarize').run();
  *
  * // One-time config
- * Weft.configure({ provider: 'openai', model: 'gpt-4o' });
+ * Weft.configure({ provider: 'anthropic', model: 'claude-sonnet-4-20250514' });
  *
  * // Provider list
  * const providers = Weft.providers();
@@ -188,6 +339,8 @@ export const Weft: WeftFunction = Object.assign(_weftFn, {
   run: _run,
   stream,
   agent: _agent,
+  unit: <T>(computation: AgentComputation<T>) => AgentUnit.from<T>(computation),
+  of: <T>(value: T) => AgentUnit.of<T>(value),
   configure: _configure,
   providers: _providers,
 }) as unknown as WeftFunction;

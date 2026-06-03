@@ -7,7 +7,7 @@ import { Weft } from "weft-core/server";
  *
  * Demonstrates the core pattern:
  *   1. `Weft(prompt)` builds an AI call.
- *   2. `.toUnit()` lifts it into the AgentUnit<T> algebra.
+ *   2. `.coordinate()` lifts it into the AgentUnit<T> algebra.
  *   3. Layer safety operators on top (retry, timeout, fallback, …).
  *   4. `.run(ctx)` executes and returns a TrackedResult.
  *
@@ -27,7 +27,7 @@ async function main(): Promise<void> {
   const input = "The quick brown fox jumps over the lazy dog.";
 
   const result = await Weft(`Summarise in one sentence: ${input}`)
-    .toUnit()
+    .coordinate()
     .retry(2)
     .timeout(15_000)
     .run(ctx);

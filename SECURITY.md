@@ -2,19 +2,19 @@
 
 ## Supported versions
 
-Weft is pre-1.0. We support **only the latest minor of each `@weft/*` package** while in 0.x. Older minors receive no patches. Pin exact versions and upgrade deliberately.
+Weft is pre-1.0. We support **only the latest minor of each `weft-*` package** while in 0.x. Older minors receive no patches. Pin exact versions and upgrade deliberately.
 
 | Package | Supported |
 |---|---|
-| `@weft/core` | Latest 0.x minor |
-| `@weft/react` | Latest 0.x minor |
-| `@weft/convex` | Latest 0.x minor |
-| `@weft/cli` | Latest 0.x minor |
-| `@weft/mcp` | Latest 0.x minor |
-| `@weft/harness` | Latest 0.x minor |
-| `@weft/testing` | Latest 0.x minor |
-| `@weft/devtools` | Latest 0.x minor |
-| `@weft/pro` | Latest 0.x minor |
+| `weft-core` | Latest 0.x minor |
+| `weft-react` | Latest 0.x minor |
+| `weft-convex` | Latest 0.x minor |
+| `weft-cli` | Latest 0.x minor |
+| `weft-mcp` | Latest 0.x minor |
+| `weft-harness` | Latest 0.x minor |
+| `weft-testing` | Latest 0.x minor |
+| `weft-devtools` | Latest 0.x minor |
+| `weft-pro` | Latest 0.x minor |
 
 ## Reporting a vulnerability
 
@@ -42,7 +42,7 @@ If we cannot meet the timeline, we will communicate revised dates in writing. If
 
 ## In scope
 
-- The published `@weft/*` packages and their build artefacts on npm.
+- The published `weft-*` packages and their build artefacts on npm.
 - This repo's CI configuration and release tooling.
 - The Weft documentation site.
 
