@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { WeftError } from "../errors";
+import { redactErrorMessage, safeCause } from "./redact";
 import type {
   AIMessage,
   AIRequest,
@@ -104,8 +105,8 @@ export function createOpenAIProvider(apiKey: string): Provider {
           finishReason: transformFinishReason(choice.finish_reason),
           raw: response,
         };
-      } catch (error: any) {
-        const detail = error.message?.replace(apiKey, "[REDACTED]");
+      } catch (error: unknown) {
+        const detail = redactErrorMessage(apiKey, error);
         throw new WeftError({
           code: "PROVIDER_ERROR",
           why: `OpenAI request failed: ${detail}`,
@@ -115,7 +116,7 @@ export function createOpenAIProvider(apiKey: string): Provider {
             docsUrl: "https://platform.openai.com/api-keys",
           },
           example: 'process.env.OPENAI_API_KEY = "sk-proj-...";',
-          cause: error,
+          cause: safeCause(apiKey, error),
         });
       }
     },
@@ -159,8 +160,8 @@ export function createOpenAIProvider(apiKey: string): Provider {
               : undefined,
           };
         }
-      } catch (error: any) {
-        const detail = error.message?.replace(apiKey, "[REDACTED]");
+      } catch (error: unknown) {
+        const detail = redactErrorMessage(apiKey, error);
         throw new WeftError({
           code: "PROVIDER_ERROR",
           why: `OpenAI streaming failed: ${detail}`,
@@ -170,7 +171,7 @@ export function createOpenAIProvider(apiKey: string): Provider {
             docsUrl: "https://platform.openai.com/docs/api-reference/streaming",
           },
           example: 'process.env.OPENAI_API_KEY = "sk-proj-...";',
-          cause: error,
+          cause: safeCause(apiKey, error),
         });
       }
     },

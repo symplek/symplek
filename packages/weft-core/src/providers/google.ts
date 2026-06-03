@@ -1,5 +1,6 @@
 import { type Content, GoogleGenerativeAI } from "@google/generative-ai";
 import { WeftError } from "../errors";
+import { redactErrorMessage, safeCause } from "./redact";
 import type {
   AIMessage,
   AIRequest,
@@ -116,8 +117,8 @@ export function createGoogleProvider(apiKey: string): Provider {
           ),
           raw: response,
         };
-      } catch (error: any) {
-        const detail = error.message?.replace(apiKey, "[REDACTED]");
+      } catch (error: unknown) {
+        const detail = redactErrorMessage(apiKey, error);
         throw new WeftError({
           code: "PROVIDER_ERROR",
           why: `Google Gemini request failed: ${detail}`,
@@ -127,7 +128,7 @@ export function createGoogleProvider(apiKey: string): Provider {
             docsUrl: "https://ai.google.dev/gemini-api/docs/api-key",
           },
           example: 'process.env.GOOGLE_GENERATIVE_AI_API_KEY = "AIza...";',
-          cause: error,
+          cause: safeCause(apiKey, error),
         });
       }
     },
@@ -171,8 +172,8 @@ export function createGoogleProvider(apiKey: string): Provider {
               : undefined,
           };
         }
-      } catch (error: any) {
-        const detail = error.message?.replace(apiKey, "[REDACTED]");
+      } catch (error: unknown) {
+        const detail = redactErrorMessage(apiKey, error);
         throw new WeftError({
           code: "PROVIDER_ERROR",
           why: `Google Gemini streaming failed: ${detail}`,
@@ -183,7 +184,7 @@ export function createGoogleProvider(apiKey: string): Provider {
               "https://ai.google.dev/gemini-api/docs/text-generation#generate-a-text-stream",
           },
           example: 'process.env.GOOGLE_GENERATIVE_AI_API_KEY = "AIza...";',
-          cause: error,
+          cause: safeCause(apiKey, error),
         });
       }
     },

@@ -11,6 +11,7 @@ import { createAgent } from "./agent/agent";
 import { WeftError } from "./errors";
 import { getInitPromise, clearInitPromise } from "./globalConfig";
 import { parallel } from "./parallel";
+import { redactErrorMessage, safeCause } from "./providers/redact";
 import type { AIOptions as BaseAIOptions } from "./providers/auto";
 import { detectProvider, selectModelForTask } from "./providers/auto";
 import type { AIMessage, AIRequest } from "./providers/interface";
@@ -133,8 +134,9 @@ async function aiImplementation<T extends z.ZodType = any>(
       });
     }
 
-    // 2. Select model
-    const model = selectModelForTask(prompt, options);
+    // 2. Select model — thread the already-resolved providerId so quality heuristics
+    // key off the same provider that will execute the request (H6 fix).
+    const model = selectModelForTask(prompt, options, providerId);
 
     // 3. Prepare messages
     const messages: AIMessage[] = [];
@@ -235,14 +237,25 @@ async function aiImplementation<T extends z.ZodType = any>(
   } catch (error) {
     if (error instanceof WeftError) throw error;
 
+    // Defense-in-depth: a provider SDK error could escape the adapter catch
+    // blocks and reach this backstop carrying the API key in its message or in
+    // request-header objects on the raw error. We have no apiKey reference here,
+    // so we cannot string-redact a specific key — but routing the cause through
+    // safeCause() still DROPS the secret-bearing raw SDK object (returning a flat
+    // key-free summary), which closes the util.inspect/.cause leak vector.
+    // Provider adapters already redact the key from their own messages before
+    // re-throwing as WeftError (handled above), so a raw provider message only
+    // reaches here for errors that never passed through an adapter.
+    const message =
+      error instanceof Error
+        ? redactErrorMessage(undefined, error)
+        : "An unknown error occurred during AI generation.";
+
     throw new WeftError({
       code: "UNKNOWN_ERROR",
-      message:
-        error instanceof Error
-          ? error.message
-          : "An unknown error occurred during AI generation.",
+      message,
       action: "Check the error cause and context for more details.",
-      cause: error,
+      cause: safeCause(undefined, error),
     });
   }
 }

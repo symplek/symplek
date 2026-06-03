@@ -156,31 +156,61 @@ export class WeftError extends Error {
     }
   }
 
-  static sanitizeContext(context: Record<string, any>): Record<string, any> {
-    const sensitiveKeys = [
-      "api_key",
-      "apikey",
-      "secret",
-      "token",
-      "password",
-      "auth",
-      "credentials",
-      "authorization",
-    ];
+  private static readonly SENSITIVE_KEYS = [
+    "api_key",
+    "apikey",
+    "secret",
+    "token",
+    "password",
+    "auth",
+    "credentials",
+    "authorization",
+  ];
 
-    const sanitized: Record<string, any> = {};
+  /**
+   * Deep-redact sensitive keys from an error context.
+   *
+   * Walks objects AND arrays recursively so secrets nested in an
+   * array-of-objects (e.g. `{ headers: [{ authorization: "Bearer …" }] }`) are
+   * caught — the previous implementation skipped arrays entirely. A `WeakSet`
+   * seen-guard breaks reference cycles: a circular context (`a.self = a`) would
+   * otherwise recurse until stack overflow, turning a logging path into a DoS.
+   * On a cycle we substitute the literal `"[Circular]"`.
+   *
+   * @param seen - Internal accumulator of already-visited object references.
+   *               Callers never pass this.
+   */
+  static sanitizeContext(
+    context: Record<string, any>,
+    seen: WeakSet<object> = new WeakSet(),
+  ): Record<string, any> {
+    return WeftError.sanitizeValue(context, seen) as Record<string, any>;
+  }
 
-    for (const [key, value] of Object.entries(context)) {
-      const lowerKey = key.toLowerCase();
-      if (sensitiveKeys.some((s) => lowerKey.includes(s))) {
-        sanitized[key] = "[REDACTED]";
-      } else if (value && typeof value === "object" && !Array.isArray(value)) {
-        sanitized[key] = WeftError.sanitizeContext(value);
-      } else {
-        sanitized[key] = value;
-      }
+  private static sanitizeValue(value: unknown, seen: WeakSet<object>): unknown {
+    if (value === null || typeof value !== "object") {
+      return value;
     }
 
+    // Cycle guard — a self-referential object must not recurse forever.
+    if (seen.has(value as object)) {
+      return "[Circular]";
+    }
+    seen.add(value as object);
+
+    if (Array.isArray(value)) {
+      return value.map((item) => WeftError.sanitizeValue(item, seen));
+    }
+
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+      const lowerKey = key.toLowerCase();
+      if (WeftError.SENSITIVE_KEYS.some((s) => lowerKey.includes(s))) {
+        sanitized[key] = "[REDACTED]";
+      } else {
+        sanitized[key] = WeftError.sanitizeValue(val, seen);
+      }
+    }
     return sanitized;
   }
 

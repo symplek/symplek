@@ -207,6 +207,32 @@ function createConsensusComputation<T>(
   };
 }
 
+/**
+ * Creates an iterative convergence computation where a set of agents
+ * collaboratively refine a shared value over successive rounds until they
+ * agree (i.e., all agents signal `hasMore: false`).
+ *
+ * **Serial mode (`parallel: false`)**: agents execute sequentially each round;
+ * each agent receives the updated state from the previous agent in that round.
+ *
+ * **Parallel mode (`parallel: true`, default)**: all agents run simultaneously
+ * against the same `currentState`. The `mergeStrategy` option controls how
+ * their results are combined:
+ *
+ * - `"last"` (default): the contribution from the last agent in the array is
+ *   used as the next round's starting state. This is **deterministic** — the
+ *   same agent always wins within a round given the same agent array — but
+ *   intermediate contributions are not surfaced in `finalResult`. To accumulate
+ *   all contributions, use `mergeStrategy: "reduce"`.
+ * - `"reduce"`: contributions are applied left-to-right; each agent's
+ *   non-null result replaces the running accumulator. All agents still execute
+ *   from the **original** round state (not from each other's output), so this
+ *   is not equivalent to serial mode. Use when every agent's contribution
+ *   should influence the final state.
+ *
+ * In both strategies, `ConvergeResult.contributions` records `hadMore` and
+ * `reasoning` for every agent every round regardless of whose result wins.
+ */
 export function createConvergeComputation<T>(
   initialValue: T,
   agents: Array<ConvergentAgent<T>>,
@@ -214,6 +240,7 @@ export function createConvergeComputation<T>(
 ): AgentComputation<ConvergeResult<T>> {
   const maxRounds = options.maxRounds ?? 5;
   const parallel = options.parallel ?? true;
+  const mergeStrategy = options.mergeStrategy ?? "last";
 
   return async (ctx: AgentContext): Promise<ConvergeResult<T>> => {
     let currentState = initialValue;
@@ -274,12 +301,23 @@ export function createConvergeComputation<T>(
       }
 
       if (parallel) {
-        const lastResult = roundContributions
-          .map((r) => r.contribution.result)
-          .filter((r) => r !== null && r !== undefined)
-          .pop();
-        if (lastResult !== undefined) {
-          currentState = lastResult;
+        if (mergeStrategy === "reduce") {
+          currentState = roundContributions.reduce(
+            (acc, { contribution }) =>
+              contribution.result !== null && contribution.result !== undefined
+                ? contribution.result
+                : acc,
+            currentState,
+          );
+        } else {
+          // "last" — existing behavior: last agent by array index wins
+          const lastResult = roundContributions
+            .map((r) => r.contribution.result)
+            .filter((r) => r !== null && r !== undefined)
+            .pop();
+          if (lastResult !== undefined) {
+            currentState = lastResult;
+          }
         }
       }
 

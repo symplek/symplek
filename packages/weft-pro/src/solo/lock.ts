@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @fileoverview Distributed Lock Manager
  * @description In-memory lock implementation for solo mechanism
  * @module weft-core/solo/lock
@@ -13,26 +13,121 @@
  *
  * Thread safety: Uses synchronous operations on Map, safe for Node.js single-threaded model.
  * For multi-process scenarios, replace with distributed lock implementation.
+ *
+ * State isolation: each InMemoryLockManager instance maintains its own private lock Map.
+ * Free-standing functions (acquireLock, releaseLock, etc.) delegate to the module-level
+ * defaultLockManager singleton. Two separately constructed instances never share state.
  */
 
 import type { LockAcquisitionResult, LockEntry, LockManager } from "./types";
+import {
+  _acquireFromMap,
+  _cleanupFromMap,
+  _extendInMap,
+  _getActiveFromMap,
+  _getHolderFromMap,
+  _isLockedInMap,
+  _releaseFromMap,
+} from "./lockHelpers";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// IN-MEMORY LOCK STORE
+// LOCK MANAGER CLASS
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Global lock store for in-memory implementation.
- * @internal
+ * In-memory lock manager with per-instance state isolation.
+ *
+ * Each instance maintains its own private lock store. Two instances of
+ * InMemoryLockManager never share state — acquiring a lock on instance A does
+ * not affect instance B, even for the same resourceId.
+ *
+ * The free-standing module functions (acquireLock, releaseLock, etc.) delegate
+ * to the exported `defaultLockManager` singleton and share its state only.
  */
-const activeLocks = new Map<string, LockEntry>();
+export class InMemoryLockManager implements LockManager {
+  /** Per-instance isolated lock store. */
+  private readonly locks = new Map<string, LockEntry>();
+
+  async acquire(
+    resourceId: string,
+    agentId: string,
+    timeoutMs: number,
+  ): Promise<LockAcquisitionResult> {
+    return _acquireFromMap(this.locks, resourceId, agentId, timeoutMs);
+  }
+
+  async release(resourceId: string, agentId: string): Promise<boolean> {
+    return _releaseFromMap(this.locks, resourceId, agentId);
+  }
+
+  async isLocked(resourceId: string): Promise<boolean> {
+    return _isLockedInMap(this.locks, resourceId);
+  }
+
+  async getHolder(resourceId: string): Promise<string | undefined> {
+    return _getHolderFromMap(this.locks, resourceId);
+  }
+
+  async extend(
+    resourceId: string,
+    agentId: string,
+    additionalMs: number,
+  ): Promise<boolean> {
+    return _extendInMap(this.locks, resourceId, agentId, additionalMs);
+  }
+
+  /**
+   * Return all unexpired lock entries (for monitoring/debugging).
+   */
+  getActive(): LockEntry[] {
+    return _getActiveFromMap(this.locks);
+  }
+
+  /**
+   * Remove expired lock entries; return count removed.
+   */
+  cleanup(): number {
+    return _cleanupFromMap(this.locks);
+  }
+
+  /**
+   * Clear all locks in this instance.
+   * @internal For testing only.
+   */
+  clearAll(): void {
+    this.locks.clear();
+  }
+
+  /**
+   * Force-delete a specific lock regardless of holder.
+   * @internal Admin / emergency use only.
+   */
+  forceDelete(resourceId: string): boolean {
+    return this.locks.delete(resourceId);
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CORE LOCK FUNCTIONS
+// DEFAULT INSTANCE
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Default lock manager singleton.
+ * Free-standing functions below delegate here; callers who import the
+ * free-standing API share this instance's state.
+ * Custom instances constructed with `new InMemoryLockManager()` are isolated.
+ */
+export const defaultLockManager = new InMemoryLockManager();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FREE-STANDING API (delegates to defaultLockManager — signatures unchanged)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Attempt to acquire a distributed lock on a resource.
+ *
+ * Delegates to `defaultLockManager`. Callers who need isolated state should
+ * construct a `new InMemoryLockManager()` and call `.acquire()` directly.
  *
  * @param resourceId - Unique identifier for the resource to lock
  * @param agentId - Identifier of the agent requesting the lock
@@ -56,38 +151,7 @@ export async function acquireLock(
   agentId: string,
   timeoutMs: number = 30000,
 ): Promise<LockAcquisitionResult> {
-  const now = Date.now();
-  const existing = activeLocks.get(resourceId);
-
-  // Check if lock exists and is still valid
-  if (existing && existing.expires > now) {
-    // Lock is held by someone else
-    if (existing.agentId !== agentId) {
-      return {
-        acquired: false,
-        reason: "already_held",
-        heldBy: existing.agentId,
-      };
-    }
-    // Same agent - extend the lock
-    const extended: LockEntry = {
-      ...existing,
-      expires: now + timeoutMs,
-    };
-    activeLocks.set(resourceId, extended);
-    return { acquired: true, lock: extended };
-  }
-
-  // Lock is free or expired - acquire it
-  const lock: LockEntry = {
-    agentId,
-    resourceId,
-    expires: now + timeoutMs,
-    acquiredAt: now,
-  };
-
-  activeLocks.set(resourceId, lock);
-  return { acquired: true, lock };
+  return defaultLockManager.acquire(resourceId, agentId, timeoutMs);
 }
 
 /**
@@ -101,21 +165,7 @@ export async function releaseLock(
   resourceId: string,
   agentId: string,
 ): Promise<boolean> {
-  const existing = activeLocks.get(resourceId);
-
-  // Lock doesn't exist or is expired - consider it released
-  if (!existing || existing.expires <= Date.now()) {
-    activeLocks.delete(resourceId);
-    return true;
-  }
-
-  // Only the holder can release
-  if (existing.agentId !== agentId) {
-    return false;
-  }
-
-  activeLocks.delete(resourceId);
-  return true;
+  return defaultLockManager.release(resourceId, agentId);
 }
 
 /**
@@ -125,16 +175,7 @@ export async function releaseLock(
  * @returns True if resource is locked and lock hasn't expired
  */
 export async function isLockHeld(resourceId: string): Promise<boolean> {
-  const existing = activeLocks.get(resourceId);
-  if (!existing) return false;
-
-  // Clean up expired lock
-  if (existing.expires <= Date.now()) {
-    activeLocks.delete(resourceId);
-    return false;
-  }
-
-  return true;
+  return defaultLockManager.isLocked(resourceId);
 }
 
 /**
@@ -146,15 +187,12 @@ export async function isLockHeld(resourceId: string): Promise<boolean> {
 export async function getLockHolder(
   resourceId: string,
 ): Promise<string | undefined> {
-  const existing = activeLocks.get(resourceId);
-  if (!existing || existing.expires <= Date.now()) {
-    return undefined;
-  }
-  return existing.agentId;
+  return defaultLockManager.getHolder(resourceId);
 }
 
 /**
  * Extend an existing lock's TTL.
+ * Writes a new Map entry rather than mutating the existing object in place.
  *
  * @param resourceId - Resource with the lock
  * @param agentId - Agent holding the lock
@@ -166,123 +204,41 @@ export async function extendLock(
   agentId: string,
   additionalMs: number,
 ): Promise<boolean> {
-  const existing = activeLocks.get(resourceId);
-
-  // Lock doesn't exist or is expired
-  if (!existing || existing.expires <= Date.now()) {
-    return false;
-  }
-
-  // Only holder can extend
-  if (existing.agentId !== agentId) {
-    return false;
-  }
-
-  existing.expires += additionalMs;
-  return true;
+  return defaultLockManager.extend(resourceId, agentId, additionalMs);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// LOCK MANAGER CLASS
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * In-memory lock manager implementation.
- * Implements the LockManager interface for pluggable lock backends.
- */
-export class InMemoryLockManager implements LockManager {
-  async acquire(
-    resourceId: string,
-    agentId: string,
-    timeoutMs: number,
-  ): Promise<LockAcquisitionResult> {
-    return acquireLock(resourceId, agentId, timeoutMs);
-  }
-
-  async release(resourceId: string, agentId: string): Promise<boolean> {
-    return releaseLock(resourceId, agentId);
-  }
-
-  async isLocked(resourceId: string): Promise<boolean> {
-    return isLockHeld(resourceId);
-  }
-
-  async getHolder(resourceId: string): Promise<string | undefined> {
-    return getLockHolder(resourceId);
-  }
-
-  async extend(
-    resourceId: string,
-    agentId: string,
-    additionalMs: number,
-  ): Promise<boolean> {
-    return extendLock(resourceId, agentId, additionalMs);
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// UTILITY FUNCTIONS
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Get all active locks (for debugging/monitoring).
- * @returns Array of all active lock entries
+ * @returns Array of all active lock entries from defaultLockManager
  */
 export function getActiveLocks(): LockEntry[] {
-  const now = Date.now();
-  const active: LockEntry[] = [];
-
-  for (const [, lock] of activeLocks) {
-    if (lock.expires > now) {
-      active.push({ ...lock });
-    }
-  }
-
-  return active;
+  return defaultLockManager.getActive();
 }
 
 /**
- * Clear all locks (for testing).
+ * Clear all locks in defaultLockManager (for testing).
+ * Does NOT affect separately constructed InMemoryLockManager instances.
  * @internal
  */
 export function clearAllLocks(): void {
-  activeLocks.clear();
+  defaultLockManager.clearAll();
 }
 
 /**
  * Force release a lock regardless of holder (admin operation).
+ * Operates on defaultLockManager only.
  * @internal
  */
 export function forceReleaseLock(resourceId: string): boolean {
-  return activeLocks.delete(resourceId);
+  return defaultLockManager.forceDelete(resourceId);
 }
 
 /**
- * Clean up expired locks.
+ * Clean up expired locks in defaultLockManager.
  * Call periodically to prevent memory leaks in long-running processes.
  *
  * @returns Number of expired locks cleaned up
  */
 export function cleanupExpiredLocks(): number {
-  const now = Date.now();
-  let count = 0;
-
-  for (const [resourceId, lock] of activeLocks) {
-    if (lock.expires <= now) {
-      activeLocks.delete(resourceId);
-      count++;
-    }
-  }
-
-  return count;
+  return defaultLockManager.cleanup();
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DEFAULT INSTANCE
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Default lock manager instance.
- * Use this for standard in-memory locking.
- */
-export const defaultLockManager = new InMemoryLockManager();

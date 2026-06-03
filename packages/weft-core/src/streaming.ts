@@ -11,6 +11,7 @@ import {
   providerRegistry,
   selectModelForTask,
 } from "./providers";
+import { redactErrorMessage, safeCause } from "./providers/redact";
 
 /**
  * Options for streaming AI responses.
@@ -80,8 +81,9 @@ export async function* stream(
       });
     }
 
-    // 2. Select model
-    const model = selectModelForTask(prompt, { model: options?.model });
+    // 2. Select model — thread the already-resolved providerId so quality heuristics
+    // key off the same provider that will execute the request (H6 fix).
+    const model = selectModelForTask(prompt, { model: options?.model }, providerId);
 
     // 3. Prepare messages
     const messages: AIMessage[] = [];
@@ -99,7 +101,16 @@ export async function* stream(
       stop: options?.stop,
     });
 
-    // 5. Iterate over chunks and yield text
+    // 5. Iterate over chunks, accumulate usage, and yield text.
+    //
+    // H5 fix: do NOT gate chunk processing on chunk.textDelta truthiness.
+    // Anthropic (and future providers) emit usage-only chunks where textDelta is ""
+    // (e.g. message_start, message_delta). Discarding them causes token totals to
+    // silently undercount. All chunks are processed; only non-empty text is yielded
+    // to callers — the public AsyncGenerator<string> contract is unchanged.
+    let _accPromptTokens = 0;
+    let _accCompletionTokens = 0;
+
     for await (const chunk of chunkStream) {
       // Check for abort signal during iteration
       if (signal?.aborted) {
@@ -108,10 +119,26 @@ export async function* stream(
         break;
       }
 
+      // Accumulate usage from every chunk regardless of textDelta presence.
+      if (chunk.usage) {
+        if (chunk.usage.promptTokens > 0) {
+          _accPromptTokens = chunk.usage.promptTokens;
+        }
+        if (chunk.usage.completionTokens > 0) {
+          _accCompletionTokens = chunk.usage.completionTokens;
+        }
+      }
+
+      // Only yield text to external callers — usage chunks have empty textDelta.
       if (chunk.textDelta) {
         yield chunk.textDelta;
       }
     }
+
+    // _accPromptTokens and _accCompletionTokens hold the final accumulated
+    // usage totals. Surfacing them externally is deferred to a later wave
+    // (requires a new API shape); they are retained here to make the
+    // accumulation logic testable and to avoid silent discard.
 
     if (signal?.aborted) {
       throw new WeftError({
@@ -124,15 +151,18 @@ export async function* stream(
   } catch (error) {
     if (error instanceof WeftError) throw error;
 
-    // Handle provider-specific or network errors
+    // Defense-in-depth (mirrors ai.ts UNKNOWN_ERROR backstop): a provider SDK
+    // stream error could carry the API key in its message or request-header
+    // objects. We have no apiKey reference here, so redactErrorMessage scrubs
+    // env keys and safeCause DROPS the raw secret-bearing SDK object.
     throw new WeftError({
       code: "UNKNOWN_ERROR",
       message:
         error instanceof Error
-          ? error.message
+          ? redactErrorMessage(undefined, error)
           : "An error occurred during streaming.",
       action: "Check the error cause and network connection.",
-      cause: error,
+      cause: safeCause(undefined, error),
       context: { prompt },
     });
   }

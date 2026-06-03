@@ -9,6 +9,41 @@ import type { ProviderId } from "./interface";
 import { providerRegistry } from "./registry";
 
 /**
+ * Provider-specific default models for each quality tier.
+ *
+ * These are the canonical model IDs for each provider at each quality level.
+ * Kept in one place so that heuristic logic in selectModelForTask reads from
+ * this table rather than hardcoding strings inline.
+ *
+ * Rules:
+ * - "high" → best available model for the provider (reasoning/flagship)
+ * - "fast" → smallest/fastest model for the provider (mini/flash/haiku)
+ * - "default" → safe fallback when no quality tier is specified
+ *
+ * Update this table when providers release new model families.
+ */
+const PROVIDER_MODEL_DEFAULTS: Record<
+  string,
+  { high: string; fast: string; default: string }
+> = {
+  openai: {
+    high: "gpt-4o",
+    fast: "gpt-4o-mini",
+    default: "gpt-4o-mini",
+  },
+  anthropic: {
+    high: "claude-opus-4-5",
+    fast: "claude-haiku-3-5",
+    default: "claude-sonnet-4-5",
+  },
+  google: {
+    high: "gemini-1.5-pro",
+    fast: "gemini-2.0-flash",
+    default: "gemini-2.0-flash",
+  },
+};
+
+/**
  * Options for AI generation that influence model selection.
  */
 export interface AIOptions {
@@ -119,27 +154,71 @@ export function resolveModelFromContext(ctx?: {
 }
 
 /**
+ * Resolve the active provider's model table, falling back to OpenAI defaults.
+ *
+ * Accepts an already-resolved `providerId` from the call site (ai.ts / streaming.ts)
+ * so that the model table is always keyed off the SAME provider that will actually
+ * execute the request. Falls back to detectProvider() only when no providerId is
+ * threaded in (e.g. when selectModelForTask is called directly in tests or from
+ * AgentUnit operators without a resolved context).
+ *
+ * This function is intentionally side-effect-free (read-only registry/env access).
+ *
+ * @param resolvedProviderId - Already-resolved provider ID from the call site, or
+ *   undefined to fall back to detectProvider().
+ */
+function resolveProviderModelDefaults(resolvedProviderId?: string): {
+  high: string;
+  fast: string;
+  default: string;
+} {
+  // Prefer the caller-supplied provider so model IDs always agree with the executor.
+  const id = resolvedProviderId ?? (() => {
+    try {
+      return detectProvider();
+    } catch {
+      return undefined;
+    }
+  })();
+
+  return (id && PROVIDER_MODEL_DEFAULTS[id]) ? PROVIDER_MODEL_DEFAULTS[id] : PROVIDER_MODEL_DEFAULTS.openai;
+}
+
+/**
  * Selects an appropriate model for a given task/prompt.
  *
- * Priority ordering (Codex-corrected — supersedes Wave-0 Contract 1 draft):
+ * Priority ordering (H4-corrected + H6-threaded — supersedes Wave-0 Contract 1 draft):
  * 1. Call-site explicit model (options.model, includes .model() override via resolveModelFromContext).
  * 2. Global config model set via Weft.configure({ model }) — beats heuristics so a configured
  *    Anthropic/Google model is not silently overridden by an OpenAI heuristic ID.
- * 3. Quality heuristics (options.quality, prompt complexity).
- * 4. Hardcoded default ("gpt-4o-mini").
+ * 3. Quality heuristics (options.quality, prompt complexity) — keyed off resolvedProviderId
+ *    (H6 fix). The ALREADY-RESOLVED provider from ai.ts/streaming.ts is threaded in so the
+ *    model table is always consistent with the executor. Falls back to detectProvider() when
+ *    no providerId is given (direct callers, AgentUnit operators, tests).
+ * 4. Provider-aware default (OpenAI fallback when no provider is configured).
  *
- * Rationale for order change: heuristics return hardcoded OpenAI model IDs ("gpt-4o",
- * "gpt-4o-mini"). If those IDs are forwarded to a configured Anthropic or Google provider
- * the request fails at the provider's API. The globally configured model is provider-aware
- * (it was set by the same caller who configured the provider), so it must win over heuristics.
+ * Rationale for heuristic fix (H4): previously heuristics returned hardcoded OpenAI
+ * IDs ("gpt-4o", "gpt-4o-mini") even when the active provider was Anthropic or Google,
+ * causing API failures at the provider. Heuristics now call resolveProviderModelDefaults()
+ * which maps the active provider → its canonical model family.
+ *
+ * Rationale for threading fix (H6): H4's resolveProviderModelDefaults() called
+ * detectProvider() independently inside selectModelForTask. If ai.ts resolved the provider
+ * as Anthropic (via options.provider override) but detectProvider() would return OpenAI
+ * (from registry/env), selectModelForTask still returned gpt-4o and sent it to Anthropic.
+ * Threading the already-resolved providerId closes this gap.
  *
  * @param prompt - The user prompt or task description
  * @param options - Optional generation options (may include context-injected overrides)
+ * @param resolvedProviderId - The ALREADY-RESOLVED provider ID from the call site (ai.ts /
+ *   streaming.ts). When supplied, model heuristics key off this provider. When omitted,
+ *   falls back to detectProvider() for backwards-compatible direct callers.
  * @returns The selected model name
  */
 export function selectModelForTask(
   prompt: string,
   options?: AIOptions,
+  resolvedProviderId?: string,
 ): string {
   // 1. Explicit call-site model (includes .model() override via resolveModelFromContext)
   if (options?.model) {
@@ -147,21 +226,26 @@ export function selectModelForTask(
   }
 
   // 2. Global config model — set via Weft.configure({ model }).
-  // Must precede heuristics: heuristics emit OpenAI-specific IDs that break non-OpenAI providers.
+  // Must precede heuristics: heuristics previously emitted OpenAI-specific IDs that
+  // break non-OpenAI providers. The globally configured model is provider-aware.
   const globalModel = getGlobalConfig().model;
   if (globalModel) {
     return globalModel;
   }
 
-  // 3. Explicit quality choice (includes .quality() override via resolveModelFromContext)
+  // 3. Quality heuristics — keyed off the already-resolved provider (H6 fix).
+  // Pass resolvedProviderId so the model table matches the executor, not whatever
+  // detectProvider() would independently return.
+  const providerDefaults = resolveProviderModelDefaults(resolvedProviderId);
+
   if (options?.quality === "high") {
-    return "gpt-4o";
+    return providerDefaults.high;
   }
   if (options?.quality === "fast") {
-    return "gpt-4o-mini";
+    return providerDefaults.fast;
   }
 
-  // 3b. Complexity heuristic — OpenAI model IDs, only safe when no globalModel is set.
+  // 3b. Complexity heuristic — uses provider-aware "high" model.
   const isComplex =
     prompt.length > 500 ||
     /\b(analyze|complex|reason|think|evaluate|summarize|extract)\b/i.test(
@@ -169,9 +253,9 @@ export function selectModelForTask(
     );
 
   if (isComplex) {
-    return "gpt-4o";
+    return providerDefaults.high;
   }
 
-  // 4. Hardcoded default
-  return "gpt-4o-mini";
+  // 4. Provider-aware default.
+  return providerDefaults.default;
 }

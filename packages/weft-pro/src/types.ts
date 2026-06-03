@@ -273,7 +273,22 @@ export interface ConvergeContribution<T> {
 
 export interface ConvergeOptions {
   maxRounds?: number;
+  /** @default true */
   parallel?: boolean;
+  /**
+   * How to combine parallel agent contributions in each round.
+   *
+   * - `"last"` (default): the contribution from the last agent in the array is
+   *   used as the next round's starting state. Deterministic by array position —
+   *   the same agent always wins within a round given the same input.
+   * - `"reduce"`: contributions are applied left-to-right via a fold; each
+   *   agent's result (if non-null) replaces the accumulator in order. All agents
+   *   still execute from the **original** round state, not from each other's
+   *   output, so this is not equivalent to serial mode.
+   *
+   * @default "last"
+   */
+  mergeStrategy?: "last" | "reduce";
 }
 
 export interface ConvergeResult<T> {

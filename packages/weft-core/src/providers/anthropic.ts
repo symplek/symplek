@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { WeftError } from "../errors";
+import { redactErrorMessage, safeCause } from "./redact";
 import type {
   AIMessage,
   AIRequest,
@@ -104,8 +105,8 @@ export function createAnthropicProvider(apiKey: string): Provider {
           finishReason: transformFinishReason(response.stop_reason),
           raw: response,
         };
-      } catch (error: any) {
-        const detail = error.message?.replace(apiKey, "[REDACTED]");
+      } catch (error: unknown) {
+        const detail = redactErrorMessage(apiKey, error);
         throw new WeftError({
           code: "PROVIDER_ERROR",
           why: `Anthropic request failed: ${detail}`,
@@ -115,7 +116,7 @@ export function createAnthropicProvider(apiKey: string): Provider {
             docsUrl: "https://docs.anthropic.com/en/api/getting-started",
           },
           example: 'process.env.ANTHROPIC_API_KEY = "sk-ant-...";',
-          cause: error,
+          cause: safeCause(apiKey, error),
         });
       }
     },
@@ -133,26 +134,23 @@ export function createAnthropicProvider(apiKey: string): Provider {
           top_p: request.topP,
         });
 
+        // H5 fix: track prompt tokens from message_start so the message_delta
+        // usage chunk can emit a complete (promptTokens + completionTokens) total.
+        // Previously message_delta emitted promptTokens:0, causing undercounted totals.
+        let promptTokensSeen = 0;
+
         for await (const event of stream) {
           if (
             event.type === "content_block_delta" &&
             event.delta.type === "text_delta"
           ) {
             yield { textDelta: event.delta.text };
-          } else if (event.type === "message_delta") {
-            yield {
-              textDelta: "",
-              finishReason: transformFinishReason(event.delta.stop_reason),
-              usage: event.usage
-                ? {
-                    promptTokens: 0, // Delta doesn't always provide full usage
-                    completionTokens: event.usage.output_tokens,
-                    totalTokens: event.usage.output_tokens,
-                  }
-                : undefined,
-            };
           } else if (event.type === "message_start") {
-            // Initial usage
+            // H5 fix: emit usage as a dedicated chunk (textDelta:"" is intentional —
+            // streaming.ts must NOT gate usage accumulation on textDelta truthiness).
+            // Callers of the public stream() AsyncGenerator<string> never see this chunk;
+            // streaming.ts accumulates it internally.
+            promptTokensSeen = event.message.usage.input_tokens;
             yield {
               textDelta: "",
               usage: {
@@ -161,10 +159,24 @@ export function createAnthropicProvider(apiKey: string): Provider {
                 totalTokens: event.message.usage.input_tokens,
               },
             };
+          } else if (event.type === "message_delta") {
+            // H5 fix: combine prompt tokens (from message_start) with output tokens
+            // (from message_delta) so the emitted usage is a complete, accurate total.
+            // Previously this emitted promptTokens:0, underreporting usage.
+            const completionTokens = event.usage?.output_tokens ?? 0;
+            yield {
+              textDelta: "",
+              finishReason: transformFinishReason(event.delta.stop_reason),
+              usage: {
+                promptTokens: promptTokensSeen,
+                completionTokens,
+                totalTokens: promptTokensSeen + completionTokens,
+              },
+            };
           }
         }
-      } catch (error: any) {
-        const detail = error.message?.replace(apiKey, "[REDACTED]");
+      } catch (error: unknown) {
+        const detail = redactErrorMessage(apiKey, error);
         throw new WeftError({
           code: "PROVIDER_ERROR",
           why: `Anthropic streaming failed: ${detail}`,
@@ -174,7 +186,7 @@ export function createAnthropicProvider(apiKey: string): Provider {
             docsUrl: "https://docs.anthropic.com/en/api/messages-streaming",
           },
           example: 'process.env.ANTHROPIC_API_KEY = "sk-ant-...";',
-          cause: error,
+          cause: safeCause(apiKey, error),
         });
       }
     },
