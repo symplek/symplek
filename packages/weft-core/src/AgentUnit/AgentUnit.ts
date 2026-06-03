@@ -85,13 +85,41 @@ export class AgentUnit<T> {
 
   // ─── INTERNAL API ────────────────────────────────────────────────────────────
 
-  /** ID generator exposed for operator files (prototype augmentation). */
+  /**
+   * @internal ID generator exposed for operator files (prototype augmentation).
+   * Public so operator files can call it via the prototype-augmentation pattern.
+   * Do NOT use from user code.
+   */
   static readonly _generateId = generateId;
 
-  /** Deprecation flag — owned here so tests can reset via `AgentUnit._deprecationWarned = false`. */
-  static _deprecationWarned = false;
+  /** True once the legacy-mode deprecation warning has been emitted (process-scoped). */
+  static #deprecationWarned = false;
 
-  /** Internal factory for creating instances from operator files (prototype augmentation). */
+  /**
+   * Returns and mutates the process-scoped deprecation flag.
+   * Called by {@link zeroTrust.emitDeprecationWarning} only.
+   * @internal
+   */
+  static _getAndSetDeprecationWarned(): boolean {
+    const prev = AgentUnit.#deprecationWarned;
+    AgentUnit.#deprecationWarned = true;
+    return prev;
+  }
+
+  /**
+   * Reset the deprecation warning flag. FOR TESTING ONLY.
+   * Call in `beforeEach` to prevent state leaking between test cases.
+   * @internal
+   */
+  static resetDeprecationWarningForTesting(): void {
+    AgentUnit.#deprecationWarned = false;
+  }
+
+  /**
+   * @internal Internal factory for creating instances from operator files (prototype augmentation).
+   * Public so operator files can call it via the prototype-augmentation pattern.
+   * Do NOT use from user code.
+   */
   static _make<T>(
     computation: AgentComputation<T>,
     metadata: AgentUnitMetadata,

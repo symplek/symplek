@@ -1,4 +1,4 @@
-import { type Content, GoogleGenerativeAI } from "@google/generative-ai";
+import type { Content } from "@google/generative-ai";
 import { WeftError } from "../errors";
 import { redactErrorMessage, safeCause } from "./redact";
 import type {
@@ -10,10 +10,38 @@ import type {
   StreamChunk,
 } from "./interface";
 
+// ── Lazy SDK loader ──────────────────────────────────────────────────────────
+// No top-level import of @google/generative-ai. The SDK is loaded on first
+// factory call and cached for the process lifetime — import() is called once.
+
+type GoogleGenAIMod = typeof import("@google/generative-ai");
+let _GoogleSdk: GoogleGenAIMod | null = null;
+
+async function loadGoogleSdk(): Promise<GoogleGenAIMod> {
+  if (_GoogleSdk !== null) return _GoogleSdk;
+  try {
+    const mod = await import("@google/generative-ai");
+    _GoogleSdk = mod;
+    return _GoogleSdk;
+  } catch {
+    throw new WeftError({
+      code: "PROVIDER_ERROR",
+      why: "@google/generative-ai is not installed. Run: pnpm add @google/generative-ai",
+      fix: {
+        description: "Run: pnpm add @google/generative-ai",
+        docsUrl: "https://ai.google.dev/gemini-api/docs/api-key",
+      },
+      example: "pnpm add @google/generative-ai",
+    });
+  }
+}
+
 /**
  * Google Gemini Provider Adapter
  */
-export function createGoogleProvider(apiKey: string): Provider {
+export async function createGoogleProvider(
+  apiKey: string,
+): Promise<Provider> {
   if (!apiKey) {
     throw new WeftError({
       code: "PROVIDER_ERROR",
@@ -26,6 +54,7 @@ export function createGoogleProvider(apiKey: string): Provider {
       example: 'process.env.GOOGLE_GENERATIVE_AI_API_KEY = "AIza...";',
     });
   }
+  const { GoogleGenerativeAI } = await loadGoogleSdk();
   const genAI = new GoogleGenerativeAI(apiKey);
 
   const capabilities: ProviderCapabilities = {

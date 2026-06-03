@@ -29,8 +29,7 @@ describe("Zero-Trust Default Implementation", () => {
     ctx = createTestContext();
     consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     // Reset the deprecation warning flag
-    // @ts-expect-error - Accessing private static for testing
-    AgentUnit._deprecationWarned = false;
+    AgentUnit.resetDeprecationWarningForTesting();
   });
 
   afterEach(() => {

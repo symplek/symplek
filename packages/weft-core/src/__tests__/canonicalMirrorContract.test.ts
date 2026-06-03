@@ -104,9 +104,7 @@ describe.skipIf(!canonicalPresent)("AgentUnit — canonical ↔ mirror contract"
   beforeEach(() => {
     warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     // Reset the per-process deprecation guard so legacy tests don't bleed
-    (
-      AgentUnit as unknown as { _deprecationWarned: boolean }
-    )._deprecationWarned = false;
+    AgentUnit.resetDeprecationWarningForTesting();
   });
   afterEach(() => {
     warnSpy.mockRestore();
@@ -1008,9 +1006,7 @@ describe.skipIf(!canonicalPresent)("RetryOptions — canonical ↔ mirror contra
 
       // Suppress deprecation warning
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      (
-        AgentUnit as unknown as { _deprecationWarned: boolean }
-      )._deprecationWarned = false;
+      AgentUnit.resetDeprecationWarningForTesting();
       const result = await unit.run(ctx, { trustMode: "legacy" });
       warnSpy.mockRestore();
 

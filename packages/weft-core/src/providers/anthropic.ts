@@ -1,4 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
+// Type-only import — erased at runtime; safe for lazy SDK loading.
+import type Anthropic from "@anthropic-ai/sdk";
 import { WeftError } from "../errors";
 import { redactErrorMessage, safeCause } from "./redact";
 import type {
@@ -10,10 +11,39 @@ import type {
   StreamChunk,
 } from "./interface";
 
+// ── Lazy SDK loader ──────────────────────────────────────────────────────────
+// No top-level import of @anthropic-ai/sdk. The SDK is loaded on first factory
+// call and cached for the process lifetime — import() is called exactly once.
+
+let _AnthropicSdk: typeof import("@anthropic-ai/sdk")["default"] | null = null;
+
+async function loadAnthropicSdk(): Promise<
+  typeof import("@anthropic-ai/sdk")["default"]
+> {
+  if (_AnthropicSdk !== null) return _AnthropicSdk;
+  try {
+    const mod = await import("@anthropic-ai/sdk");
+    _AnthropicSdk = mod.default;
+    return _AnthropicSdk;
+  } catch {
+    throw new WeftError({
+      code: "PROVIDER_ERROR",
+      why: "@anthropic-ai/sdk is not installed. Run: pnpm add @anthropic-ai/sdk",
+      fix: {
+        description: "Run: pnpm add @anthropic-ai/sdk",
+        docsUrl: "https://docs.anthropic.com/en/api/getting-started",
+      },
+      example: "pnpm add @anthropic-ai/sdk",
+    });
+  }
+}
+
 /**
  * Anthropic Provider Adapter
  */
-export function createAnthropicProvider(apiKey: string): Provider {
+export async function createAnthropicProvider(
+  apiKey: string,
+): Promise<Provider> {
   if (!apiKey) {
     throw new WeftError({
       code: "PROVIDER_ERROR",
@@ -25,6 +55,7 @@ export function createAnthropicProvider(apiKey: string): Provider {
       example: 'process.env.ANTHROPIC_API_KEY = "sk-ant-...";',
     });
   }
+  const Anthropic = await loadAnthropicSdk();
   const client = new Anthropic({ apiKey });
 
   const capabilities: ProviderCapabilities = {

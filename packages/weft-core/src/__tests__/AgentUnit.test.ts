@@ -21,9 +21,8 @@ describe("AgentUnit", () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
     consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    // Reset the deprecation warning flag
-    // @ts-expect-error - Accessing private static for testing
-    AgentUnit._deprecationWarned = false;
+    // Reset the deprecation warning flag between tests
+    AgentUnit.resetDeprecationWarningForTesting();
   });
   afterEach(() => {
     consoleWarnSpy.mockRestore();

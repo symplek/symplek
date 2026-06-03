@@ -1,4 +1,5 @@
-import OpenAI from "openai";
+// Type-only import — erased at runtime; safe for lazy SDK loading.
+import type OpenAI from "openai";
 import { WeftError } from "../errors";
 import { redactErrorMessage, safeCause } from "./redact";
 import type {
@@ -10,10 +11,37 @@ import type {
   StreamChunk,
 } from "./interface";
 
+// ── Lazy SDK loader ──────────────────────────────────────────────────────────
+// No top-level import of openai. The SDK is loaded on first factory call and
+// cached for the process lifetime — import() is called exactly once.
+
+let _OpenAISdk: typeof import("openai")["default"] | null = null;
+
+async function loadOpenAISdk(): Promise<typeof import("openai")["default"]> {
+  if (_OpenAISdk !== null) return _OpenAISdk;
+  try {
+    const mod = await import("openai");
+    _OpenAISdk = mod.default;
+    return _OpenAISdk;
+  } catch {
+    throw new WeftError({
+      code: "PROVIDER_ERROR",
+      why: "openai is not installed. Run: pnpm add openai",
+      fix: {
+        description: "Run: pnpm add openai",
+        docsUrl: "https://platform.openai.com/docs/libraries",
+      },
+      example: "pnpm add openai",
+    });
+  }
+}
+
 /**
  * OpenAI Provider Adapter
  */
-export function createOpenAIProvider(apiKey: string): Provider {
+export async function createOpenAIProvider(
+  apiKey: string,
+): Promise<Provider> {
   if (!apiKey) {
     throw new WeftError({
       code: "PROVIDER_ERROR",
@@ -25,6 +53,7 @@ export function createOpenAIProvider(apiKey: string): Provider {
       example: 'process.env.OPENAI_API_KEY = "sk-proj-...";',
     });
   }
+  const OpenAI = await loadOpenAISdk();
   const client = new OpenAI({ apiKey });
 
   const capabilities: ProviderCapabilities = {

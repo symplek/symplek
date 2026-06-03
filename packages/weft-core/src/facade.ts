@@ -24,11 +24,6 @@ import {
   resetAll,
   setInitPromise,
 } from "./globalConfig";
-// TODO(Wave 3 / Contract 2): replace these static imports with lazy dynamic imports
-// once the per-adapter lazy-load pattern lands. For now, factories are synchronous.
-import { createAnthropicProvider } from "./providers/anthropic";
-import { createGoogleProvider } from "./providers/google";
-import { createOpenAIProvider } from "./providers/openai";
 import { providerRegistry } from "./providers/registry";
 import type { StreamOptions } from "./streaming";
 import { stream } from "./streaming";
@@ -149,33 +144,38 @@ type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number];
  * Bootstrap the provider adapter and register it as the registry default.
  * Called inside `_configure()` via `_initPromise` to keep `configure()` void.
  *
- * Note: for Wave 0, factories are called synchronously (they use static imports).
- * Wave 3 / Contract 2 will make this truly async via lazy dynamic imports.
+ * Each branch does a true dynamic import() of the adapter module — the SDK is
+ * loaded lazily and cached per-module (Contract 2). The factory is async; we
+ * await it before registering.
  */
 async function _bootstrapProvider(
   provider: string,
   apiKey: string,
 ): Promise<void> {
-  // TODO(Wave 3 / Contract 2): switch each branch to: const mod = await import("./providers/<name>"); mod.create<Name>Provider(apiKey)
   switch (provider as SupportedProvider) {
     case "openai": {
-      const p = createOpenAIProvider(apiKey);
+      const { createOpenAIProvider } = await import("./providers/openai");
+      const p = await createOpenAIProvider(apiKey);
       providerRegistry.register(p, true);
       break;
     }
     case "anthropic": {
-      const p = createAnthropicProvider(apiKey);
+      const { createAnthropicProvider } = await import(
+        "./providers/anthropic"
+      );
+      const p = await createAnthropicProvider(apiKey);
       providerRegistry.register(p, true);
       break;
     }
     case "google": {
-      const p = createGoogleProvider(apiKey);
+      const { createGoogleProvider } = await import("./providers/google");
+      const p = await createGoogleProvider(apiKey);
       providerRegistry.register(p, true);
       break;
     }
     default: {
-      // This branch is unreachable at runtime — provider was validated synchronously
-      // in _configure(). It is retained here as a defensive guard for Wave 3 refactors.
+      // Unreachable: provider was validated synchronously in _configure().
+      // Retained as a defensive guard.
       throw new WeftError({
         code: "PROVIDER_ERROR",
         why: `Unknown provider "${String(provider)}". Supported providers: ${SUPPORTED_PROVIDERS.join(", ")}.`,

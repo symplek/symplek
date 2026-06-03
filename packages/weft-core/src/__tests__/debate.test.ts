@@ -23,8 +23,7 @@ describe("Debate Operator", () => {
     ctx = createContext();
     consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     // Reset the deprecation warning flag
-    // @ts-expect-error - Accessing private static for testing
-    AgentUnit._deprecationWarned = false;
+    AgentUnit.resetDeprecationWarningForTesting();
   });
   afterEach(() => {
     consoleWarnSpy.mockRestore();

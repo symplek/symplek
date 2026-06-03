@@ -14,7 +14,7 @@ describe("AgentUnit.compensate()", () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
     consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    AgentUnit._deprecationWarned = false;
+    AgentUnit.resetDeprecationWarningForTesting();
   });
   afterEach(() => {
     consoleWarnSpy.mockRestore();

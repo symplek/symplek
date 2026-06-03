@@ -18,7 +18,7 @@ let warnSpy: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
   warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
   // Reset deprecation guard so each test starts clean
-  AgentUnit._deprecationWarned = false;
+  AgentUnit.resetDeprecationWarningForTesting();
 });
 afterEach(() => {
   warnSpy.mockRestore();

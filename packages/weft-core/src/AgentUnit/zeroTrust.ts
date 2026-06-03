@@ -19,15 +19,15 @@ import {
 
 /**
  * Emit deprecation warning for legacy mode. Only emits once per process.
- * State is owned by the `AgentUnit._deprecationWarned` static field so tests
- * can reset it between runs via `AgentUnit._deprecationWarned = false`.
- * @param cls - The AgentUnit class (provides `_deprecationWarned` flag)
+ * State is owned by the `AgentUnit.#deprecationWarned` private static field.
+ * Tests reset it via `AgentUnit.resetDeprecationWarningForTesting()`.
+ * @param cls - The AgentUnit class (provides `_getAndSetDeprecationWarned`)
  */
 export function emitDeprecationWarning(cls: {
-  _deprecationWarned: boolean;
+  _getAndSetDeprecationWarned(): boolean;
 }): void {
-  if (!cls._deprecationWarned) {
-    cls._deprecationWarned = true;
+  const alreadyWarned = cls._getAndSetDeprecationWarned();
+  if (!alreadyWarned) {
     console.warn(
       '[Weft] trustMode: "legacy" is deprecated and will be removed in v3.0.\n' +
         "  Migration guide: https://Weft.ai/docs/migration/zero-trust",

@@ -122,6 +122,18 @@ export class Interview<TContext> {
    * @throws Error if configuration is invalid
    */
   private validateConfig(): void {
+    // Validate contextSchema is present and is a Zod type
+    if (
+      this.contextSchema === undefined ||
+      this.contextSchema === null ||
+      typeof this.contextSchema !== "object" ||
+      typeof (this.contextSchema as { parse?: unknown }).parse !== "function"
+    ) {
+      throw new Error(
+        "Interview config error: contextSchema is required and must be a Zod schema",
+      );
+    }
+
     // Validate clarity threshold (0-100)
     if (
       this.options.clarityThreshold < 0 ||

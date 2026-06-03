@@ -7,7 +7,7 @@
  * 📝 BUILD[Weft-interview]: Schema-driven agent generation
  */
 
-import type { z } from "zod";
+import { z } from "zod";
 import { AgentUnit } from "../AgentUnit";
 import type {
   ClarityScore,
@@ -54,52 +54,86 @@ export interface AnalyzedField {
  * // [{ name: 'name', type: 'ZodString', isRequired: true, weight: 15 }, ...]
  * ```
  */
+/**
+ * Derive a stable Zod class-name string from a field schema using only public
+ * Zod v3 `instanceof` checks.  Mirrors the strings previously read from
+ * `._def.typeName` so downstream consumers receive identical values.
+ *
+ * @param field - Any Zod type (already unwrapped of Optional/Nullable/Default)
+ * @returns Class-name string (e.g. "ZodString") or "unknown"
+ */
+function zodTypeName(field: z.ZodTypeAny): string {
+  if (field instanceof z.ZodString) return "ZodString";
+  if (field instanceof z.ZodNumber) return "ZodNumber";
+  if (field instanceof z.ZodBoolean) return "ZodBoolean";
+  if (field instanceof z.ZodBigInt) return "ZodBigInt";
+  if (field instanceof z.ZodDate) return "ZodDate";
+  if (field instanceof z.ZodArray) return "ZodArray";
+  if (field instanceof z.ZodObject) return "ZodObject";
+  if (field instanceof z.ZodEnum) return "ZodEnum";
+  if (field instanceof z.ZodNativeEnum) return "ZodNativeEnum";
+  if (field instanceof z.ZodUnion) return "ZodUnion";
+  if (field instanceof z.ZodLiteral) return "ZodLiteral";
+  if (field instanceof z.ZodTuple) return "ZodTuple";
+  if (field instanceof z.ZodRecord) return "ZodRecord";
+  if (field instanceof z.ZodNull) return "ZodNull";
+  if (field instanceof z.ZodUndefined) return "ZodUndefined";
+  if (field instanceof z.ZodAny) return "ZodAny";
+  if (field instanceof z.ZodUnknown) return "ZodUnknown";
+  return "unknown";
+}
+
 export function analyzeSchema<T>(schema: z.ZodType<T>): AnalyzedField[] {
   const fields: AnalyzedField[] = [];
 
-  // Access Zod internal definition
-  const def = schema._def as { typeName?: string };
+  // Use public instanceof check instead of ._def.typeName
+  if (!(schema instanceof z.ZodObject)) {
+    return fields;
+  }
 
-  // Handle ZodObject schemas
-  if (def.typeName === "ZodObject") {
-    const shape = (schema as unknown as z.ZodObject<z.ZodRawShape>).shape;
+  // .shape is a public Zod v3 API (documented in the Zod README)
+  const shape = schema.shape;
 
-    for (const [name, fieldSchema] of Object.entries(shape)) {
-      const field = fieldSchema as z.ZodTypeAny;
-      const fieldDef = field._def as {
-        typeName?: string;
-        description?: string;
-        innerType?: { _def: { typeName?: string } };
-      };
+  for (const [name, rawField] of Object.entries(shape)) {
+    let field = rawField as z.ZodTypeAny;
 
-      // Determine if field is optional (unwrap optional/nullable wrappers)
-      let innerType = fieldDef.typeName;
-      const isOptional =
-        innerType === "ZodOptional" || innerType === "ZodNullable";
-      const hasDefault = innerType === "ZodDefault";
-      const isRequired = !isOptional && !hasDefault;
+    // Determine wrapper kind using public instanceof checks
+    const isOptional =
+      field instanceof z.ZodOptional || field instanceof z.ZodNullable;
+    const hasDefault = field instanceof z.ZodDefault;
+    const isRequired = !isOptional && !hasDefault;
 
-      // Get the actual type if wrapped
-      if (isOptional || hasDefault) {
-        innerType = fieldDef.innerType?._def?.typeName ?? innerType;
-      }
-
-      // Get description if set via .describe()
-      const description = fieldDef.description;
-
-      // Calculate weight based on required/default status
-      // Required fields without defaults are most important
-      const weight = isRequired ? 15 : hasDefault ? 10 : 5;
-
-      fields.push({
-        name,
-        type: innerType ?? "unknown",
-        description,
-        isRequired,
-        hasDefault,
-        weight,
-      });
+    // Unwrap to the inner type using public Zod v3 APIs:
+    //   ZodOptional.unwrap()  — documented public API
+    //   ZodNullable.unwrap()  — documented public API
+    //   ZodDefault.removeDefault() — documented public API
+    let innerField: z.ZodTypeAny = field;
+    if (field instanceof z.ZodOptional) {
+      innerField = field.unwrap();
+    } else if (field instanceof z.ZodNullable) {
+      innerField = field.unwrap();
+    } else if (field instanceof z.ZodDefault) {
+      innerField = field.removeDefault();
     }
+
+    // .description is a public property on ZodType (set by .describe())
+    // It lives on the *outer* type (the wrapper carries the description).
+    const description = field.description;
+
+    const typeName = zodTypeName(innerField);
+
+    // Calculate weight based on required/default status
+    // Required fields without defaults are most important
+    const weight = isRequired ? 15 : hasDefault ? 10 : 5;
+
+    fields.push({
+      name,
+      type: typeName,
+      description,
+      isRequired,
+      hasDefault,
+      weight,
+    });
   }
 
   return fields;

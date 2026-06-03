@@ -23,8 +23,7 @@ describe("AgentUnit Algebra Level 3", () => {
   let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
     consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    // @ts-expect-error - Accessing private static for testing
-    AgentUnit._deprecationWarned = false;
+    AgentUnit.resetDeprecationWarningForTesting();
   });
   afterEach(() => {
     consoleWarnSpy.mockRestore();
