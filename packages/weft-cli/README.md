@@ -16,34 +16,38 @@ npx weft-cli --help
 
 ```bash
 # Display help
-Weft --help
+weft --help
 
 # Display version
-Weft --version
+weft --version
 
-# Initialize a new Weft project (coming soon)
-Weft init
+# Initialize a new Weft project
+weft init
 
-# Add agents, tools, or workflows (coming soon)
-Weft add agent my-agent
+# Add agents, tools, or workflows
+weft add agent my-agent
 
-# Validate YAML agent definitions (coming soon)
-Weft validate agents/
+# Validate YAML agent definitions
+weft validate agents/
 
-# Generate TypeScript from YAML (coming soon)
-Weft generate
+# Migrate existing agent definitions
+weft migrate
+
+# Generate TypeScript from YAML
+weft generate
 ```
 
 ## Commands
 
 | Command | Description | Status |
 |---------|-------------|--------|
-| `Weft --help` | Display help information | ✅ Available |
-| `Weft --version` | Display CLI version | ✅ Available |
-| `Weft init` | Initialize a new Weft project | 🚧 Coming in 03.02 |
-| `Weft add` | Add agents, tools, or workflows | 🚧 Coming in 03.03 |
-| `Weft validate` | Validate YAML definitions | 🚧 Coming in 03.04 |
-| `Weft generate` | Generate TypeScript from YAML | 🚧 Coming in 03.05 |
+| `weft --help` | Display help information | ✅ Available |
+| `weft --version` | Display CLI version | ✅ Available |
+| `weft init` | Initialize a new Weft project | ✅ Available |
+| `weft add` | Add agents, tools, or workflows | ✅ Available |
+| `weft validate` | Validate YAML definitions | ✅ Available |
+| `weft migrate` | Migrate existing agent definitions | ✅ Available |
+| `weft generate` | Generate TypeScript from YAML | ✅ Available |
 
 ## Requirements
 

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `weft-core/server` imports provider SDKs dynamically so only the provider in use must be installed (no `MODULE_NOT_FOUND` for optional peer deps).
+- Schema generic is threaded through the builder so `TrackedResult<T>` retains its inferred type through `ai()` calls with a schema.
+
+### Fixed
+
+- `Weft.configure()` global config (`provider`/`model`/`apiKey`/`debug`) is now consumed by `ai()` and provider detection (was a silent no-op).
+- API key no longer leaks through the retained raw `error.cause`; the cause is deep-sanitised before attachment.
+- API-key redaction replaces all occurrences in a string, not just the first.
+- `selectModelForTask()` returns provider-appropriate default models (Anthropic/Google users no longer receive OpenAI model strings).
+- Anthropic streaming usage metadata is recovered from `textDelta` chunks; token totals are now accurate.
+
+### Changed
+
+- `operators.ts` split into domain sub-modules to stay below the 1000-LOC absolute ceiling (rule 039).
+
 ## [1.0.0-beta.1] - 2026-04-13
 
 ### Added
@@ -27,5 +44,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **OC-0**: Import path cleanup for published package layout and consumer ergonomics.
 
-[Unreleased]: https://github.com/aWeft13/Weft/compare/weft-core@1.0.0-beta.1...HEAD
-[1.0.0-beta.1]: https://github.com/aWeft13/Weft/releases/tag/weft-core@1.0.0-beta.1
+[Unreleased]: https://github.com/wefthq/weft/compare/weft-core@1.0.0-beta.1...HEAD
+[1.0.0-beta.1]: https://github.com/wefthq/weft/releases/tag/weft-core@1.0.0-beta.1

@@ -4,7 +4,7 @@ Weft uses [Changesets](https://github.com/changesets/changesets) to manage versi
 
 ## When to add a changeset
 
-Any PR that changes a published `@weft/*` package needs a changeset. PRs that touch only docs, tests, CI, or other non-published files do not.
+Any PR that changes a published `weft-*` package needs a changeset. PRs that touch only docs, tests, CI, or other non-published files do not.
 
 ## How to add one
 
@@ -21,6 +21,7 @@ You'll be asked:
    - `patch` — bug fix, internal refactor, no API change.
    - `minor` — new feature, new exports, additive only.
    - `major` — breaking change. While we're 0.x, breaking changes are minor bumps; major is reserved for 1.0+.
+   - **Beta note**: `weft-core` and `weft-pro` are linked — a changeset touching either will bump both to the same version. During the prerelease cycle (`0.x.y-beta.N`) Changesets will append a beta suffix automatically when you are on a prerelease branch.
 3. **Summary.** One line. This is what appears in the CHANGELOG.
 
 A new file appears in `.changeset/`. Commit it with your PR.

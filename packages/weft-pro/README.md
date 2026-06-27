@@ -28,7 +28,8 @@ pnpm add weft-core weft-pro
 | **Multi-round TaCo consensus** | Agents share rationale and revote until convergence | — | ✓ |
 | **Stigmergic confidence** | Pheromone-based coordination with evaporation/decay | — | ✓ |
 | **Agent antibodies** | Runtime output pattern scanning — reject, warn, quarantine | — | ✓ |
-| **Observability** | Span tracing, cost tracking, collector hooks (in-memory) | — | ✓ |
+| **Basic observability** | Span tracing, cost tracking, collector hooks (in-memory) | ✓ | ✓ |
+| **Advanced observability** | Multi-agent trace aggregation, cost dashboards, distributed tracing | — | ✓ |
 | **Trust registry** | Trusted-traveler lanes, configurable scan depth per agent | — | ✓ |
 | **Teams** | Named reusable agent teams with shared configuration | — | ✓ |
 | **Change-kernel** | Approval workflows, escalation, merge, classification | — | ✓ |
@@ -45,7 +46,7 @@ Single-round consensus (free) votes once. TaCo iterates — agents see each othe
 Agent antibodies scan every result against a registry of regex, substring, and structural matchers. Block XSS patterns, hallucinated field names, schema violations, or any custom pattern before it reaches downstream consumers.
 
 **You need span-level tracing across a workflow.**
-The observability layer records wall-clock span timing, custom attributes, and trace IDs. Attach collector hooks to export to your own backend (Datadog, Honeycomb, or OTEL-compatible).
+Basic observability (span recording, cost/error tracking, in-memory trace store, collector hook) is included in `weft-core` at no cost. `weft-pro` adds advanced observability: multi-agent trace aggregation, cost dashboards, and distributed tracing for organisational-scale deployments.
 
 **You need trust-based routing.**
 Tag agents or callers with trust levels and expiration. Route deeper, more expensive analysis only when trust score warrants it.

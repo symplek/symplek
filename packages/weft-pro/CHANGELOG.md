@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `test` script (`vitest run`) so `pnpm test` runs the contract suite and CI no longer silently skips this package.
+
+### Fixed
+
+- `converge` parallel last-writer-wins semantics are documented and guarded with a runtime warning so callers are not silently surprised.
+- In-memory lock state (`solo/lock.ts`) is now per-instance rather than a process-global singleton, eliminating state leakage across unrelated operations and tests.
+
 ## [1.0.0-beta.1] - 2026-04-13
 
 ### Added
@@ -23,5 +32,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **OC-2 PKG**: Package metadata complete for npm discoverability (`keywords`, `description`, `engines`).
 - **OC-2 DX**: `WeftError` messages include `[weft@VERSION]` prefix for self-identifying stack traces (inherited from `weft-core`).
 
-[Unreleased]: https://github.com/aWeft13/Weft/compare/weft-pro@1.0.0-beta.1...HEAD
-[1.0.0-beta.1]: https://github.com/aWeft13/Weft/releases/tag/weft-pro@1.0.0-beta.1
+[Unreleased]: https://github.com/wefthq/weft/compare/weft-pro@1.0.0-beta.1...HEAD
+[1.0.0-beta.1]: https://github.com/wefthq/weft/releases/tag/weft-pro@1.0.0-beta.1

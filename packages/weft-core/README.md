@@ -142,7 +142,7 @@ One import. `Weft(task)` for the simple case, `Weft.unit(fn)` / `Weft.of(value)`
 
 - **Multi-round TaCo consensus** — agents share rationale and revote until convergence (reduces error amplification by 17×)
 - **Agent antibodies** — pattern-match and reject bad outputs at runtime (XSS, hallucinated fields, schema violations)
-- **Built-in observability** — span tracing with wall-clock timing, collector hooks, cost tracking
+- **Advanced observability** — multi-agent trace aggregation, cost dashboards, distributed tracing
 - **Trust registry** — trusted-traveler lanes with configurable scan depth per agent or caller
 - **Teams** — named reusable agent teams with shared configuration
 - **Stigmergic coordination** — pheromone-based confidence with evaporation/decay
@@ -153,10 +153,10 @@ See [weft-pro](../weft-pro/README.md) for details.
 
 ## Links
 
-- [Quickstart](../../docs/weft-quickstart.md) — First agent in 30 seconds
-- [Cookbook](../../docs/weft-cookbook.md) — Copy-paste recipes for real patterns
-- [API Reference](../../docs/weft-exports.md) — Full method signatures and types
-- [GitHub](https://github.com/weft-ai/weft)
+- [Architecture overview](../../docs/ARCHITECTURE.md) — How weft-core is structured
+- [Tier boundary](../../docs/tier-boundary.md) — What is free vs. pro
+- [Full architecture reference](../../docs/ARCHITECTURE-FULL.md) — Deep-dive on every module
+- [GitHub](https://github.com/wefthq/weft)
 
 ---
 
