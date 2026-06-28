@@ -66,6 +66,15 @@ export {
   trackCost,
   trackError,
 } from "./observability";
+// ─── OpenTelemetry Export (additive — optional @opentelemetry/* peers) ───────
+export {
+  configureOpenTelemetry,
+  exportTraces,
+  genAiSpanAttributes,
+  type OpenTelemetryOptions,
+  type OtelExportResult,
+  shutdownOpenTelemetry,
+} from "./otel";
 // ─── CoherenceError + createSoloComputation (operators.ts) ───────────────────
 export { CoherenceError, createSoloComputation } from "./operators";
 // ─── Provider ────────────────────────────────────────────────────────────────
