@@ -344,6 +344,33 @@ describe("Converge Operator", () => {
       // Last agent's result wins in parallel mode
       expect(result.finalResult).toBe("second");
     });
+
+    it("should shallow-merge plain object results in parallel mode", async () => {
+      const agent0 = (): ConvergeContribution<{
+        first?: string;
+        second?: string;
+      }> => ({
+        result: { first: "agent-0" },
+        hasMore: false,
+      });
+
+      const agent1 = (): ConvergeContribution<{
+        first?: string;
+        second?: string;
+      }> => ({
+        result: { second: "agent-1" },
+        hasMore: false,
+      });
+
+      const result = await AgentUnit.of({})
+        .converge([agent0, agent1], { parallel: true })
+        .run(ctx, { trustMode: "legacy" });
+
+      expect(result.finalResult).toEqual({
+        first: "agent-0",
+        second: "agent-1",
+      });
+    });
   });
 
   describe("Contribution Tracking", () => {

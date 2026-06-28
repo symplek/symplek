@@ -113,8 +113,8 @@ configuration that targets team workflows, not individual agent composition.
 ## Verification
 
 ```bash
-# Confirm no @weft/pro imports in weft-core source
-rg "@weft/pro" packages/weft-core/src --glob "*.ts" -l
+# Confirm no weft-pro imports in weft-core source
+rg "weft-pro" packages/weft-core/src --glob "*.ts" -l
 
 # Run tier boundary tests
 cd packages/weft-core && pnpm vitest run src/__tests__/tierBoundary.test.ts

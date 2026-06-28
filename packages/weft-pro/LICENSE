@@ -3,8 +3,15 @@ Business Source License 1.1
 Parameters
 
 Licensor:             Weft Contributors
-Licensed Work:        @weft/pro (all versions)
+Licensed Work:        weft-pro (all versions)
                       The Licensed Work is (c) 2024 Weft Contributors
+Additional Use Grant: You may use the Licensed Work in production provided
+                      that you are an individual or a team with fewer than
+                      five (5) developers. You may also use, copy, modify,
+                      and redistribute the Licensed Work, provided that you
+                      may not offer the Licensed Work to third parties as a
+                      hosted or managed service that competes with offerings
+                      from the Licensor.
 Change Date:          2030-04-13
 Change License:       MIT
 

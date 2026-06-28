@@ -14,13 +14,34 @@ import type {
   ConvergeResult,
 } from "../types";
 
+function isMergeableObject(value: unknown): value is Record<string, unknown> {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.getPrototypeOf(value) === Object.prototype
+  );
+}
+
+function mergeContributionResult<T>(state: T, result: T): T {
+  if (isMergeableObject(state) && isMergeableObject(result)) {
+    return { ...state, ...result } as T;
+  }
+
+  return result;
+}
+
 /**
  * Creates a computation that implements iterative convergence.
  * Loops until all agents return hasMore: false or maxRounds hit.
  *
  * @remarks
  * Agents can return AgentUnit, Promise, or raw ConvergeContribution.
- * In parallel mode (default), all agents run simultaneously each round.
+ * In parallel mode (default), all agents run simultaneously each round against
+ * the same state snapshot, then their results are applied deterministically in
+ * agent-array order. Plain object states are shallow-merged so independent
+ * fields from multiple agents are retained; non-object states still use
+ * last-result-wins semantics.
  * In sequential mode, each agent's result is immediately applied.
  *
  * @param initialValue - The starting state for convergence
@@ -30,8 +51,9 @@ import type {
  *
  * 📝 IMPL[fast-20260204]: Parallel vs Sequential mode - parallel runs all agents per round,
  *    sequential applies each result immediately (use for order-dependent refinement).
- * 📝 IMPL[fast-20260204]: State merging in parallel mode uses "last non-null wins" strategy
- *    because agents run simultaneously and can't see each other's changes mid-round.
+ * 📝 IMPL[fast-20260204]: State merging in parallel mode applies completed
+ *    contributions in input order after every agent has finished, making the
+ *    final state independent of promise resolution timing.
  * ⚠️ CAUTION: trustMode: 'legacy' used in executeAgent() to avoid double-wrapping
  *    TrackedResult - converge handles confidence adjustment (+0.15) at the operator level.
  */
@@ -107,14 +129,20 @@ export function createConvergeComputation<T>(
         });
       }
 
-      // Merge results in parallel mode (use last non-null result)
+      // Merge results in parallel mode.
+      // Promise.all preserves the agents' input order, so this fold is deterministic
+      // even when agents resolve at different times.
       if (parallel) {
-        const lastResult = roundContributions
-          .map((r) => r.contribution.result)
-          .filter((r) => r !== null && r !== undefined)
-          .pop();
-        if (lastResult !== undefined) {
-          currentState = lastResult;
+        for (const { contribution } of roundContributions) {
+          if (
+            contribution.result !== null &&
+            contribution.result !== undefined
+          ) {
+            currentState = mergeContributionResult(
+              currentState,
+              contribution.result,
+            );
+          }
         }
       }
 

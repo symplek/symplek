@@ -18,16 +18,6 @@
 import type { LockAcquisitionResult, LockEntry, LockManager } from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// IN-MEMORY LOCK STORE
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Global lock store for in-memory implementation.
- * @internal
- */
-const activeLocks = new Map<string, LockEntry>();
-
-// ─────────────────────────────────────────────────────────────────────────────
 // CORE LOCK FUNCTIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -56,38 +46,7 @@ export async function acquireLock(
   agentId: string,
   timeoutMs: number = 30000,
 ): Promise<LockAcquisitionResult> {
-  const now = Date.now();
-  const existing = activeLocks.get(resourceId);
-
-  // Check if lock exists and is still valid
-  if (existing && existing.expires > now) {
-    // Lock is held by someone else
-    if (existing.agentId !== agentId) {
-      return {
-        acquired: false,
-        reason: "already_held",
-        heldBy: existing.agentId,
-      };
-    }
-    // Same agent - extend the lock
-    const extended: LockEntry = {
-      ...existing,
-      expires: now + timeoutMs,
-    };
-    activeLocks.set(resourceId, extended);
-    return { acquired: true, lock: extended };
-  }
-
-  // Lock is free or expired - acquire it
-  const lock: LockEntry = {
-    agentId,
-    resourceId,
-    expires: now + timeoutMs,
-    acquiredAt: now,
-  };
-
-  activeLocks.set(resourceId, lock);
-  return { acquired: true, lock };
+  return defaultLockManager.acquire(resourceId, agentId, timeoutMs);
 }
 
 /**
@@ -101,21 +60,7 @@ export async function releaseLock(
   resourceId: string,
   agentId: string,
 ): Promise<boolean> {
-  const existing = activeLocks.get(resourceId);
-
-  // Lock doesn't exist or is expired - consider it released
-  if (!existing || existing.expires <= Date.now()) {
-    activeLocks.delete(resourceId);
-    return true;
-  }
-
-  // Only the holder can release
-  if (existing.agentId !== agentId) {
-    return false;
-  }
-
-  activeLocks.delete(resourceId);
-  return true;
+  return defaultLockManager.release(resourceId, agentId);
 }
 
 /**
@@ -125,16 +70,7 @@ export async function releaseLock(
  * @returns True if resource is locked and lock hasn't expired
  */
 export async function isLockHeld(resourceId: string): Promise<boolean> {
-  const existing = activeLocks.get(resourceId);
-  if (!existing) return false;
-
-  // Clean up expired lock
-  if (existing.expires <= Date.now()) {
-    activeLocks.delete(resourceId);
-    return false;
-  }
-
-  return true;
+  return defaultLockManager.isLocked(resourceId);
 }
 
 /**
@@ -146,11 +82,7 @@ export async function isLockHeld(resourceId: string): Promise<boolean> {
 export async function getLockHolder(
   resourceId: string,
 ): Promise<string | undefined> {
-  const existing = activeLocks.get(resourceId);
-  if (!existing || existing.expires <= Date.now()) {
-    return undefined;
-  }
-  return existing.agentId;
+  return defaultLockManager.getHolder(resourceId);
 }
 
 /**
@@ -166,20 +98,7 @@ export async function extendLock(
   agentId: string,
   additionalMs: number,
 ): Promise<boolean> {
-  const existing = activeLocks.get(resourceId);
-
-  // Lock doesn't exist or is expired
-  if (!existing || existing.expires <= Date.now()) {
-    return false;
-  }
-
-  // Only holder can extend
-  if (existing.agentId !== agentId) {
-    return false;
-  }
-
-  existing.expires += additionalMs;
-  return true;
+  return defaultLockManager.extend(resourceId, agentId, additionalMs);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -191,24 +110,85 @@ export async function extendLock(
  * Implements the LockManager interface for pluggable lock backends.
  */
 export class InMemoryLockManager implements LockManager {
+  private readonly activeLocks = new Map<string, LockEntry>();
+
   async acquire(
     resourceId: string,
     agentId: string,
     timeoutMs: number,
   ): Promise<LockAcquisitionResult> {
-    return acquireLock(resourceId, agentId, timeoutMs);
+    const now = Date.now();
+    const existing = this.activeLocks.get(resourceId);
+
+    // Check if lock exists and is still valid
+    if (existing && existing.expires > now) {
+      // Lock is held by someone else
+      if (existing.agentId !== agentId) {
+        return {
+          acquired: false,
+          reason: "already_held",
+          heldBy: existing.agentId,
+        };
+      }
+      // Same agent - extend the lock
+      const extended: LockEntry = {
+        ...existing,
+        expires: now + timeoutMs,
+      };
+      this.activeLocks.set(resourceId, extended);
+      return { acquired: true, lock: extended };
+    }
+
+    // Lock is free or expired - acquire it
+    const lock: LockEntry = {
+      agentId,
+      resourceId,
+      expires: now + timeoutMs,
+      acquiredAt: now,
+    };
+
+    this.activeLocks.set(resourceId, lock);
+    return { acquired: true, lock };
   }
 
   async release(resourceId: string, agentId: string): Promise<boolean> {
-    return releaseLock(resourceId, agentId);
+    const existing = this.activeLocks.get(resourceId);
+
+    // Lock doesn't exist or is expired - consider it released
+    if (!existing || existing.expires <= Date.now()) {
+      this.activeLocks.delete(resourceId);
+      return true;
+    }
+
+    // Only the holder can release
+    if (existing.agentId !== agentId) {
+      return false;
+    }
+
+    this.activeLocks.delete(resourceId);
+    return true;
   }
 
   async isLocked(resourceId: string): Promise<boolean> {
-    return isLockHeld(resourceId);
+    const existing = this.activeLocks.get(resourceId);
+    if (!existing) return false;
+
+    // Clean up expired lock
+    if (existing.expires <= Date.now()) {
+      this.activeLocks.delete(resourceId);
+      return false;
+    }
+
+    return true;
   }
 
   async getHolder(resourceId: string): Promise<string | undefined> {
-    return getLockHolder(resourceId);
+    const existing = this.activeLocks.get(resourceId);
+    if (!existing || existing.expires <= Date.now()) {
+      this.activeLocks.delete(resourceId);
+      return undefined;
+    }
+    return existing.agentId;
   }
 
   async extend(
@@ -216,7 +196,70 @@ export class InMemoryLockManager implements LockManager {
     agentId: string,
     additionalMs: number,
   ): Promise<boolean> {
-    return extendLock(resourceId, agentId, additionalMs);
+    const existing = this.activeLocks.get(resourceId);
+
+    // Lock doesn't exist or is expired
+    if (!existing || existing.expires <= Date.now()) {
+      return false;
+    }
+
+    // Only holder can extend
+    if (existing.agentId !== agentId) {
+      return false;
+    }
+
+    existing.expires += additionalMs;
+    return true;
+  }
+
+  /**
+   * Get active locks for this manager instance.
+   * @returns Array of active lock entries
+   */
+  getActiveLocks(): LockEntry[] {
+    const now = Date.now();
+    const active: LockEntry[] = [];
+
+    for (const [, lock] of this.activeLocks) {
+      if (lock.expires > now) {
+        active.push({ ...lock });
+      }
+    }
+
+    return active;
+  }
+
+  /**
+   * Clear all locks held by this manager instance.
+   */
+  clearAllLocks(): void {
+    this.activeLocks.clear();
+  }
+
+  /**
+   * Force release a lock from this manager regardless of holder.
+   */
+  forceRelease(resourceId: string): boolean {
+    return this.activeLocks.delete(resourceId);
+  }
+
+  /**
+   * Clean up expired locks in this manager instance.
+   *
+   * @returns Number of expired locks cleaned up
+   */
+  cleanupExpiredLocks(): number {
+    const now = Date.now();
+    let count = 0;
+
+    for (const [resourceId, lock] of this.activeLocks) {
+      if (lock.expires <= now) {
+        this.activeLocks.delete(resourceId);
+        count++;
+      }
+    }
+
+    return count;
   }
 }
 
@@ -229,16 +272,7 @@ export class InMemoryLockManager implements LockManager {
  * @returns Array of all active lock entries
  */
 export function getActiveLocks(): LockEntry[] {
-  const now = Date.now();
-  const active: LockEntry[] = [];
-
-  for (const [, lock] of activeLocks) {
-    if (lock.expires > now) {
-      active.push({ ...lock });
-    }
-  }
-
-  return active;
+  return defaultLockManager.getActiveLocks();
 }
 
 /**
@@ -246,7 +280,7 @@ export function getActiveLocks(): LockEntry[] {
  * @internal
  */
 export function clearAllLocks(): void {
-  activeLocks.clear();
+  defaultLockManager.clearAllLocks();
 }
 
 /**
@@ -254,7 +288,7 @@ export function clearAllLocks(): void {
  * @internal
  */
 export function forceReleaseLock(resourceId: string): boolean {
-  return activeLocks.delete(resourceId);
+  return defaultLockManager.forceRelease(resourceId);
 }
 
 /**
@@ -264,17 +298,7 @@ export function forceReleaseLock(resourceId: string): boolean {
  * @returns Number of expired locks cleaned up
  */
 export function cleanupExpiredLocks(): number {
-  const now = Date.now();
-  let count = 0;
-
-  for (const [resourceId, lock] of activeLocks) {
-    if (lock.expires <= now) {
-      activeLocks.delete(resourceId);
-      count++;
-    }
-  }
-
-  return count;
+  return defaultLockManager.cleanupExpiredLocks();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

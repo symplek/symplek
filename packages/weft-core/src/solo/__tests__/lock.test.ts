@@ -237,5 +237,18 @@ describe("Lock Manager", () => {
 
       expect(await manager.isLocked("resource-1")).toBe(false);
     });
+
+    it("should keep lock state isolated per manager instance", async () => {
+      const managerA = new InMemoryLockManager();
+      const managerB = new InMemoryLockManager();
+
+      const first = await managerA.acquire("resource-1", "agent-1", 30000);
+      const second = await managerB.acquire("resource-1", "agent-2", 30000);
+
+      expect(first.acquired).toBe(true);
+      expect(second.acquired).toBe(true);
+      expect(await managerA.getHolder("resource-1")).toBe("agent-1");
+      expect(await managerB.getHolder("resource-1")).toBe("agent-2");
+    });
   });
 });
