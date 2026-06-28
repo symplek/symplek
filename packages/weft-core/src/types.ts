@@ -317,6 +317,12 @@ export interface AgentContext {
   readonly signal?: AbortSignal;
   /** Additional context data */
   readonly extensions?: Record<string, unknown>;
+  /**
+   * Idempotency key for this run, propagated to tool calls so side effects can
+   * be deduplicated downstream. Set automatically by `AgentUnit.run()` when an
+   * idempotency config is supplied; survives rehearsal replay via the context.
+   */
+  readonly idempotencyKey?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -393,6 +399,16 @@ export interface RunOptionsWithTrust {
    * @default false
    */
   captureIntermediates?: boolean;
+
+  /**
+   * Optional idempotency configuration. When supplied, `AgentUnit.run()` checks
+   * the store before executing: an existing key either throws
+   * (`strategy: 'reject'`) or returns the cached result
+   * (`strategy: 'return-cached'`). On a fresh key the result is stored after a
+   * successful run and the key is propagated to tool calls via
+   * {@link AgentContext.idempotencyKey}.
+   */
+  idempotency?: import("./idempotency").IdempotencyConfig;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

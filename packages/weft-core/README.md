@@ -132,6 +132,7 @@ One import. `Weft(task)` for the simple case, `Weft.unit(fn)` / `Weft.of(value)`
 | `AgentUnit` | `weft-core` | Lazy agent monad — `.from()`, `.of()`, `.map()`, `.flatMap()`, `.zipAll()`, `.race()` |
 | `createContext` | `weft-core` | Create an `AgentContext` for `.run()` calls (zero-arg works) |
 | `WeftError` | `weft-core` | Structured error with `.code`, `.message`, `.action` fields |
+| `InMemoryIdempotencyStore` | `weft-core` | Injectable idempotency store for `.run(ctx, { idempotency })` — dedupes side-effecting runs (`reject` / `return-cached`, optional TTL) |
 | `Weft` | `weft-core/server` | Zero-boilerplate facade — `Weft(task)`, `.run()`, `.stream()`, `.agent()`, `.unit()`, `.of()`, `.configure()`, `.providers()` |
 
 ---

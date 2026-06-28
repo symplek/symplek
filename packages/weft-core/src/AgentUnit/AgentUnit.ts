@@ -14,6 +14,11 @@ import type { z } from "zod";
 import type { HasVotes } from "../coherence/types";
 import type { ContractOptions } from "../contract";
 import { WeftError } from "../errors";
+import {
+  defaultIdempotencyStore,
+  IdempotencyError,
+  type IdempotencyStore,
+} from "../idempotency";
 import type {
   InterviewConfig,
   InterviewHandlers,
@@ -515,8 +520,39 @@ export class AgentUnit<T> {
       });
     }
     const trustMode: TrustMode = options?.trustMode ?? "zero-trust";
+
+    // ─── Idempotency pre-check (before execution) ──────────────────────────
+    // Resolved here so a `reject` throw propagates cleanly, ahead of the
+    // try/catch that would otherwise re-route it through handleError().
+    const idempotency = options?.idempotency;
+    let idemStore: IdempotencyStore | null = null;
+    let runCtx = ctx;
+    if (idempotency) {
+      idemStore = idempotency.store ?? defaultIdempotencyStore;
+      const cached = await idemStore.get(idempotency.key);
+      if (cached !== null) {
+        if (idempotency.strategy === "reject") {
+          throw new IdempotencyError(idempotency.key);
+        }
+        // strategy === "return-cached"
+        const tracked = cached as TrackedResult<T>;
+        return trustMode === "legacy" ? tracked.value : tracked;
+      }
+      // Fresh key — propagate it to tool calls via the context.
+      runCtx = { ...ctx, idempotencyKey: idempotency.key };
+    }
+
     try {
-      const value = await this.computation(ctx);
+      const value = await this.computation(runCtx);
+      if (idempotency && idemStore) {
+        const tracked = wrapInTrackedResult(this._metadata, value);
+        await idemStore.set(idempotency.key, tracked, idempotency.ttl);
+        if (trustMode === "legacy") {
+          emitDeprecationWarning(AgentUnit);
+          return value;
+        }
+        return tracked;
+      }
       if (trustMode === "legacy") {
         emitDeprecationWarning(AgentUnit);
         return value;

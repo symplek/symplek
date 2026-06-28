@@ -55,6 +55,17 @@ export type {
 } from "./interview";
 // ─── Interview ───────────────────────────────────────────────────────────────
 export { Interview } from "./interview";
+// ─── Idempotency ─────────────────────────────────────────────────────────────
+export {
+  defaultIdempotencyStore,
+  IdempotencyError,
+  InMemoryIdempotencyStore,
+} from "./idempotency";
+export type {
+  IdempotencyConfig,
+  IdempotencyStore,
+  IdempotencyStrategy,
+} from "./idempotency";
 // ─── Observability (Free Tier — moved from weft-pro) ────────────────────────
 export {
   clearTraces,

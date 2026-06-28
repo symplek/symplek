@@ -1,0 +1,162 @@
+/**
+ * @module weft-core/idempotency
+ * @description Idempotency-key infrastructure preventing duplicate execution of
+ *   side-effecting AgentUnit runs. Provides the config/store contracts, an
+ *   in-memory store with TTL expiry, and the IDEMPOTENCY_VIOLATION error.
+ * @blast_radius MEDIUM — wired into AgentUnit.run().
+ * @status STABLE
+ * @runtime node
+ * @surface public
+ * @rules @.claude/rules/patterns/029-file-header-contracts.md
+ */
+
+import { WeftError } from "./errors";
+import type { TrackedResult } from "./types";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONFIG + STORE CONTRACTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Behaviour when an idempotency key has already been seen.
+ * - `reject`: throw {@link IdempotencyError} (fail-closed; duplicate writes blocked)
+ * - `return-cached`: return the previously stored {@link TrackedResult} unchanged
+ */
+export type IdempotencyStrategy = "reject" | "return-cached";
+
+/**
+ * Per-run idempotency configuration passed via `AgentUnit.run(ctx, { idempotency })`.
+ *
+ * @remarks
+ * The `store` is optional and injectable — omit it to use the process-wide
+ * {@link defaultIdempotencyStore}, or supply any {@link IdempotencyStore}
+ * (e.g. a Redis/Convex-backed implementation) for distributed deduplication.
+ */
+export interface IdempotencyConfig {
+  /** Stable key uniquely identifying this logical operation. */
+  key: string;
+  /** Time-to-live in milliseconds for the cached result. Omit for no expiry. */
+  ttl?: number;
+  /** What to do when the key already exists. */
+  strategy: IdempotencyStrategy;
+  /**
+   * Store used to read/write the cached result.
+   * @default {@link defaultIdempotencyStore}
+   */
+  store?: IdempotencyStore;
+}
+
+/**
+ * Pluggable persistence contract for idempotency results.
+ * Implementations must be safe to share across concurrent runs.
+ */
+export interface IdempotencyStore {
+  /** Return the cached result for `key`, or `null` if absent/expired. */
+  get(key: string): Promise<TrackedResult<any> | null>;
+  /** Persist `result` under `key`, optionally expiring after `ttl` ms. */
+  set(key: string, result: TrackedResult<any>, ttl?: number): Promise<void>;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ERROR
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Thrown when a `reject`-strategy run encounters an already-used idempotency key.
+ * Carries the descriptive code `IDEMPOTENCY_VIOLATION`.
+ */
+export class IdempotencyError extends WeftError {
+  /** The duplicate key that triggered the violation. */
+  readonly key: string;
+
+  constructor(key: string) {
+    super({
+      code: "IDEMPOTENCY_VIOLATION",
+      why: `Idempotency key "${key}" has already been used — duplicate execution rejected.`,
+      action:
+        "Use a unique key, or set strategy: 'return-cached' to return the prior result.",
+      context: { key },
+    });
+    this.name = "IdempotencyError";
+    this.key = key;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IN-MEMORY STORE
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface StoredEntry {
+  result: TrackedResult<any>;
+  /** Absolute expiry epoch-ms, or undefined when the entry never expires. */
+  expiresAt?: number;
+  /** Active cleanup timer, cleared on overwrite/delete. */
+  timer?: ReturnType<typeof setTimeout>;
+}
+
+/**
+ * Map-based {@link IdempotencyStore} for single-process use.
+ *
+ * @remarks
+ * TTL is enforced two ways for robustness: a `setTimeout` proactively evicts the
+ * entry, and `get()` also checks the stored `expiresAt` so a result is never
+ * returned past its TTL even if the timer has not yet fired (e.g. under fake
+ * timers). The timer is `unref`'d so it never keeps the process alive.
+ */
+export class InMemoryIdempotencyStore implements IdempotencyStore {
+  private readonly store = new Map<string, StoredEntry>();
+
+  async get(key: string): Promise<TrackedResult<any> | null> {
+    const entry = this.store.get(key);
+    if (!entry) return null;
+    if (entry.expiresAt !== undefined && Date.now() >= entry.expiresAt) {
+      this.delete(key);
+      return null;
+    }
+    return entry.result;
+  }
+
+  async set(
+    key: string,
+    result: TrackedResult<any>,
+    ttl?: number,
+  ): Promise<void> {
+    // Clear any prior timer so an overwrite doesn't leak a pending eviction.
+    const existing = this.store.get(key);
+    if (existing?.timer) clearTimeout(existing.timer);
+
+    const entry: StoredEntry = { result };
+    if (ttl !== undefined && ttl > 0) {
+      entry.expiresAt = Date.now() + ttl;
+      entry.timer = setTimeout(() => this.delete(key), ttl);
+      // Don't let the eviction timer hold the event loop open.
+      if (typeof entry.timer.unref === "function") entry.timer.unref();
+    }
+    this.store.set(key, entry);
+  }
+
+  /** Remove a key and cancel its pending eviction timer. */
+  delete(key: string): void {
+    const entry = this.store.get(key);
+    if (entry?.timer) clearTimeout(entry.timer);
+    this.store.delete(key);
+  }
+
+  /** Drop all entries and cancel every pending timer. */
+  clear(): void {
+    for (const entry of this.store.values()) {
+      if (entry.timer) clearTimeout(entry.timer);
+    }
+    this.store.clear();
+  }
+
+  /** Current entry count (expired-but-not-yet-evicted entries included). */
+  get size(): number {
+    return this.store.size;
+  }
+}
+
+/**
+ * Process-wide default store used when an {@link IdempotencyConfig} omits `store`.
+ */
+export const defaultIdempotencyStore = new InMemoryIdempotencyStore();

@@ -54,6 +54,7 @@ export type WeftErrorCode =
   | "SETUP_ERROR"
   | "TIMEOUT"
   | "NETWORK_ERROR"
+  | "IDEMPOTENCY_VIOLATION"
   | "UNKNOWN_ERROR";
 
 // ── WeftError Detail (attached to enhanced errors) ──────────────────────────
