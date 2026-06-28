@@ -1,0 +1,41 @@
+{
+  "name": "create-weft",
+  "version": "1.0.0-beta.1",
+  "description": "Scaffold a Weft agent project — npm create wrapper around weft-cli init.",
+  "license": "MIT",
+  "bin": {
+    "create-weft": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "ai",
+    "agents",
+    "Weft",
+    "scaffolding",
+    "create"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wefthq/weft.git",
+    "directory": "packages/create-weft"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs --outDir dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}
