@@ -61,6 +61,15 @@ export function genAiSpanAttributes(
     "weft.operator.name": entry.operatorName,
   };
 
+  // Pass through arbitrary scalar attributes recorded via setAttribute —
+  // custom data, `agent.cost.*` tokens, and `agent.error.*` from trackError()
+  // would otherwise never reach the collector. Raw `gen_ai.*` keys are skipped
+  // because their canonical forms are derived explicitly below.
+  for (const [key, value] of Object.entries(a)) {
+    if (key.startsWith("gen_ai.")) continue;
+    if (isScalar(value)) out[key] = value;
+  }
+
   const system = a.system ?? a.provider ?? a["gen_ai.system"];
   if (isScalar(system)) out["gen_ai.system"] = system;
 
@@ -90,6 +99,47 @@ function isScalar(v: unknown): v is string | number | boolean {
 
 function isNumber(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v);
+}
+
+/**
+ * Source-attribute keys consumed by {@link genAiSpanAttributes}. Excluded from
+ * {@link passthroughSpanAttributes} so the same value is not emitted twice
+ * (once mapped to a `gen_ai.*` key, once raw).
+ */
+const GEN_AI_SOURCE_KEYS: ReadonlySet<string> = new Set([
+  "system",
+  "provider",
+  "gen_ai.system",
+  "model",
+  "requestModel",
+  "gen_ai.request.model",
+  "agent.cost.model",
+  "responseModel",
+  "gen_ai.response.model",
+  "inputTokens",
+  "promptTokens",
+  "gen_ai.usage.input_tokens",
+  "outputTokens",
+  "completionTokens",
+  "gen_ai.usage.output_tokens",
+]);
+
+/**
+ * Pass remaining scalar attributes on a {@link TraceEntry} through to the span
+ * verbatim — arbitrary `setAttribute()` data plus the `agent.cost.*` and
+ * `agent.error.*` fields written by `trackCost`/`trackError` that the gen_ai
+ * mapping does not cover. Keys already consumed by {@link genAiSpanAttributes}
+ * are skipped; non-scalar values are dropped (the OTel API rejects them).
+ */
+export function passthroughSpanAttributes(
+  entry: TraceEntry,
+): Record<string, OtelAttributeValue> {
+  const out: Record<string, OtelAttributeValue> = {};
+  for (const [key, value] of Object.entries(entry.attributes ?? {})) {
+    if (GEN_AI_SOURCE_KEYS.has(key)) continue;
+    if (isScalar(value)) out[key] = value;
+  }
+  return out;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -171,26 +221,43 @@ export async function exportTraces(): Promise<OtelExportResult> {
   // biome-ignore lint/suspicious/noExplicitAny: OTel Span type optional at compile time.
   const built = new Map<string, any>();
 
+  // Cap parent-chain recursion as a backstop against pathological nesting.
+  const MAX_DEPTH = 256;
+
   // biome-ignore lint/suspicious/noExplicitAny: OTel Span type optional at compile time.
-  const build = (entry: TraceEntry): any => {
+  const build = (entry: TraceEntry, ancestors: Set<string> = new Set()): any => {
     const existing = built.get(entry.spanId);
     if (existing) return existing;
 
     let ctx = api.context.active();
-    if (entry.parentSpanId) {
+    // Establish parent context only when the parent is a real, non-cyclic
+    // ancestor. `ancestors` tracks the spans currently on the build stack so a
+    // self-parent or a parent→child→parent cycle degrades to a root span
+    // instead of recursing forever.
+    if (entry.parentSpanId && ancestors.size < MAX_DEPTH) {
       const parentEntry = byId.get(entry.parentSpanId);
-      if (parentEntry) {
-        ctx = api.trace.setSpan(ctx, build(parentEntry));
+      if (
+        parentEntry &&
+        parentEntry.spanId !== entry.spanId &&
+        !ancestors.has(parentEntry.spanId)
+      ) {
+        ctx = api.trace.setSpan(
+          ctx,
+          build(parentEntry, new Set(ancestors).add(entry.spanId)),
+        );
       }
     }
 
+    // OTel JS treats raw numbers as hrtime-relative; epoch ms must be wrapped
+    // in `Date` so the SDK records the correct absolute timestamp.
     const span = tracer.startSpan(
       `${entry.operatorType}:${entry.operatorName}`,
-      { startTime: entry.startedAt },
+      { startTime: new Date(entry.startedAt) },
       ctx,
     );
     span.setAttributes(genAiSpanAttributes(entry));
-    span.end(entry.endedAt ?? entry.startedAt);
+    span.setAttributes(passthroughSpanAttributes(entry));
+    span.end(new Date(entry.endedAt ?? entry.startedAt));
     built.set(entry.spanId, span);
     return span;
   };
@@ -233,6 +300,7 @@ async function loadOtel(): Promise<[any, any, any, any]> {
       fix: {
         description:
           "Install the OpenTelemetry peer dependencies to enable OTLP export.",
+        docsUrl: "https://github.com/wefthq/weft#opentelemetry-export",
       },
       example:
         "npm install @opentelemetry/api @opentelemetry/sdk-trace-node @opentelemetry/exporter-trace-otlp-http @opentelemetry/resources",

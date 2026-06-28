@@ -6,8 +6,8 @@
  * through untouched. Invoked as `npm create weft@latest [args]`, which npm
  * resolves to this `create-weft` bin.
  *
- * Carries no runtime dependencies of its own: it fetches and runs weft-cli
- * via `npx` so the scaffolder is always the latest published version.
+ * Carries no runtime dependencies of its own: it fetches weft-cli at the
+ * same version via npx so the scaffolder matches this create package.
  */
 
 import { spawn } from "node:child_process";
@@ -15,16 +15,22 @@ import { spawn } from "node:child_process";
 // Everything after the binary name is forwarded verbatim to `weft init`.
 const forwardedArgs = process.argv.slice(2);
 
-const isWindows = process.platform === "win32";
-const npxBin = isWindows ? "npx.cmd" : "npx";
+// Resolve weft-cli at the same version as this create-weft package
+// to guarantee compatibility.
+const weftVersion = require("../package.json").version;
 
-// weft-cli exposes its CLI under the `weft` bin name, so resolve the package
-// explicitly with `-p weft-cli` and run the `weft init` subcommand.
-const npxArgs = ["--yes", "-p", "weft-cli", "weft", "init", ...forwardedArgs];
+const npxArgs = [
+  "--yes",
+  "-p",
+  `weft-cli@${weftVersion}`,
+  "weft",
+  "init",
+  ...forwardedArgs,
+];
 
-const child = spawn(npxBin, npxArgs, {
+// spawn without shell to prevent command injection via untrusted CLI args.
+const child = spawn("npx", npxArgs, {
   stdio: "inherit",
-  shell: isWindows,
 });
 
 child.on("error", (err) => {

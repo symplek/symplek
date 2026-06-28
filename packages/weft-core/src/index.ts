@@ -73,6 +73,7 @@ export {
   genAiSpanAttributes,
   type OpenTelemetryOptions,
   type OtelExportResult,
+  passthroughSpanAttributes,
   shutdownOpenTelemetry,
 } from "./otel";
 // ─── CoherenceError + createSoloComputation (operators.ts) ───────────────────
