@@ -45,7 +45,7 @@ const result = await harness.plan("summarise this PDF")
 ## What's in the package
 
 - `createHarness(options)` — Create a harness instance for planning and execution.
-- `harness.plan(options)` — Build a plan AgentUnit.
+- `harness.plan(intent)` — Build a plan AgentUnit from an intent string.
 - `harness.execute(planOrPrompt)` — Execute a plan or prompt.
 - React entry at `weft-harness/react` — `useHarnessProgress()` hook for streaming progress UI.
 - Replay entry at `weft-harness/replay` — Deterministic replay of recorded harness traces.
