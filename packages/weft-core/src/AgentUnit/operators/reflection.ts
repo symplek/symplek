@@ -7,7 +7,8 @@
  * @surface internal
  */
 
-import { createReflectComputation } from "../../operators";
+import { createReflectComputation } from "../../operators/reflect";
+import { REFLECT_MAX_DEPTH } from "../../operators/reflect";
 import type { ReflectOptions, ReflectResult } from "../../types";
 import type { AgentComputation } from "../AgentUnit";
 import { AgentUnit } from "../AgentUnit";

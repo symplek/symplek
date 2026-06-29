@@ -668,6 +668,10 @@ export interface AgentUnit<T> {
   /** Execute autonomously when confidence and coherence are high. */
   solo(config?: SoloConfig): AgentUnit<SoloResult<T>>;
 
+  // ─── reflection ───────────────────────────────────────────────────────────
+  /** Recursive self-review: critique, verify, and optionally improve output. */
+  reflect(options?: ReflectOptions<T>): AgentUnit<ReflectResult<T>>;
+
   // ─── interview ───────────────────────────────────────────────────────────
   /** Configure an adaptive human-in-the-loop interview. */
   interview<TContext>(
