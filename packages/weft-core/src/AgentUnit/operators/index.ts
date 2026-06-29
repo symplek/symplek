@@ -18,6 +18,7 @@ export * from "./coordination";
 export * from "./interview";
 export * from "./model";
 export * from "./parallel";
+export * from "./reflection";
 export * from "./rehearsal";
 // `export * from` (not `import` side-effect) keeps these files in the dts roll-up.
 // Files with no named exports contribute zero public surface; the `declare module`

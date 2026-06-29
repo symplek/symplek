@@ -12,6 +12,7 @@ export { createConvergeComputation } from "./converge";
 export { createDebateComputation } from "./debate";
 export { createDialecticComputation } from "./dialectic";
 export { createFallbackComputation } from "./fallback";
+export { createReflectComputation, REFLECT_MAX_DEPTH } from "./reflect";
 export { createRetryComputation } from "./retry";
 export { createSoloComputation, extractSignals } from "./solo";
 export { createTrackedComputation } from "./sourceTracking";

@@ -280,6 +280,95 @@ export type ConvergentAgent<T> = (
   | ConvergeContribution<T>;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// REFLECT TYPES
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A reflection agent function.
+ *
+ * @remarks
+ * Takes an input and returns output as an AgentUnit, Promise, or raw value —
+ * mirroring {@link ConvergentAgent}. These functions ARE the caller's
+ * compute()/LLM calls; the reflect operator orchestrates them but never
+ * constructs an LLM call of its own.
+ */
+export type ReflectAgent<I, O> = (
+  input: I,
+) => import("./AgentUnit").AgentUnit<O> | Promise<O> | O;
+
+/**
+ * Structured feedback returned by a reflect verifier agent.
+ */
+export interface ReflectVerifierFeedback {
+  /** Concrete issues found in the output. An empty array means the verifier approves. */
+  issues: string[];
+  /** Verifier's confidence in the output's correctness, 0..1. */
+  confidence?: number;
+  /** Explicit approval flag; when omitted it is derived from `issues.length === 0`. */
+  approved?: boolean;
+}
+
+/**
+ * Options for the reflect operator.
+ *
+ * @typeParam T - The type of the output being reflected upon.
+ */
+export interface ReflectOptions<T = unknown> {
+  /**
+   * Generate a critique of the output.
+   * @default true
+   */
+  critique?: boolean;
+  /**
+   * Chain an improvement pass when the verifier reports issues. Requires an
+   * `improveAgent` to actually change the output.
+   * @default false
+   */
+  improve?: boolean;
+  /**
+   * Maximum recursive reflection passes. Each pass reflects on the previous
+   * improved output. @default 1 — hard-capped at {@link REFLECT_MAX_DEPTH} (10)
+   * to prevent runaway self-review loops.
+   */
+  maxDepth?: number;
+  /**
+   * Produces critique text from the current output. When omitted (and `critique`
+   * is enabled) a deterministic structural self-check is used instead — no LLM call.
+   */
+  critiqueAgent?: ReflectAgent<T, string>;
+  /**
+   * Turns critique text into structured feedback (issues + confidence). When
+   * omitted, a built-in heuristic derives feedback from the critique text.
+   */
+  verifierAgent?: ReflectAgent<string, ReflectVerifierFeedback>;
+  /**
+   * Produces an improved output from the original plus its critique. Required
+   * for `improve` to change anything; without it the original is preserved.
+   */
+  improveAgent?: ReflectAgent<{ original: T; critique: string }, T>;
+}
+
+/**
+ * Result of a reflect operation.
+ *
+ * @typeParam T - The type of the output being reflected upon.
+ */
+export interface ReflectResult<T> {
+  /** The original (pre-reflection) output. */
+  original: T;
+  /** Critique text, when `critique` is enabled. */
+  critique?: string;
+  /** Structured verifier feedback, when verification runs. */
+  verifierFeedback?: ReflectVerifierFeedback;
+  /** Improved output, when `improve` is enabled and issues were found. */
+  improved?: T;
+  /** Confidence in the final output, 0..1. */
+  confidence: number;
+  /** Number of reflection passes actually executed (1..maxDepth, capped at 10). */
+  depth: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // RESILIENCE TYPES
 // ─────────────────────────────────────────────────────────────────────────────
 

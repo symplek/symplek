@@ -49,6 +49,8 @@ import type {
   DialecticOptions,
   DialecticResult,
   LeaderAgent,
+  ReflectOptions,
+  ReflectResult,
   RetryOptions,
   RunOptionsWithTrust,
   SourceTrackingOptions,
