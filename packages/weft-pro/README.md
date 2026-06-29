@@ -121,7 +121,7 @@ if (scan.recommendation === "reject") {
 ## Observability example
 
 ```typescript
-import { createOperatorSpan, getTraces, configureObservability } from "weft-pro";
+import { createOperatorSpan, getTraces, configureObservability } from "weft-core";
 
 configureObservability({ enabled: true, verbosity: "verbose" });
 
