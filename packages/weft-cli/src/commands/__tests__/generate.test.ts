@@ -319,7 +319,7 @@ operators:
       const content = readFileSync(join(testDir, "retry-agent.ts"), "utf-8");
 
       expect(content).toContain("export const retryAgentWithOperators");
-      expect(content).toContain(".retry(5, 2000)");
+      expect(content).toContain(".retry(5, { baseDelayMs: 2000 })");
     });
 
     it("generates timeout operator chain", () => {
@@ -378,7 +378,7 @@ operators:
       generateFile(yamlPath, undefined, true);
       const content = readFileSync(join(testDir, "multi-op-agent.ts"), "utf-8");
 
-      expect(content).toContain(".retry(3, 1000)");
+      expect(content).toContain(".retry(3, { baseDelayMs: 1000 })");
       expect(content).toContain(".timeout(30000)");
     });
   });
