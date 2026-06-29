@@ -351,7 +351,7 @@ function generateTypeScript(
     if (config.operators.retry) {
       const { maxAttempts = 3, backoffMs = 1000 } = config.operators.retry;
       operatorChains.push(
-        `.retry(${emitNumber(maxAttempts, "operators.retry.maxAttempts")}, ${emitNumber(backoffMs, "operators.retry.backoffMs")})`,
+        `.retry(${emitNumber(maxAttempts, "operators.retry.maxAttempts")}, { baseDelayMs: ${emitNumber(backoffMs, "operators.retry.backoffMs")} })`,
       );
     }
 
