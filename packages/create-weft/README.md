@@ -7,7 +7,7 @@ npm create weft@latest
 ```
 
 That's it. The command drops you into an interactive setup and generates a
-ready-to-run Weft agent project — complete with rehearsal/replay examples.
+ready-to-run Weft agent project — complete with retry, fallback, and testing.
 
 ## What it does
 

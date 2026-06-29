@@ -30,26 +30,23 @@ Most agent SDKs give you a single function: send a prompt, get a response. They 
 
 ```typescript
 import { AgentUnit, createContext } from "weft-core";
-import { plan, execute, session } from "weft-harness";
+import { createHarness } from "weft-harness";
 
-const ctx = createContext();
-
-// Plan + execute, with retries + timeout + parallel race against a cheaper backup.
-const result = await plan({ goal: "summarise this PDF", model: "claude-sonnet-4" })
-  .pipe(p => execute(p))
+const harness = createHarness({ model: "claude-sonnet-4" });
+const result = await harness.plan({ goal: "summarise this PDF" })
   .retry(2)
-  .timeout(30_000)
-  .fallback(execute({ prompt: "fallback summariser", model: "gpt-4o-mini" }))
-  .run(ctx);
+  .timeout(120_000)
+  .fallback(() => "Unable to generate report. Please try again later.")
+  .run(createContext());
 ```
 
 ---
 
 ## What's in the package
 
-- `plan(options)` — Build a plan AgentUnit. Wraps `claude-agent-sdk` planning calls.
-- `execute(planOrPrompt)` — Execute a plan. Wraps the relevant SDK's runtime.
-- `session(config)` — Long-running conversational session. Captures full history.
+- `createHarness(options)` — Create a harness instance for planning and execution.
+- `harness.plan(options)` — Build a plan AgentUnit.
+- `harness.execute(planOrPrompt)` — Execute a plan or prompt.
 - React entry at `weft-harness/react` — `useHarnessProgress()` hook for streaming progress UI.
 - Replay entry at `weft-harness/replay` — Deterministic replay of recorded harness traces.
 
