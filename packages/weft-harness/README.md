@@ -32,8 +32,8 @@ Most agent SDKs give you a single function: send a prompt, get a response. They 
 import { AgentUnit, createContext } from "weft-core";
 import { createHarness } from "weft-harness";
 
-const harness = createHarness({ adapter: "claude-code", model: "claude-sonnet-4" });
-const result = await harness.plan({ goal: "summarise this PDF" })
+const harness = createHarness({ adapter: "claude-agent-sdk", model: "claude-sonnet-4" });
+const result = await harness.plan("summarise this PDF")
   .retry(2)
   .timeout(120_000)
   .orElse("Unable to generate report. Please try again later.")

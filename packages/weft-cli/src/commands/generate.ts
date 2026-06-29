@@ -373,9 +373,7 @@ function generateTypeScript(
         );
         operatorChains.push(`.fallback(${fallbackAgent})`);
       } else if (config.operators.fallback.value !== undefined) {
-        operatorChains.push(
-          `.fallback(${JSON.stringify(config.operators.fallback.value)})`,
-        );
+        operatorChains.push(`.orElse(${JSON.stringify(config.operators.fallback.value)})`);
       }
     }
 
