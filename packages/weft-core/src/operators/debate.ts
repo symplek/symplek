@@ -70,6 +70,8 @@ export function createDebateComputation<T>(
     onConsensusAttempt,
   } = options;
 
+  const safeMaxAttempts = maxConsensusAttempts < 1 ? 1 : maxConsensusAttempts;
+
   return async (ctx: AgentContext): Promise<DebateResult<T>> => {
     if (agents.length === 0) {
       return {
@@ -112,7 +114,7 @@ export function createDebateComputation<T>(
     let objections: Array<{ agentId: string; reasoning: string }> = [];
     let lastVotes: Vote[] = [];
 
-    for (let attempt = 1; attempt <= maxConsensusAttempts; attempt++) {
+    for (let attempt = 1; attempt <= safeMaxAttempts; attempt++) {
       // Phase 1: Run sequential converge
       const convergeResult = await createConvergeComputation(
         currentState,
@@ -242,14 +244,14 @@ export function createDebateComputation<T>(
     // Max attempts exhausted - calculate objective confidence from last votes
     const exhaustedObjectiveConfidence = calculateObjectiveConfidence({
       votes: lastVotes,
-      retryCount: maxConsensusAttempts - 1, // All retries used
+      retryCount: safeMaxAttempts - 1, // All retries used
     });
 
     return {
       outcome: "exhausted",
       finalState: currentState,
       rounds: totalRounds,
-      attempts: maxConsensusAttempts,
+      attempts: safeMaxAttempts,
       converged: false,
       votes: lastVotes,
       objections,

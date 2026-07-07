@@ -12,6 +12,7 @@ import {
   createRetryComputation,
   createTimeoutComputation,
 } from "../../operators";
+import { WeftError } from "../../errors";
 import type { RetryOptions } from "../../types";
 import type { AgentComputation } from "../AgentUnit";
 import { AgentUnit } from "../AgentUnit";
@@ -64,6 +65,15 @@ AgentUnit.prototype.retry = function <T>(
   maxAttempts = 3,
   options?: RetryOptions,
 ): AgentUnit<T> {
+  if (maxAttempts < 1) {
+    return AgentUnit.fail<T>(
+      new WeftError({
+        code: "SETUP_ERROR",
+        why: `retry maxAttempts must be >= 1, got ${maxAttempts}`,
+        action: "Pass a positive integer for maxAttempts.",
+      }),
+    );
+  }
   const selfComp = (this as unknown as { computation: AgentComputation<T> })
     .computation;
   const selfMeta = this.getMetadata();

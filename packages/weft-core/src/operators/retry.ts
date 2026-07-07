@@ -24,6 +24,11 @@ export function createRetryComputation<T>(
     retryIf,
   } = options;
 
+  // Validate numeric parameters to prevent NaN/negative delays
+  const safeBaseDelay = Number.isFinite(baseDelayMs) && baseDelayMs >= 0 ? baseDelayMs : 0;
+  const safeMaxDelay = Number.isFinite(maxDelayMs) && maxDelayMs >= 0 ? maxDelayMs : 0;
+  const safeJitter = Number.isFinite(jitter) && jitter >= 0 && jitter <= 1 ? jitter : 0;
+
   return async (ctx: AgentContext): Promise<T> => {
     let lastError: Error | unknown;
     const attempts = maxAttempts;
@@ -48,10 +53,10 @@ export function createRetryComputation<T>(
 
         // Calculate delay with exponential backoff
         const baseDelay = Math.min(
-          baseDelayMs * 2 ** (attempt - 1),
-          maxDelayMs,
+          safeBaseDelay * 2 ** (attempt - 1),
+          safeMaxDelay,
         );
-        const jitterAmount = baseDelay * jitter * (Math.random() * 2 - 1);
+        const jitterAmount = baseDelay * safeJitter * (Math.random() * 2 - 1);
         const delay = Math.max(0, baseDelay + jitterAmount);
 
         await new Promise((resolve) => setTimeout(resolve, delay));

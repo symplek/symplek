@@ -62,7 +62,7 @@ export function createConvergeComputation<T>(
   agents: Array<ConvergentAgent<T>>,
   options: ConvergeOptions = {},
 ): AgentComputation<ConvergeResult<T>> {
-  const maxRounds = options.maxRounds ?? 5;
+  const maxRounds = (options.maxRounds ?? 5) < 1 ? 1 : (options.maxRounds ?? 5);
   const parallel = options.parallel ?? true;
 
   return async (ctx: AgentContext): Promise<ConvergeResult<T>> => {

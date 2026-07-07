@@ -142,6 +142,14 @@ export function createConsensusComputation<T>(
 
     const votes = await Promise.all(votePromises);
 
+    // Validate vote confidences are finite numbers before proceeding
+    // Prevents NaN propagation in objective confidence calculations
+    for (const vote of votes) {
+      if (!Number.isFinite(vote.confidence)) {
+        vote.confidence = 0;
+      }
+    }
+
     // Calculate weighted approval
     const totalWeight = votes.reduce((sum, v) => sum + v.weight, 0);
     const approveWeight = votes

@@ -30,7 +30,7 @@ const result = await AgentUnit.from(async () =>
   .run(ctx);
 
 console.log(result.value.approved);      // false
-console.log(result.value.agreementRate);  // 0.33
+console.log(result.value.weightedApproval);  // 0.33
 console.log(result.value.votes);          // [{decision: 'reject', confidence: 0.92, ...}]
 ```
 
@@ -123,7 +123,7 @@ All operators on `AgentUnit<T>` are free (MIT). The full list:
 **Composition**
 - `.map(fn)` — transform the resolved value
 - `.flatMap(fn)` / `.chain(fn)` — sequence two computations
-- `.pipe(fn)` — alias for map with explicit typing
+
 
 **Resilience**
 - `.retry(n, opts?)` — exponential backoff retry
@@ -148,7 +148,7 @@ All operators on `AgentUnit<T>` are free (MIT). The full list:
 - `.conduct(handlers)` — execute a pending interview
 
 **Tracking**
-- `.track(opts?)` — source-tracking wrapper
+- `.tracked(opts?)` — source-tracking wrapper
 - `.tap(fn)` — side-effect without modifying value
 
 **Observability** (also free, in `weft-core`)

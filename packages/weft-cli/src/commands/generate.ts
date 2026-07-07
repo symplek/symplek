@@ -234,6 +234,24 @@ function parseYamlFile(filePath: string): ParseResult {
     errors.push(`Invalid agent name: ${parsed.name}. Use kebab-case.`);
   }
 
+  // Validate version is semver-ish if present
+  if (parsed.version !== undefined && typeof parsed.version !== "string") {
+    errors.push(`version must be a string, got ${typeof parsed.version}`);
+  }
+
+  // Validate tags are strings if present
+  if (parsed.tags !== undefined) {
+    if (!Array.isArray(parsed.tags)) {
+      errors.push("tags must be an array of strings");
+    } else {
+      for (const tag of parsed.tags as unknown[]) {
+        if (typeof tag !== "string") {
+          errors.push(`tag must be a string, got ${typeof tag}`);
+        }
+      }
+    }
+  }
+
   const config: YamlAgentConfig = {
     name: (parsed.name as string) || "unknown",
     model: (parsed.model as SupportedModel) || "gpt-4o",
@@ -265,11 +283,6 @@ function generateTypeScript(
 
   const lines: string[] = [];
 
-  // Header
-  lines.push(`// Generated from ${sourceFile}`);
-  lines.push("// Do not edit directly - regenerate with: npx Weft generate");
-  lines.push("");
-
   // Validate identifiers up-front so failures surface before any code is emitted.
   const safeExportName = emitIdentifier(exportName, "exportName");
   // `modelInfo.fn` and `modelInfo.pkg` come from a static lookup table
@@ -280,6 +293,9 @@ function generateTypeScript(
 
   // Imports — modelInfo.pkg is a fixed npm package name, safe to emit
   // as a string literal via emitString.
+  lines.push(`// Generated from ${emitString(sourceFile)}`);
+  lines.push("// Do not edit directly - regenerate with: npx Weft generate");
+  lines.push("");
   lines.push('import { AgentUnit } from "weft-core";');
   lines.push(`import { ${safeModelFn} } from ${emitString(modelInfo.pkg)};`);
 
