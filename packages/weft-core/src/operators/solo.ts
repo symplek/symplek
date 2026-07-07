@@ -17,8 +17,8 @@ import {
 // Solo mechanism imports (STORY-02.01)
 import type { ExtractedSignals, SoloConfig, SoloResult } from "../solo/types";
 import { SoloBlockedError } from "../solo/types";
-import type { AgentContext, TrackedResult } from "../types";
-import { TRACKED_MARKER } from "../types";
+import { isTrackedResult } from "../trust";
+import type { AgentContext } from "../types";
 
 /**
  * Extract confidence, coherence, and risk signals from a value.
@@ -42,6 +42,9 @@ export function extractSignals(value: unknown): ExtractedSignals {
   let riskScore = 0.5;
   let source: ExtractedSignals["source"] = "default";
 
+  // ── FATAL #2 HARDENING (2026-07-07): Only trust explicit signals from
+  // genuine TrackedResults. Arbitrary objects with confidence/coherence
+  // fields are downgraded to "explicit-untrusted" and clamped.
   if (value === null || value === undefined) {
     return { confidence, coherence, riskScore, source };
   }
@@ -53,65 +56,30 @@ export function extractSignals(value: unknown): ExtractedSignals {
 
   const obj = value as Record<string, unknown>;
 
-  // Check for explicit signals
-  if (typeof obj.confidence === "number") {
+  // ── FATAL #2 HARDENING (2026-07-07, strengthened R3):
+  // Check TrackedResult authenticity FIRST. Only genuine TrackedResults
+  // can set confidence/coherence/riskScore above defaults. An arbitrary
+  // object with { confidence: 1, coherence: 1, riskScore: 0 } is IGNORED
+  // unless it passes isTrackedResult().
+  if (isTrackedResult(obj)) {
+    // Trust the TrackedResult's confidence and provenance
     confidence = obj.confidence;
-    source = "explicit";
-  }
-  if (typeof obj.coherence === "number") {
-    coherence = obj.coherence;
-    source = "explicit";
-  }
-  if (typeof obj.riskScore === "number") {
-    riskScore = obj.riskScore;
-    source = "explicit";
-  }
+    coherence = obj.minChainConfidence ?? obj.confidence;
+    source = "tracked-result";
 
-  // Check for TrackedResult
-  if (TRACKED_MARKER in obj) {
-    const tracked = obj as unknown as TrackedResult<unknown>;
-    if (source === "default") {
-      confidence = tracked.confidence;
-      source = "inferred";
-    }
     // Extract objective confidence if available
-    if (tracked.objectiveConfidence) {
-      confidence = tracked.objectiveConfidence.composite;
-      source = "inferred";
+    if (obj.objectiveConfidence) {
+      confidence = obj.objectiveConfidence.composite;
+      source = "tracked-result-objective";
     }
   }
 
-  // Check for multi-agent results with objectiveConfidence
-  if (obj.objectiveConfidence && typeof obj.objectiveConfidence === "object") {
-    const oc = obj.objectiveConfidence as { composite?: number };
-    if (typeof oc.composite === "number") {
-      confidence = oc.composite;
-      source = "inferred";
-    }
-  }
-
-  // Check for ConsensusResult
-  if (typeof obj.weightedApproval === "number") {
-    // Use weightedApproval as a coherence proxy
-    if (source === "default" || coherence === 0.5) {
-      coherence = obj.weightedApproval as number;
-      source = "inferred";
-    }
-  }
-
-  // Check for CoherenceResult
-  if (obj.coherence && typeof obj.coherence === "object") {
-    const coh = obj.coherence as { composite?: number };
-    if (typeof coh.composite === "number") {
-      coherence = coh.composite;
-      source = "inferred";
-    }
-  }
-
-  // Estimate risk based on value characteristics
-  // Higher complexity = higher risk
-  if (source === "default") {
-    // Simple heuristic: larger objects = more complex = higher risk
+  // Estimate risk based on value characteristics (conservative for untracked)
+  if (source !== "tracked-result" && source !== "tracked-result-objective") {
+    // For non-TrackedResult values, risk is maximized — we can't trust them
+    riskScore = Math.min(1.0, Math.max(0.3, Object.keys(obj).length * 0.05));
+  } else {
+    // Tracked results: risk is lower, use a heuristic
     const keys = Object.keys(obj);
     riskScore = Math.min(0.5, keys.length * 0.05);
   }

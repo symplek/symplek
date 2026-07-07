@@ -36,9 +36,12 @@
  *   // High confidence - safe to auto-approve
  * } else if (result.composite < CONFIDENCE_THRESHOLDS.low) {
  *   // Low confidence - require human review
- * }
+ *   }
  * ```
  */
+
+// License gate — FATAL #6 HARDENING (2026-07-07)
+import "../license-gate";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPE EXPORTS

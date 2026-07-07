@@ -7,6 +7,9 @@
  * 📝 BUILD[F-048-01.10]: Teams barrel exports
  */
 
+// License gate — FATAL #6 HARDENING (2026-07-07)
+import "../license-gate";
+
 // Export Team class (Story 01.08)
 export { Team } from "./Team";
 // Export TeamRegistry class and singleton (Story 01.09)

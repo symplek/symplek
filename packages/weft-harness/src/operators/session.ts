@@ -8,8 +8,8 @@
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */
 
-import type { TrackedResult } from "weft-core";
-import { AgentUnit, TRACKED_MARKER } from "weft-core";
+import { AgentUnit, createTrackedResult } from "weft-core";
+import type { ResultSource, TrackedResult } from "weft-core";
 import type { SourceRef } from "../types";
 
 // ─── SDK Interface Stub ───────────────────────────────────────────────────────
@@ -85,18 +85,13 @@ export function session(
     const chainConfidence =
       sources.length === 0 ? 0.5 : Math.max(0.5, 0.7 - sources.length * 0.01);
 
-    const tracked: TrackedResult<string> = {
-      [TRACKED_MARKER]: true,
-      value: sdkResult.finalMessage,
-      source: "agent",
+    const tracked = createTrackedResult(sdkResult.finalMessage, {
+      source: "agent" as ResultSource,
       confidence: chainConfidence,
       verifiedBy: `weft-harness/session@prompt:${prompt.slice(0, 40)}`,
-      // Map each SourceRef to the "tool" ResultSource for the standard chain.
-      // The full SourceRef metadata (kind, uri, hash) lives in sources above
-      // and can be surfaced by the harness adapter if needed.
-      sourceChain: sources.map(() => "tool" as const),
+      sourceChain: sources.map(() => "tool" as ResultSource),
       minChainConfidence: chainConfidence,
-    };
+    });
 
     return tracked;
   });

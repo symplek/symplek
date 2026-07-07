@@ -102,9 +102,25 @@ interface StoredEntry {
  * entry, and `get()` also checks the stored `expiresAt` so a result is never
  * returned past its TTL even if the timer has not yet fired (e.g. under fake
  * timers). The timer is `unref`'d so it never keeps the process alive.
+ *
+ * Defaults:
+ * - `defaultTtlMs`: 1 hour (3_600_000 ms) — entries without an explicit TTL expire.
+ * - `maxEntries`: 10_000 — LRU eviction when the limit is reached.
  */
 export class InMemoryIdempotencyStore implements IdempotencyStore {
+  /** Default TTL applied to entries when no explicit TTL is provided. */
+  static readonly DEFAULT_TTL_MS = 60 * 60 * 1000; // 1 hour
+  /** Maximum number of entries before LRU eviction kicks in. */
+  static readonly DEFAULT_MAX_ENTRIES = 10_000;
+
   private readonly store = new Map<string, StoredEntry>();
+  /** LRU tracking: insertion/access order (head = oldest, tail = newest). */
+  private readonly lru: string[] = [];
+  private maxEntries: number;
+
+  constructor(maxEntries: number = InMemoryIdempotencyStore.DEFAULT_MAX_ENTRIES) {
+    this.maxEntries = maxEntries;
+  }
 
   async get(key: string): Promise<TrackedResult<any> | null> {
     const entry = this.store.get(key);
@@ -113,6 +129,8 @@ export class InMemoryIdempotencyStore implements IdempotencyStore {
       this.delete(key);
       return null;
     }
+    // Promote to LRU tail on access
+    this.touchLru(key);
     return entry.result;
   }
 
@@ -125,14 +143,52 @@ export class InMemoryIdempotencyStore implements IdempotencyStore {
     const existing = this.store.get(key);
     if (existing?.timer) clearTimeout(existing.timer);
 
+    // Use default TTL when none is provided (prevents unbounded storage).
+    const effectiveTtl = ttl !== undefined && ttl > 0 ? ttl : InMemoryIdempotencyStore.DEFAULT_TTL_MS;
+
     const entry: StoredEntry = { result };
-    if (ttl !== undefined && ttl > 0) {
-      entry.expiresAt = Date.now() + ttl;
-      entry.timer = setTimeout(() => this.delete(key), ttl);
-      // Don't let the eviction timer hold the event loop open.
-      if (typeof entry.timer.unref === "function") entry.timer.unref();
-    }
+    entry.expiresAt = Date.now() + effectiveTtl;
+    entry.timer = setTimeout(() => this.delete(key), effectiveTtl);
+    // Don't let the eviction timer hold the event loop open.
+    if (typeof entry.timer.unref === "function") entry.timer.unref();
+
     this.store.set(key, entry);
+    // Update LRU: remove existing entry, then push to tail.
+    this.removeFromLru(key);
+    this.lru.push(key);
+    // Evict oldest entries if over the limit.
+    this.evictIfNeeded();
+  }
+
+  /**
+   * Promote a key to the LRU tail (most recently used).
+   */
+  private touchLru(key: string): void {
+    const idx = this.lru.indexOf(key);
+    if (idx !== -1) {
+      this.lru.splice(idx, 1);
+      this.lru.push(key);
+    }
+  }
+
+  /**
+   * Remove a key from the LRU tracking array.
+   */
+  private removeFromLru(key: string): void {
+    const idx = this.lru.indexOf(key);
+    if (idx !== -1) this.lru.splice(idx, 1);
+  }
+
+  /**
+   * Evict the oldest (LRU head) entries when over maxEntries.
+   */
+  private evictIfNeeded(): void {
+    while (this.store.size > this.maxEntries && this.lru.length > 0) {
+      const oldest = this.lru.shift()!;
+      const entry = this.store.get(oldest);
+      if (entry?.timer) clearTimeout(entry.timer);
+      this.store.delete(oldest);
+    }
   }
 
   /** Remove a key and cancel its pending eviction timer. */
@@ -140,6 +196,7 @@ export class InMemoryIdempotencyStore implements IdempotencyStore {
     const entry = this.store.get(key);
     if (entry?.timer) clearTimeout(entry.timer);
     this.store.delete(key);
+    this.removeFromLru(key);
   }
 
   /** Drop all entries and cancel every pending timer. */
@@ -148,6 +205,7 @@ export class InMemoryIdempotencyStore implements IdempotencyStore {
       if (entry.timer) clearTimeout(entry.timer);
     }
     this.store.clear();
+    this.lru.length = 0;
   }
 
   /** Current entry count (expired-but-not-yet-evicted entries included). */

@@ -15,6 +15,9 @@
  * Requires weft-core as peer dependency.
  */
 
+// License gate — FATAL #6 HARDENING (2026-07-07)
+import "./license-gate";
+
 import type {
   ConfidenceDepositOptions,
   ConfidenceSenseOptions,

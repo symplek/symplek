@@ -111,26 +111,41 @@ export class WeftBuilder<T = unknown> implements PromiseLike<TrackedResult<T>> {
     const task = this.task;
     const opts = this.options;
 
-    let unit = AgentUnit.from<T>(async () => {
+    if (opts.schema) {
+      // Schema provided: ai() returns the parsed output type.
+      // We narrow through opts.schema to preserve the Zod inference chain.
+      const schema = opts.schema;
+      const unit = AgentUnit.from<T>(async () => {
+        const result = await ai(task, {
+          model: opts.model,
+          schema,
+        });
+        return result as T;
+      });
+      return unit.provides(schema) as AgentUnit<T>;
+    }
+
+    // No schema: ai() returns string. We cast through unknown to prevent
+    // leaking unknown/any through the type system — callers of WeftBuilder<string>
+    // get a properly typed string result.
+    const unit = AgentUnit.from<T>(async () => {
       const result = await ai(task, {
         model: opts.model,
-        schema: opts.schema,
-      } as any);
-      return result as T;
+      });
+      return result as unknown as T;
     });
 
-    if (opts.schema) {
-      unit = unit.provides(opts.schema);
-    }
     if (opts.timeout !== undefined) {
-      unit = unit.timeout(opts.timeout);
+      return unit.timeout(opts.timeout) as unknown as AgentUnit<T>;
     }
     if (opts.retry !== undefined) {
       const retryConfig =
         typeof opts.retry === "number"
           ? { maxAttempts: opts.retry }
           : opts.retry;
-      unit = unit.retry(retryConfig.maxAttempts ?? 3, retryConfig);
+      return unit
+        .retry(retryConfig.maxAttempts ?? 3, retryConfig)
+        .timeout(opts.timeout ?? 30_000) as unknown as AgentUnit<T>;
     }
 
     return unit;

@@ -12,9 +12,12 @@
  * import { Interview } from 'weft-core/interview';
  *
  * // Or via main package
- * import { Interview, type InterviewConfig } from 'weft-core';
+ *   import { Interview, type InterviewConfig } from 'weft-core';
  * ```
  */
+
+// License gate — FATAL #6 HARDENING (2026-07-07)
+import "../license-gate";
 
 // =============================================================================
 // CORE CLASS

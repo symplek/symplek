@@ -86,7 +86,6 @@ describe("weft-core/server — Package Contract Smoke", () => {
         "test task",
         expect.objectContaining({
           model: "test-model",
-          schema: undefined,
         }),
       );
       expect(result.value).toBe("server-generated answer");

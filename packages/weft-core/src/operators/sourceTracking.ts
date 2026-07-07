@@ -6,12 +6,12 @@
  */
 
 import type { AgentComputation, AgentUnitMetadata } from "../AgentUnit";
+import { createTrackedResult } from "../trust";
 import type {
   AgentContext,
   SourceTrackingOptions,
   TrackedResult,
 } from "../types";
-import { TRACKED_MARKER } from "../types";
 
 /**
  * Creates a computation that wraps results with source tracking metadata.
@@ -38,15 +38,13 @@ export function createTrackedComputation<T>(
   return async (ctx: AgentContext): Promise<TrackedResult<T>> => {
     const value = await innerComputation(ctx);
 
-    return {
-      [TRACKED_MARKER]: true,
-      value,
+    return createTrackedResult(value, {
       source,
       confidence,
       verifiedBy: source === "verified" ? verifiedBy : undefined,
       verifiedAt: source === "verified" ? Date.now() : undefined,
       sourceChain: [source],
       minChainConfidence: confidence,
-    };
+    });
   };
 }

@@ -19,14 +19,21 @@ export function createTimeoutComputation<T>(
   const { timeoutMs, message } = options;
 
   return async (ctx: AgentContext): Promise<T> => {
+    let timerId: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
+      timerId = setTimeout(() => {
         reject(
           new Error(message ?? `Operation timed out after ${timeoutMs}ms`),
         );
       }, timeoutMs);
     });
 
-    return Promise.race([innerComputation(ctx), timeoutPromise]);
+    try {
+      return await Promise.race([innerComputation(ctx), timeoutPromise]);
+    } finally {
+      if (timerId !== undefined) {
+        clearTimeout(timerId);
+      }
+    }
   };
 }

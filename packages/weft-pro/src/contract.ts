@@ -30,6 +30,9 @@
  * ```
  */
 
+// License gate — FATAL #6 HARDENING (2026-07-07)
+import "./license-gate";
+
 import type { z } from "zod";
 
 // ─────────────────────────────────────────────────────────────────────────────

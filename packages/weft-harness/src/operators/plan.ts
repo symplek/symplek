@@ -8,8 +8,8 @@
  */
 
 import { createHash } from "node:crypto";
-import type { TrackedResult } from "weft-core";
-import { AgentUnit, TRACKED_MARKER } from "weft-core";
+import { AgentUnit, createTrackedResult } from "weft-core";
+import type { ResultSource, TrackedResult } from "weft-core";
 import { LowProvenanceError } from "../errors";
 import type {
   HarnessConfig,
@@ -279,14 +279,12 @@ export function makePlanUnit(
           artifact.sources.length
         : 0.8;
 
-    const tracked: TrackedResult<PlanArtifact> = {
-      [TRACKED_MARKER]: true,
-      value: artifact,
-      source: "tool",
+    const tracked = createTrackedResult(artifact, {
+      source: "tool" as ResultSource,
       confidence: meanConfidence,
-      sourceChain: ["tool"],
+      sourceChain: ["tool" as ResultSource],
       minChainConfidence: meanConfidence,
-    };
+    });
 
     return tracked;
   });

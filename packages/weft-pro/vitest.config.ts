@@ -5,6 +5,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "weft-core": resolve(__dirname, "../weft-core/src/index.ts"),
+      "weft-core/solo": resolve(__dirname, "../weft-core/src/solo/index.ts"),
+      "weft-core/": resolve(__dirname, "../weft-core/src/"),
     },
   },
   test: {

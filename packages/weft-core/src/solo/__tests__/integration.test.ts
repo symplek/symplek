@@ -8,6 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentUnit } from "../../AgentUnit";
 import { createContext } from "../../context";
+import { createTrackedResult } from "../../trust";
 import { clearAllLocks } from "../lock";
 import { clearAllTransactions } from "../transactionLog";
 import { SoloBlockedError } from "../types";
@@ -27,13 +28,12 @@ describe("AgentUnit.solo() Integration", () => {
 
   describe("basic solo execution", () => {
     it("should execute solo when confidence and coherence are high", async () => {
-      // Create value with high signals
-      const valueWithSignals = {
-        data: "test",
+      // Use createTrackedResult() so extractSignals trusts the high signals
+      const valueWithSignals = createTrackedResult("test", {
+        source: "agent",
         confidence: 0.95,
-        coherence: 0.9,
-        riskScore: 0.15,
-      };
+        minChainConfidence: 0.9,
+      });
 
       const result = await AgentUnit.of(valueWithSignals)
         .solo()
@@ -45,6 +45,7 @@ describe("AgentUnit.solo() Integration", () => {
     });
 
     it("should block when confidence is low", async () => {
+      // Plain object — extractSignals gives default 0.5 confidence → blocked
       const valueWithLowConfidence = {
         data: "test",
         confidence: 0.5,
@@ -60,12 +61,12 @@ describe("AgentUnit.solo() Integration", () => {
     });
 
     it("should block when coherence is low", async () => {
-      const valueWithLowCoherence = {
-        data: "test",
-        confidence: 0.95,
-        coherence: 0.5,
-        riskScore: 0.15,
-      };
+      // Create a tracked result but with low confidence → blocked
+      const valueWithLowCoherence = createTrackedResult("test", {
+        source: "agent",
+        confidence: 0.5,
+        minChainConfidence: 0.5,
+      });
 
       await expect(
         AgentUnit.of(valueWithLowCoherence)
@@ -75,6 +76,7 @@ describe("AgentUnit.solo() Integration", () => {
     });
 
     it("should block when risk is high", async () => {
+      // Plain object — extractSignals raises risk for untracked
       const valueWithHighRisk = {
         data: "test",
         confidence: 0.95,
@@ -92,12 +94,12 @@ describe("AgentUnit.solo() Integration", () => {
 
   describe("custom thresholds", () => {
     it("should use custom thresholds", async () => {
-      const valueWithMediumSignals = {
-        data: "test",
+      // TrackedResult with medium signals + lowered thresholds → passes
+      const valueWithMediumSignals = createTrackedResult("test", {
+        source: "agent",
         confidence: 0.8,
-        coherence: 0.75,
-        riskScore: 0.4,
-      };
+        minChainConfidence: 0.75,
+      });
 
       const result = await AgentUnit.of(valueWithMediumSignals)
         .solo({
@@ -111,11 +113,12 @@ describe("AgentUnit.solo() Integration", () => {
     });
 
     it("should block with stricter thresholds", async () => {
-      const value = {
+      // TrackedResult with 0.92 confidence, threshold 0.95 → blocked
+      const value = createTrackedResult("test", {
+        source: "agent",
         confidence: 0.92,
-        coherence: 0.88,
-        riskScore: 0.2,
-      };
+        minChainConfidence: 0.88,
+      });
 
       await expect(
         AgentUnit.of(value)
@@ -131,11 +134,11 @@ describe("AgentUnit.solo() Integration", () => {
     it("should call onSoloAction when approved", async () => {
       const onSoloAction = vi.fn();
 
-      const value = {
+      const value = createTrackedResult("test", {
+        source: "agent",
         confidence: 0.95,
-        coherence: 0.9,
-        riskScore: 0.15,
-      };
+        minChainConfidence: 0.9,
+      });
 
       await AgentUnit.of(value)
         .solo({ onSoloAction })
@@ -153,6 +156,7 @@ describe("AgentUnit.solo() Integration", () => {
     it("should call onBlocked when blocked", async () => {
       const onBlocked = vi.fn();
 
+      // Plain object → default 0.5 confidence → blocked
       const value = {
         confidence: 0.5,
         coherence: 0.9,
@@ -177,11 +181,11 @@ describe("AgentUnit.solo() Integration", () => {
       const onLockAttempt = vi.fn();
       const onLockRelease = vi.fn();
 
-      const value = {
+      const value = createTrackedResult("test", {
+        source: "agent",
         confidence: 0.95,
-        coherence: 0.9,
-        riskScore: 0.15,
-      };
+        minChainConfidence: 0.9,
+      });
 
       await AgentUnit.of(value)
         .solo({ onLockAttempt, onLockRelease })
@@ -195,27 +199,31 @@ describe("AgentUnit.solo() Integration", () => {
   describe("chaining with other operators", () => {
     it("should work after map", async () => {
       const result = await AgentUnit.of({ data: 1 })
-        .map((v) => ({
-          ...v,
-          confidence: 0.95,
-          coherence: 0.9,
-          riskScore: 0.15,
-        }))
+        .map((v) =>
+          createTrackedResult(v, {
+            source: "agent",
+            confidence: 0.95,
+            minChainConfidence: 0.9,
+          }),
+        )
         .solo()
         .run(ctx, { trustMode: "legacy" });
 
       expect(result.decision.canActSolo).toBe(true);
-      expect(result.value.data).toBe(1);
+      // value is the TrackedResult wrapper, data is inside .value
+      expect(result.value.value.data).toBe(1);
     });
 
     it("should work with tap", async () => {
       const sideEffect = vi.fn();
 
-      const result = await AgentUnit.of({
+      const value = createTrackedResult("test", {
+        source: "agent",
         confidence: 0.95,
-        coherence: 0.9,
-        riskScore: 0.15,
-      })
+        minChainConfidence: 0.9,
+      });
+
+      const result = await AgentUnit.of(value)
         .tap(sideEffect)
         .solo()
         .run(ctx, { trustMode: "legacy" });
@@ -225,11 +233,11 @@ describe("AgentUnit.solo() Integration", () => {
     });
 
     it("should work with fallback", async () => {
-      const highConfidenceValue = {
+      const highConfidenceValue = createTrackedResult("test", {
+        source: "agent",
         confidence: 0.95,
-        coherence: 0.9,
-        riskScore: 0.15,
-      };
+        minChainConfidence: 0.9,
+      });
 
       // First attempt fails, fallback succeeds
       const result = await AgentUnit.fail<typeof highConfidenceValue>(
@@ -245,6 +253,7 @@ describe("AgentUnit.solo() Integration", () => {
 
   describe("error details", () => {
     it("should include decision in error", async () => {
+      // Plain object → default 0.5 confidence → blocked
       const value = {
         confidence: 0.5,
         coherence: 0.9,
@@ -266,11 +275,13 @@ describe("AgentUnit.solo() Integration", () => {
 
   describe("operator chain metadata", () => {
     it("should track solo in operator chain", async () => {
-      const unit = AgentUnit.of({
-        confidence: 0.95,
-        coherence: 0.9,
-        riskScore: 0.15,
-      }).solo();
+      const unit = AgentUnit.of(
+        createTrackedResult("test", {
+          source: "agent",
+          confidence: 0.95,
+          minChainConfidence: 0.9,
+        }),
+      ).solo();
 
       const metadata = unit.getMetadata();
       expect(metadata.operatorChain).toContain("solo");
@@ -288,31 +299,21 @@ describe("AgentUnit.solo() Integration", () => {
     });
 
     it("should extract confidence from TrackedResult", async () => {
-      // When using zero-trust mode, results are wrapped in TrackedResult
-      // The TrackedResult's confidence is calculated by the confidence module
-      const unit = AgentUnit.of({
-        confidence: 0.95, // This is the value's explicit confidence
-        coherence: 0.9,
-        riskScore: 0.15,
+      // Create a TrackedResult with high confidence
+      const tracked = createTrackedResult("test", {
+        source: "agent",
+        confidence: 0.95,
+        minChainConfidence: 0.9,
       });
 
-      // Run in zero-trust mode to get TrackedResult
-      const tracked = await unit.run(ctx);
-
-      // The TrackedResult has its own tracked confidence (from confidence module)
+      // The TrackedResult has its own tracked confidence
       // We lower the threshold to verify signal extraction works
       const result = await AgentUnit.of(tracked)
-        .map((t) => ({
-          ...t,
-          confidence: t.confidence, // Uses TrackedResult's confidence
-          coherence: 0.9,
-          riskScore: 0.15,
-        }))
         .solo({ confidenceThreshold: 0.8 }) // Lower threshold to verify extraction
         .run(ctx, { trustMode: "legacy" });
 
       expect(result.decision.canActSolo).toBe(true);
-      // Verify the extracted confidence was used (tracked confidence, not explicit)
+      // Verify the extracted confidence was used (tracked confidence)
       expect(result.decision.confidence).toBeGreaterThanOrEqual(0.8);
     });
   });

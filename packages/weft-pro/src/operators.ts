@@ -7,6 +7,9 @@
  * @status active
  */
 
+// License gate — FATAL #6 HARDENING (2026-07-07)
+import "./license-gate";
+
 import type {
   AgentComputation,
   AgentContext,
@@ -17,7 +20,7 @@ import type {
   Vote,
   VoteInput,
 } from "weft-core";
-import { TRACKED_MARKER } from "weft-core";
+import { isTrackedResult } from "weft-core";
 import { calculateCompositeCoherence } from "./coherence/calculations/compositeCoherence";
 import { resolveThreshold } from "./coherence/config";
 import type { EnsembleCoherence, HasVotes } from "./coherence/types";
@@ -740,47 +743,22 @@ export function extractSignals(value: unknown): ExtractedSignals {
 
   const obj = value as Record<string, unknown>;
 
-  if (typeof obj.confidence === "number") {
+  // ── FATAL #2 HARDENING (2026-07-07): Check TrackedResult FIRST.
+  // Only genuine TrackedResults can elevate confidence/coherence above defaults.
+  // Arbitrary { confidence: 1, coherence: 1, riskScore: 0 } is IGNORED.
+  if (isTrackedResult(obj)) {
     confidence = obj.confidence;
-    source = "explicit";
-  }
-  if (typeof obj.coherence === "number") {
-    coherence = obj.coherence;
-    source = "explicit";
-  }
-  if (typeof obj.riskScore === "number") {
-    riskScore = obj.riskScore;
-    source = "explicit";
-  }
+    coherence = obj.minChainConfidence ?? obj.confidence;
+    source = "tracked-result";
 
-  if (TRACKED_MARKER in obj) {
-    const tracked = obj as unknown as TrackedResult<unknown>;
-    if (source === "default") {
-      confidence = tracked.confidence;
-      source = "inferred";
+    if (obj.objectiveConfidence) {
+      confidence = obj.objectiveConfidence.composite;
+      source = "tracked-result-objective";
     }
-    if (tracked.objectiveConfidence) {
-      confidence = tracked.objectiveConfidence.composite;
-      source = "inferred";
-    }
-  }
-
-  if (obj.objectiveConfidence && typeof obj.objectiveConfidence === "object") {
-    const oc = obj.objectiveConfidence as { composite?: number };
-    if (typeof oc.composite === "number") {
-      confidence = oc.composite;
-      source = "inferred";
-    }
-  }
-
-  if (typeof obj.weightedApproval === "number") {
-    if (source === "default" || coherence === 0.5) {
-      coherence = obj.weightedApproval as number;
-      source = "inferred";
-    }
-  }
-
-  if (obj.coherence && typeof obj.coherence === "object") {
+  } else if (typeof obj.weightedApproval === "number") {
+    coherence = obj.weightedApproval as number;
+    source = "inferred";
+  } else if (obj.coherence && typeof obj.coherence === "object") {
     const coh = obj.coherence as { composite?: number };
     if (typeof coh.composite === "number") {
       coherence = coh.composite;
@@ -788,9 +766,10 @@ export function extractSignals(value: unknown): ExtractedSignals {
     }
   }
 
-  if (source === "default") {
-    const keys = Object.keys(obj);
-    riskScore = Math.min(0.5, keys.length * 0.05);
+  if (source !== "tracked-result" && source !== "tracked-result-objective") {
+    riskScore = Math.min(1.0, Math.max(0.3, Object.keys(obj).length * 0.05));
+  } else {
+    riskScore = Math.min(0.5, Object.keys(obj).length * 0.05);
   }
 
   return { confidence, coherence, riskScore, source };

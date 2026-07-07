@@ -108,19 +108,89 @@ export {
   TraceVersionError,
   VectorClockManager,
 } from "./rehearsal";
-// ─── Solo Mechanism ──────────────────────────────────────────────────────────
+// ─── Solo Mechanism (free tier — basic solo; Pro tier extends in weft-pro) ───
+// These are the building blocks. For TaCo, trust registry, antibodies, change-kernel,
+// install weft-pro and call validateLicense().
 export {
-  defaultLockManager,
-  defaultTransactionLogManager,
-  InMemoryLockManager,
-  InMemoryTransactionLogManager,
+  // Config
+  getPresetFromConfig,
+  mergeConfig,
+  resolvePreset,
   SOLO_DEFAULTS,
   SOLO_PRESETS,
+  validateConfig,
+  // Decision
+  calculateMargins,
+  decisionFromSignals,
+  formatDecision,
+  meetsThresholds,
   shouldActSolo,
+  // Lock
+  acquireLock,
+  cleanupExpiredLocks,
+  clearAllLocks,
+  defaultLockManager,
+  extendLock,
+  forceReleaseLock,
+  getActiveLocks,
+  getLockHolder,
+  InMemoryLockManager,
+  isLockHeld,
+  releaseLock,
+  // Rollback
+  clearAllCheckpoints,
+  clearOldCheckpoints,
+  composeRollbackHandlers,
+  createCheckpoint,
+  createObjectRollbackHandler,
+  executeWithRollback,
+  getActiveCheckpoints,
+  getCheckpoint,
+  removeCheckpoint,
+  withValidation,
+  // Transaction Log
+  clearAllTransactions,
+  commitTransaction,
+  createTransaction,
+  defaultTransactionLogManager,
+  getPendingTransactions,
+  getTransaction,
+  getTransactionStats,
+  getTransactionsByAgent,
+  InMemoryTransactionLogManager,
+  pruneTransactions,
+  queryTransactions,
+  rollbackTransaction,
+} from "./solo";
+// ─── Solo Types ───────────────────────────────────────────────────────────────
+export type {
+  Checkpoint,
+  ExtractedSignals,
+  LockAcquisitionResult,
+  LockEntry,
+  LockManager,
+  RollbackHandler,
+  RollbackOptions,
+  RollbackResult,
+  SignalExtractionConfig,
+  SoloConfig,
+  SoloDecision,
+  SoloPreset,
+  SoloResult,
+  TransactionEntry,
+  TransactionLogManager,
+  TransactionQuery,
+  TransactionStatus,
+} from "./solo";
+// ─── Solo Error Classes ───────────────────────────────────────────────────
+export {
+  LockAcquisitionError,
+  RollbackError,
+  SoloBlockedError,
 } from "./solo";
 export type { StreamOptions } from "./streaming";
 export type { TeamConfig, TeamMode, TeamResult } from "./teams";
-// ─── Teams ───────────────────────────────────────────────────────────────────
+// ─── Teams (free tier — basic team; Pro tier extends in weft-pro) ────────────
 export { Team, TeamRegistry, teams } from "./teams";
 // ─── Trace ───────────────────────────────────────────────────────────────────
 export type { Trace, TraceCallback } from "./trace";
@@ -145,7 +215,8 @@ export type {
   Vote,
   VoteInput,
 } from "./types";
-export { TRACKED_MARKER } from "./types";
+// ─── Trust / TrackedResult (unforgeable — marker is module-private) ──────────
+export { createTrackedResult, isTrackedResult, unwrapTrackedResult, extractTrackedConfidence } from "./trust";
 export { isTracked, unwrapTracked } from "./utils";
 // ─── Version ─────────────────────────────────────────────────────────────────
 export { VERSION } from "./version";

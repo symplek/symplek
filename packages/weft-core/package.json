@@ -95,9 +95,6 @@
     "@opentelemetry/sdk-trace-node": {
       "optional": true
     },
-    "zod": {
-      "optional": true
-    },
     "openai": {
       "optional": true
     },

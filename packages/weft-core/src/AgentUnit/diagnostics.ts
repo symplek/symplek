@@ -12,7 +12,7 @@
 import type { ObjectiveConfidence } from "../confidence";
 import type { ErrorCode, WeftErrorDetail } from "../errors";
 import type { AgentContext, ResultSource, TrackedResult } from "../types";
-import { TRACKED_MARKER } from "../types";
+import { createTrackedResult } from "../trust";
 import type { AgentUnitMetadata } from "./AgentUnit";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -298,18 +298,13 @@ export function wrapInTrackedResult<T>(
   const source: ResultSource = "agent";
   const objectiveConfidence = extractObjectiveConfidence(value);
 
-  const result: TrackedResult<T> = {
-    [TRACKED_MARKER]: true,
-    value,
+  const result: TrackedResult<T> = createTrackedResult(value, {
     source,
     confidence,
     sourceChain: [source],
     minChainConfidence: confidence,
-  };
-
-  if (objectiveConfidence) {
-    result.objectiveConfidence = objectiveConfidence;
-  }
+    objectiveConfidence,
+  });
 
   return result;
 }

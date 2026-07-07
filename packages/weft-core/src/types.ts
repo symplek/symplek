@@ -36,11 +36,10 @@ export type ResultSource =
  * The private Symbol marker prevents memory poisoning via spoofed objects.
  */
 export interface TrackedResult<T> {
-  /**
-   * Private Symbol marker proving this is a legitimate TrackedResult.
-   * ⚠️ SECURITY: Prevents memory poisoning via spoofed objects.
-   */
-  readonly [TRACKED_MARKER]: true;
+  /** Allow private Symbol marker from trust module.
+   *  ⚠️ Use isTrackedResult() to verify authenticity — the marker Symbol
+   *  is not exported and the WeakSet registry is the true authority. */
+  readonly [key: symbol]: unknown;
 
   /** The actual value */
   value: T;
@@ -81,8 +80,6 @@ export interface TrackedResult<T> {
  *
  * ⚠️ SECURITY: This prevents memory poisoning via spoofed TrackedResult objects.
  */
-export const TRACKED_MARKER = Symbol("__Weft_tracked__");
-
 /**
  * Options for source tracking configuration.
  */

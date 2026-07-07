@@ -1,10 +1,13 @@
 /**
  * @fileoverview Public API exports for weft-pro
- * @description Commercial license - Advanced multi-agent features
- * @module weft-pro
- * @since 1.0.0-beta.1
+ * @description Commercial license - Advanced multi-agent features.
  *
- * 📝 BUILD[05.05]: Public API for weft-pro package
+ * ⚠️ FATAL #6 FIX (2026-07-07): License validation added. All Pro exports
+ * are gated behind validateLicense(). Importing this module or any Pro
+ * sub-module without a valid license key will throw at module load time.
+ *
+ * @module weft-pro
+ * @since 1.0.0-beta.2 — License-gated
  *
  * @remarks
  * This package provides advanced features requiring a commercial license:
@@ -12,9 +15,25 @@
  * - Stigmergic confidence with decay
  * - Agent antibodies (pattern detection, quarantine, learning)
  * - Trusted traveler lanes
+ * - Change-Kernel (P0/P1/P2 severity classification)
+ * - Solo Mechanism extensions
+ * - Team coordination
  *
  * Requires weft-core as peer dependency.
+ * Requires a valid license key set via WEFT_PRO_LICENSE_KEY env var or
+ * validateLicense() API call.
  */
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LICENSE GATE — FATAL #6 HARDENING (2026-07-07)
+// Importing license-gate triggers requireLicense() at module scope.
+// Node.js module caching ensures it only executes once even if multiple
+// Pro modules import it. This import is NOT strippable by bundlers.
+// ═══════════════════════════════════════════════════════════════════════════════
+import "./license-gate";
+
+// Re-export validateLicense and isProLicensed for the public barrel API
+export { validateLicense, isProLicensed } from "./license-gate";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TACO CONSENSUS EXPORTS

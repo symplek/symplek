@@ -1,6 +1,6 @@
-﻿import { Command } from "commander";
-
-// Export add command utilities for programmatic use
+﻿// Library exports — no side effects. For CLI, import "weft-cli/cli" instead.
+// ⚠️ FATAL #5 FIX (2026-07-07): CLI execution split into cli.ts.
+// This file exports ONLY programmatic APIs. It does NOT call process.exit().
 export {
   createAddCommand,
   generateAgentTest,
@@ -56,38 +56,3 @@ export {
   processTemplate,
   type TemplateVars,
 } from "./utils/templates.js";
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { version } = require("../package.json") as { version: string };
-
-const program = new Command();
-
-program
-  .name("weft")
-  .description("Weft CLI - AI Agent Development Toolkit")
-  .version(version)
-  .showHelpAfterError(true)
-  .showSuggestionAfterError(true);
-
-import { createAddCommand } from "./commands/add.js";
-import { generateCommand } from "./commands/generate.js";
-// Register commands
-import { initCommand } from "./commands/init.js";
-import { migrateCommand } from "./commands/migrate.js";
-import { validateCommand } from "./commands/validate.js";
-
-program.addCommand(initCommand());
-program.addCommand(createAddCommand());
-program.addCommand(validateCommand());
-program.addCommand(migrateCommand());
-program.addCommand(generateCommand());
-
-// Handle unknown commands
-program.on("command:*", (operands) => {
-  console.error(`error: unknown command '${operands[0]}'`);
-  console.error();
-  program.outputHelp();
-  process.exit(1);
-});
-
-program.parse();

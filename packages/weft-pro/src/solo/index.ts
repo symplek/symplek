@@ -1,10 +1,9 @@
 ﻿/**
  * @fileoverview Solo Module Barrel Export
- * @description Public API for autonomous agent action mechanism
- * @module weft-core/solo
- * @since 2.2.0
- *
- * 📝 BUILD[STORY-01.10]: Barrel exports for solo module
+ * @description Public API for autonomous agent action mechanism.
+ *              Re-exports from weft-core to eliminate duplication.
+ * @module weft-pro/solo
+ * @since 2.2.1
  *
  * @remarks
  * The Solo mechanism enables agents to act autonomously when:
@@ -22,7 +21,7 @@
  *   createTransaction,
  *   executeWithRollback,
  *   SOLO_DEFAULTS,
- * } from 'weft-core/solo';
+ * } from 'weft-pro/solo';
  *
  * // Check if agent should act solo
  * const decision = shouldActSolo(0.92, 0.88, 0.15, true);
@@ -31,6 +30,9 @@
  * }
  * ```
  */
+
+// License gate — FATAL #6 HARDENING (2026-07-07)
+import "../license-gate";
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 export {
@@ -51,17 +53,14 @@ export {
 } from "./decision";
 // ─── LOCK ────────────────────────────────────────────────────────────────────
 export {
-  // Core functions
   acquireLock,
   cleanupExpiredLocks,
   clearAllLocks,
   defaultLockManager,
   extendLock,
   forceReleaseLock,
-  // Utilities
   getActiveLocks,
   getLockHolder,
-  // Manager class
   InMemoryLockManager,
   isLockHeld,
   releaseLock,
@@ -71,11 +70,8 @@ export {
   clearAllCheckpoints,
   clearOldCheckpoints,
   composeRollbackHandlers,
-  // Checkpoint management
   createCheckpoint,
-  // Utilities
   createObjectRollbackHandler,
-  // Core functions
   executeWithRollback,
   getActiveCheckpoints,
   getCheckpoint,
@@ -86,28 +82,22 @@ export {
 export {
   clearAllTransactions,
   commitTransaction,
-  // Core functions
   createTransaction,
   defaultTransactionLogManager,
   getPendingTransactions,
   getTransaction,
   getTransactionStats,
   getTransactionsByAgent,
-  // Manager class
   InMemoryTransactionLogManager,
-  // Utilities
   pruneTransactions,
   queryTransactions,
   rollbackTransaction,
 } from "./transactionLog";
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 export type {
-  // Rollback types
   Checkpoint,
-  // Signal types
   ExtractedSignals,
   LockAcquisitionResult,
-  // Lock types
   LockEntry,
   LockManager,
   RollbackHandler,
@@ -115,14 +105,12 @@ export type {
   RollbackResult,
   SignalExtractionConfig,
   SoloConfig,
-  // Core types
   SoloDecision,
   SoloPreset,
   SoloResult,
   TransactionEntry,
   TransactionLogManager,
   TransactionQuery,
-  // Transaction types
   TransactionStatus,
 } from "./types";
 // ─── ERRORS ──────────────────────────────────────────────────────────────────

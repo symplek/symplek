@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { RecordingLLMInterceptor } from "../interceptor";
 import { TraceRecorder } from "../recorder";
-import { TraceReplayer } from "../replayer";
+import { ReplayDivergenceError, TraceReplayer } from "../replayer";
 import { FileStorage } from "../storage";
 import type { ExecutionTrace } from "../types";
 
@@ -243,7 +243,7 @@ describe("Chaos Scenarios", () => {
       vi.restoreAllMocks();
     });
 
-    it("should handle trace with invalid vector clocks", () => {
+    it("should detect trace with invalid hash integrity", async () => {
       const trace: ExecutionTrace<string> = {
         id: "corrupted",
         version: "1.0.0",
@@ -274,9 +274,9 @@ describe("Chaos Scenarios", () => {
         finalOutput: "test",
       };
 
-      // Should handle gracefully (scheduler will use timestamp fallback)
+      // Trace with fake hashes should trigger ReplayDivergenceError during integrity check
       const replayer = new TraceReplayer(trace);
-      expect(() => replayer.replay()).not.toThrow();
+      await expect(replayer.replay()).rejects.toThrow(ReplayDivergenceError);
     });
   });
 

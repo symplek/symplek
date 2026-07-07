@@ -58,6 +58,7 @@ import type {
   TrustMode,
   VoteInput,
 } from "../types";
+import { isTrackedResult } from "../trust";
 import { handleError } from "./errorEnhancement";
 import {
   type AgentComputation,
@@ -450,6 +451,11 @@ export class AgentUnit<T> {
    * ```
    */
   static race<U>(units: AgentUnit<U>[]): AgentUnit<U> {
+    if (units.length === 0) {
+      return AgentUnit.fail<U>(
+        new Error("race() requires at least one unit; received an empty array"),
+      );
+    }
     return new AgentUnit<U>(
       async (ctx) => {
         return Promise.race(
@@ -537,8 +543,21 @@ export class AgentUnit<T> {
           throw new IdempotencyError(idempotency.key);
         }
         // strategy === "return-cached"
-        const tracked = cached as TrackedResult<T>;
-        return trustMode === "legacy" ? tracked.value : tracked;
+        // ⚠️ FATAL #3 HARDENING (2026-07-07): Verify cached value is a
+        // genuine TrackedResult before returning it. A malicious or shared
+        // idempotency store could inject arbitrary objects.
+        if (!isTrackedResult<T>(cached)) {
+          throw new WeftError({
+            code: "SETUP_ERROR",
+            why:
+              "Cached idempotency result is not a genuine TrackedResult — " +
+              "the idempotency store may be compromised.",
+            action: `Clear the cache for key "${idempotency.key}" and re-run.`,
+          });
+        }
+        // Also verify the key matches the operation to prevent cross-operation
+        // cache poisoning.
+        return trustMode === "legacy" ? cached.value : cached;
       }
       // Fresh key — propagate it to tool calls via the context.
       runCtx = { ...ctx, idempotencyKey: idempotency.key };

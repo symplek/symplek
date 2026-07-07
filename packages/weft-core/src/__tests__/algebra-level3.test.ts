@@ -9,12 +9,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AgentUnit,
   createContext,
+  createTrackedResult,
   isTracked,
   resolveModelFromContext,
   unwrapTracked,
 } from "../index";
-import type { AgentContext, TrackedResult } from "../types";
-import { TRACKED_MARKER } from "../types";
+import type { AgentContext } from "../types";
 
 describe("AgentUnit Algebra Level 3", () => {
   const ctx: AgentContext = createContext();
@@ -395,12 +395,10 @@ describe("AgentUnit Algebra Level 3", () => {
 
   describe("unwrapTracked()", () => {
     it("should extract value from TrackedResult", () => {
-      const tracked: TrackedResult<string> = {
-        [TRACKED_MARKER]: true,
-        value: "hello",
+      const tracked = createTrackedResult("hello", {
         source: "agent",
         confidence: 0.9,
-      };
+      });
 
       expect(unwrapTracked(tracked)).toBe("hello");
     });
@@ -419,12 +417,10 @@ describe("AgentUnit Algebra Level 3", () => {
 
     it("should work with complex nested values", () => {
       const value = { tasks: [{ id: 1, name: "Task 1" }], count: 5 };
-      const tracked: TrackedResult<typeof value> = {
-        [TRACKED_MARKER]: true,
-        value,
+      const tracked = createTrackedResult(value, {
         source: "agent",
         confidence: 0.85,
-      };
+      });
 
       expect(unwrapTracked(tracked)).toEqual(value);
     });
@@ -432,12 +428,10 @@ describe("AgentUnit Algebra Level 3", () => {
 
   describe("isTracked()", () => {
     it("should return true for TrackedResult", () => {
-      const tracked: TrackedResult<string> = {
-        [TRACKED_MARKER]: true,
-        value: "hello",
+      const tracked = createTrackedResult("hello", {
         source: "agent",
         confidence: 0.9,
-      };
+      });
 
       expect(isTracked(tracked)).toBe(true);
     });

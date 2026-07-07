@@ -6,7 +6,7 @@
  */
 
 import type { TrackedResult } from "./types";
-import { TRACKED_MARKER } from "./types";
+import { isTrackedResult, unwrapTrackedResult } from "./trust";
 
 /**
  * Type-safe extraction of raw value from a TrackedResult or pass-through.
@@ -25,18 +25,13 @@ import { TRACKED_MARKER } from "./types";
  * // raw is properly typed as T
  *
  * // Works with both modes:
- * unwrapTracked({ value: "hello", [TRACKED_MARKER]: true, ... }) // => "hello"
+ * unwrapTracked(createTrackedResult("hello")) // => "hello"
  * unwrapTracked("hello") // => "hello"
  * ```
  */
 export function unwrapTracked<T>(result: TrackedResult<T> | T): T {
-  if (
-    result !== null &&
-    result !== undefined &&
-    typeof result === "object" &&
-    TRACKED_MARKER in (result as Record<symbol, unknown>)
-  ) {
-    return (result as TrackedResult<T>).value;
+  if (isTrackedResult(result)) {
+    return unwrapTrackedResult(result);
   }
   return result as T;
 }
@@ -57,10 +52,5 @@ export function unwrapTracked<T>(result: TrackedResult<T> | T): T {
 export function isTracked<T>(
   value: TrackedResult<T> | T,
 ): value is TrackedResult<T> {
-  return (
-    value !== null &&
-    value !== undefined &&
-    typeof value === "object" &&
-    TRACKED_MARKER in (value as Record<symbol, unknown>)
-  );
+  return isTrackedResult(value);
 }

@@ -394,7 +394,7 @@ export interface ExtractedSignals {
   riskScore: number;
 
   /** Source of signals */
-  source: "explicit" | "inferred" | "default";
+  source: "explicit" | "inferred" | "default" | "tracked-result" | "tracked-result-objective";
 }
 
 /**

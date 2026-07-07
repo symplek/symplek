@@ -9,8 +9,8 @@
  */
 
 import type { ObjectiveConfidence } from "../confidence";
+import { createTrackedResult } from "../trust";
 import type { ResultSource, TrackedResult } from "../types";
-import { TRACKED_MARKER } from "../types";
 import {
   type AgentUnitMetadata,
   BASE_CONFIDENCE,
@@ -72,18 +72,11 @@ export function wrapInTrackedResult<T>(
   const source: ResultSource = "agent";
   const objectiveConfidence = extractObjectiveConfidence(value);
 
-  const result: TrackedResult<T> = {
-    [TRACKED_MARKER]: true,
-    value,
+  return createTrackedResult(value, {
     source,
     confidence,
     sourceChain: [source],
     minChainConfidence: confidence,
-  };
-
-  if (objectiveConfidence) {
-    result.objectiveConfidence = objectiveConfidence;
-  }
-
-  return result;
+    objectiveConfidence,
+  });
 }

@@ -9,8 +9,8 @@
  */
 
 import { appendFile, readFile, writeFile } from "node:fs/promises";
-import type { TrackedResult } from "weft-core";
-import { AgentUnit, TRACKED_MARKER } from "weft-core";
+import type { ResultSource, TrackedResult } from "weft-core";
+import { AgentUnit, createTrackedResult } from "weft-core";
 import { ContractViolationError, HarnessDeviationError } from "../errors";
 import { buildPermissionBridge } from "../permission-bridge";
 import type { ExecuteOptions, VerifiedPlan } from "../types";
@@ -209,16 +209,14 @@ export function execute<T>(
     // Build a TrackedResult<T> inheriting source chain from the verified plan.
     // Sources come from VerifiedPlan.plan.sources (SourceRef[]), mapped to the
     // "verified" ResultSource since the plan passed consensus approval.
-    const tracked: TrackedResult<T> = {
-      [TRACKED_MARKER]: true,
-      value: sdkResult.finalMessage as unknown as T,
-      source: "verified",
+    const tracked = createTrackedResult(sdkResult.finalMessage as unknown as T, {
+      source: "verified" as ResultSource,
       confidence: verified.approvalScore,
-      sourceChain: verified.plan.sources.map(() => "verified" as const),
+      sourceChain: verified.plan.sources.map(() => "verified" as ResultSource),
       minChainConfidence: verified.approvalScore,
       verifiedAt: Date.now(),
       verifiedBy: `weft-harness/execute@${verified.plan.id}`,
-    };
+    });
 
     return tracked;
   });

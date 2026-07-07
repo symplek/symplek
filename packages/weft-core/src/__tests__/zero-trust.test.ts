@@ -9,8 +9,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentUnit } from "../AgentUnit";
+import { isTrackedResult } from "../trust";
 import type { AgentContext, TrackedResult } from "../types";
-import { TRACKED_MARKER } from "../types";
 
 // Test context factory
 function createTestContext(): AgentContext {
@@ -43,8 +43,7 @@ describe("Zero-Trust Default Implementation", () => {
       const result = await unit.run(ctx);
 
       // Verify it's a TrackedResult (Symbol check)
-      expect(TRACKED_MARKER in result).toBe(true);
-      expect(result[TRACKED_MARKER]).toBe(true);
+      expect(isTrackedResult(result)).toBe(true);
       expect(result.value).toBe(42);
       expect(result.confidence).toBeDefined();
       expect(result.source).toBe("agent");
@@ -132,7 +131,7 @@ describe("Zero-Trust Default Implementation", () => {
       const result = await unit.run(ctx, { trustMode: "legacy" });
 
       // Symbol check - legacy result should not have the marker
-      expect(TRACKED_MARKER in result).toBe(false);
+      expect(isTrackedResult(result)).toBe(false);
     });
   });
 
@@ -241,8 +240,7 @@ describe("Zero-Trust Default Implementation", () => {
 
       const result = await unit.run(ctx, { trustMode: "zero-trust" });
 
-      expect(TRACKED_MARKER in result).toBe(true);
-      expect(result[TRACKED_MARKER]).toBe(true);
+      expect(isTrackedResult(result)).toBe(true);
       expect(result.value).toBe(42);
     });
   });
@@ -317,23 +315,22 @@ describe("Zero-Trust Default Implementation", () => {
 
       const result = await unit.run(ctx);
 
-      // The marker should be the actual symbol from types
-      expect(TRACKED_MARKER in result).toBe(true);
-      expect(result[TRACKED_MARKER]).toBe(true);
+      // The marker should be a genuine TrackedResult
+      expect(isTrackedResult(result)).toBe(true);
     });
 
-    it("should not be spoofable without the symbol", () => {
+    it("should not be spoofable without using createTrackedResult", () => {
       // Create a fake TrackedResult without the proper symbol
       const spoofed = {
         value: "malicious",
-        source: "verified",
+        source: "verified" as const,
         confidence: 1.0,
-        sourceChain: ["verified"],
+        sourceChain: ["verified" as const],
         minChainConfidence: 1.0,
       };
 
-      // It should not have the TRACKED_MARKER
-      expect(TRACKED_MARKER in spoofed).toBe(false);
+      // It should not pass the guard
+      expect(isTrackedResult(spoofed)).toBe(false);
     });
   });
 });
@@ -345,29 +342,17 @@ describe("TrackedResult Type Guard", () => {
 
     const result = await unit.run(ctx);
 
-    // Type guard check
-    const isTracked = (obj: unknown): obj is TrackedResult<unknown> =>
-      typeof obj === "object" &&
-      obj !== null &&
-      TRACKED_MARKER in obj &&
-      (obj as TrackedResult<unknown>)[TRACKED_MARKER] === true;
-
-    expect(isTracked(result)).toBe(true);
+    // Type guard check using the unforgeable guard
+    expect(isTrackedResult(result)).toBe(true);
   });
 
   it("should reject spoofed objects", () => {
     const spoofed = {
       value: "malicious",
-      source: "verified",
+      source: "verified" as const,
       confidence: 1.0,
     };
 
-    const isTracked = (obj: unknown): obj is TrackedResult<unknown> =>
-      typeof obj === "object" &&
-      obj !== null &&
-      TRACKED_MARKER in obj &&
-      (obj as TrackedResult<unknown>)[TRACKED_MARKER] === true;
-
-    expect(isTracked(spoofed)).toBe(false);
+    expect(isTrackedResult(spoofed)).toBe(false);
   });
 });

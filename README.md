@@ -147,6 +147,43 @@ All operators on `AgentUnit<T>` are free (MIT). The full list:
 - `.interview(config)` — lazy human-in-the-loop configuration
 - `.conduct(handlers)` — execute a pending interview
 
+## Record & Replay
+
+Weft's record/replay engine is the foundation for deterministic agent testing. Record a run once, replay it infinitely at zero cost. The agent body is **never called** during replay — responses come from the stored trace.
+
+```mermaid
+flowchart LR
+    subgraph RECORD["🎬 .rehearse()"]
+        A[AgentUnit] --> B[TraceRecorder]
+        B --> C["capture events + hashes"]
+        C --> D[("ExecutionTrace")]
+    end
+
+    subgraph REPLAY["▶ .replay(trace)"]
+        D --> E[TraceReplayer]
+        E --> F[verify hashes]
+        F --> G["serve cached responses<br/>(model NEVER called)"]
+        G --> H[ReplayResult]
+    end
+
+    RECORD --> REPLAY
+
+    style RECORD fill:#1a1a2e,stroke:#16213e,color:#e0e0e0
+    style REPLAY fill:#1a1a2e,stroke:#16213e,color:#e0e0e0
+    style D fill:#0f3460,stroke:#533483,color:#e0e0e0
+    style G fill:#16213e,stroke:#e94560,color:#e94560,stroke-width:2px
+```
+
+| Framework | Replay Type | Re-executes LLM? | Deterministic? | Costs Tokens? |
+|---|---|---|---|---|
+| **Weft** | Recorded trace replay | **No** | **Yes** | **No** |
+| LangGraph | Time-travel from checkpoints | Yes | No | Yes |
+| Mastra | No replay primitive | N/A | N/A | N/A |
+
+**[Full architecture →](docs/architecture.md)**
+
+> **Legal disclaimer — replay determinism.** `.replay()` replays a stored trace through the same operator logic with the same inputs, producing the same output _for a given version of Weft and a given underlying AI model_. It does **not** guarantee identical outputs across model version upgrades, provider API changes, or different runtime environments. Replay is a testing and debugging aid, not a cryptographic audit trail. Do not rely on replay parity as evidence of correctness in regulated or compliance-critical workflows without independent verification.
+
 **Tracking**
 - `.tracked(opts?)` — source-tracking wrapper
 - `.tap(fn)` — side-effect without modifying value
@@ -165,9 +202,43 @@ Pre-1.0. API is stabilising but may change between minor versions. We commit to 
 
 ---
 
+## Demo
+
+See the adversarial demo at [wefthq/weft-demo](https://github.com/wefthq/weft-demo) — a flaky agent that fails 80% of the time, recorded and replayed deterministically.
+
+**[Full demo transcript →](docs/demo-transcript.md)**
+
+Quick version:
+
+```
+# Phase 1: Flaky agent — 4/5 runs fail (genuinely non-deterministic)
+Run 1: ✗ FAILED — POST /analyze → TIMEOUT
+Run 2: ✗ FAILED — POST /analyze → TIMEOUT
+Run 3: ✗ FAILED — POST /export → TIMEOUT
+Run 4: ✓ SUCCESS — 5 results
+Run 5: ✗ FAILED — POST /export → TIMEOUT
+
+# Phase 2: .rehearse() captures a successful run
+Attempt 3: ✓ Success — 2 events recorded
+
+# Phase 3: .replay() — agent body NEVER called
+Events replayed: 2/2
+apiCallCount:    -999 (agent never ran!)
+Replay matched:  ✓ YES
+Divergences:     0
+
+# Phase 4: Output matches exactly. Zero re-execution.
+Exact match:      ✓ YES
+Agent re-executed: ✓ NO (deterministic!)
+```
+
+---
+
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) — canonical vs mirror model, package structure, known asymmetries
+- [Record/Replay Architecture](docs/architecture.md) — deep dive into `.rehearse()` / `.replay()`
+- [Demo Transcript](docs/demo-transcript.md) — full adversarial demo output
 - [GitHub Discussions](https://github.com/wefthq/weft/discussions) — questions, feature proposals, show-and-tell
 
 ---

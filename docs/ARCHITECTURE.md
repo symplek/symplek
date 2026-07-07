@@ -1,105 +1,112 @@
-# Architecture
+# Weft Architecture — Record/Replay Loop
 
-This doc explains how Weft is laid out, why some things look duplicated, and which asymmetries between the public packages and our internal canonical source are deliberate.
+## Overview
 
-## Canonical and mirror
+Weft's record/replay engine is the foundation for deterministic agent testing. It decouples **execution** from **observation**: record a run once, replay it infinitely at zero cost.
 
-Weft has two codebases:
+```mermaid
+flowchart TB
+    subgraph RECORD["🎬 RECORD: .rehearse()"]
+        direction TB
+        A[AgentUnit&lt;T&gt;] -->|".rehearse(opts)"| B[TraceRecorder]
+        B -->|"wrap + instrument"| C[Instrumented Agent]
+        C -->|"execute"| D[Agent Body]
+        D -->|"returns T"| C
+        C -->|"capture events"| B
+        B -->|"appendEvent()"| E[Event Stream]
+        B -->|"createCheckpoint()"| F[Checkpoints]
+        B -->|"finalize(T)"| G[("ExecutionTrace&lt;T&gt;<br/>━━━━━━━━━━<br/>• events[]<br/>• checkpoints[]<br/>• finalOutput<br/>• metadata<br/>• vector clocks<br/>• integrity hashes")]
+    end
 
-| Layer | Where | Role |
-|---|---|---|
-| Canonical source | A private upstream monorepo | Where Weft is developed day-to-day, alongside an application that consumes it. Not open-sourced. |
-| Distribution mirror | This repo (`wefthq/weft`) | What gets published to npm as `weft-*`. The source of truth for everything you can `pnpm add`. |
+    subgraph STORE["💾 STORE"]
+        direction LR
+        G --> H[("Filesystem<br/>JSON trace")]
+        G --> I[("Database<br/>via Storage adapter")]
+    end
 
-The canonical source uses a runtime-specific module resolver that cannot be consumed by standard Node.js bundlers. The mirror strips those runtime bindings and exposes only the environment-agnostic core, so any consumer can `pnpm add weft-core` without bringing in our internal runtime.
+    subgraph REPLAY["▶ REPLAY: .replay(trace)"]
+        direction TB
+        J[("ExecutionTrace&lt;T&gt;")] -->|"load"| K[TraceReplayer]
+        K -->|"verify hash integrity"| L{Hash Check}
+        L -->|"ok"| M[DependencyScheduler]
+        L -->|"fail"| X[ReplayDivergenceError]
+        M -->|"next event"| N[ReplayLLMInterceptor]
+        N -->|"cached response"| O[Event Processor]
+        O -->|"assert deterministic"| P[Divergence Detector]
+        P -->|"pass"| Q[ReplayResult&lt;T&gt;]
+        P -->|"divergence"| R[Divergence[]]
+    end
 
-Sync is **manual, per-release**. See [`SYNC.md`](../SYNC.md) at the repo root.
+    G -.->|"serialize"| J
 
-## Packages
+    subgraph KEY["🔑 KEY INSIGHT"]
+        direction LR
+        S["Agent body NEVER executes during replay"]
+    end
 
-| Package | Licence | What it does |
-|---|---|---|
-| `weft-core` | MIT | `AgentUnit`, composition operators, basic observability, providers |
-| `weft-pro` | BSL 1.1 | TaCo consensus, antibodies, trust registry, dashboards |
-| `weft-react` | MIT | React hooks for streaming and error boundaries |
-| `weft-convex` | MIT | Convex bindings (wraps `weft-core/server`) |
-| `weft-cli` | MIT | Scaffolding, debugging |
-| `weft-mcp` | MIT | MCP server exposing Weft as tool calls |
-| `weft-harness` | MIT | Replay / rehearse / fault-injection for tests |
-| `weft-devtools` | MIT | Trace and span inspection |
-| `weft-testing` | MIT | Vitest utilities, mock factories, deterministic providers |
+    RECORD --> KEY
+    KEY --> REPLAY
 
-## Shared concepts
-
-Four concepts exist on both sides and are contract-tested:
-
-| Concept | What it is |
-|---|---|
-| `AgentUnit` | The core algebra. Lazy, composable, typed. |
-| `AgentUnitMetadata` | Provenance and config metadata on each unit. |
-| `WeftError` | The error type. |
-| `RetryOptions` | Config for the `.retry()` operator. |
-
-Equivalence is enforced by `packages/weft-core/src/__tests__/canonicalMirrorContract.test.ts`. Failing those tests means sync has drifted.
-
-## Deliberate asymmetries
-
-These look like inconsistencies. They are not bugs. **Do not "fix" them in PRs.**
-
-### `WeftError` codes diverge
-
-The two sides use different error code vocabularies because they serve different runtimes:
-
-- **Canonical** uses codes oriented around its runtime: `CIRCUIT_OPEN`, `IDEMPOTENCY_CONFLICT`, etc.
-- **Mirror** uses codes oriented around external consumers: `AUTH_FAILED`, `NETWORK_ERROR`, etc.
-
-Only `TIMEOUT` is shared. The constructor signatures also differ: canonical requires `{ code, why, fix }`; mirror accepts a richer optional shape.
-
-### `WeftBuilder` is nearly unrelated
-
-The canonical `WeftBuilder` is a production facade with `.prompt()`, `.withFallback()`, `.withBudget()`, `.runStream()`, `.structured()`. The mirror's is a simple lazy wrapper with `.toUnit()`, `.run()`, `.then()`. Only `.toUnit()` exists in both.
-
-Why: the mirror builder exists to be tree-shakeable and runtime-free. The canonical builder leans on a runtime that mirror consumers don't have.
-
-### `RetryOptions` shapes differ
-
-- **Canonical:** `{ maxRetries?, baseDelayMs?, originalPrompt? }` — used for schema-validation retry-with-feedback inside LLM calls.
-- **Mirror:** `{ maxAttempts?, baseDelayMs?, maxDelayMs?, jitter?, retryIf? }` — used for the general-purpose `.retry()` operator on `AgentUnit`.
-
-`maxRetries` vs `maxAttempts` is the easy copy-paste trap during sync. Maintainers know.
-
-### Mirror-only additions
-
-- `TrackedResult<T>` — provenance envelope returned by default from `.run()`. The canonical side returns raw `T`.
-- `createContext()` — a factory for synthesising `AgentContext` outside the canonical runtime.
-- `WeftError.sanitizeContext()` — redacts secrets from error context. Not needed canonical-side because the runtime sanitises upstream.
-
-### Canonical-only
-
-- `AgentUnit.fromAgent()` — takes a runtime-bound executor with no mirror equivalent.
-- `WeftErrorEnvelope` / `toEnvelope()` — serialisation for the canonical runtime; mirror uses `toJSON()` → `SerializedError`.
-- Facade observability hooks — runtime-internal.
-
-## Imports
-
-```typescript
-// External consumers — what you'll do:
-import { AgentUnit, Weft } from "weft-core/server";
-
-// React components:
-import { AIErrorBoundary } from "weft-react";
-import type { WeftErrorDetail } from "weft-core";
+    style RECORD fill:#1a1a2e,stroke:#16213e,color:#e0e0e0
+    style REPLAY fill:#1a1a2e,stroke:#16213e,color:#e0e0e0
+    style STORE fill:#0f3460,stroke:#16213e,color:#e0e0e0
+    style KEY fill:#16213e,stroke:#e94560,color:#e94560
+    style S fill:#16213e,stroke:#e94560,color:#e94560,stroke-width:3px
+    style G fill:#0f3460,stroke:#533483,color:#e0e0e0
+    style J fill:#0f3460,stroke:#533483,color:#e0e0e0
+    style X fill:#e94560,stroke:#e94560,color:#fff
+    style R fill:#e94560,stroke:#e94560,color:#fff
 ```
 
-`weft-core` is browser-safe. `weft-core/server` pulls in provider SDKs and is Node-only.
+## How It Works
 
-## Pre-1.0 stance
+### Phase 1: Record (`.rehearse()`)
 
-We're in 0.x. The shape will move. Specifically:
+1. **AgentUnit wrapper** — `.rehearse(opts)` wraps the agent body in an instrumented execution path
+2. **TraceRecorder** — every decision point, API call, and output is captured as a `TraceEvent`
+3. **Vector clocks** — each event carries a Lamport-style vector clock for causal ordering across multi-agent compositions
+4. **Integrity hashes** — every event is DJB2-hashed at record time for tamper detection on replay
+5. **Checkpoints** — periodic state snapshots enable partial replay from any point
+6. **Finalize** — the trace is frozen with `Object.freeze()` and includes metadata, the final output, and the complete event stream
 
-- New operators may be added at minor bumps.
-- Existing operator names will not change without a deprecation path.
-- The `TrackedResult` envelope shape may gain fields (additive) but won't lose them before 1.0.
-- Provider adapters may be re-organised; the user-facing `Weft.configure({...})` shape is stable.
+### Phase 2: Replay (`.replay(trace)`)
 
-When in doubt, pin exact versions.
+1. **TraceReplayer** — loads the `ExecutionTrace<T>` and validates schema version
+2. **Hash verification** — re-computes every event hash; divergences throw `ReplayDivergenceError`
+3. **DependencyScheduler** — respects causal ordering from vector clocks
+4. **ReplayLLMInterceptor** — all LLM calls are served from cached responses; **the model is never called**
+5. **Divergence detection** — output hashes are compared; any mismatch is logged as a `Divergence`
+6. **Result** — `ReplayResult<T>` contains the original output, match status, event counts, and any divergences
+
+### The Key Win
+
+The agent body is **never called** during replay. The `TraceReplayer` replays from the stored event stream, using the `ReplayLLMInterceptor` to serve cached LLM responses. This means:
+
+- **Zero API costs** during replay
+- **Deterministic output** — same trace always produces the same result
+- **No flakiness** — network failures, timeouts, and non-deterministic behavior are frozen in the trace
+- **Fast** — replay is purely CPU-bound; no network I/O
+
+## Component Map
+
+| Component | File | Role |
+|---|---|---|
+| `TraceRecorder` | `rehearsal/recorder.ts` | Captures events, checkpoints, finalizes traces |
+| `TraceReplayer` | `rehearsal/replayer.ts` | Replays traces with hash verification and divergence detection |
+| `VectorClockManager` | `rehearsal/vectorClock.ts` | Causal ordering across multi-agent traces |
+| `DependencyScheduler` | `rehearsal/scheduler.ts` | Topological sort respecting vector clock ordering |
+| `ReplayLLMInterceptor` | `rehearsal/interceptor.ts` | Serves cached LLM responses during replay |
+| `CheckpointManager` | `rehearsal/checkpoint.ts` | State snapshots for partial replay |
+| `TraceStorage` | `rehearsal/storage.ts` | Persistence adapter (filesystem, DB, etc.) |
+| `ExecutionTrace<T>` | `rehearsal/types.ts` | The serialized trace data structure |
+
+## Replay vs. The Competition
+
+| Framework | Replay Type | Re-executes LLM? | Deterministic? | Costs Tokens? |
+|---|---|---|---|---|
+| **Weft** | Recorded trace replay | **No** | **Yes** | **No** |
+| LangGraph | Time-travel from checkpoints | Yes | No | Yes |
+| Mastra | No replay primitive | N/A | N/A | N/A |
+| Vercel AI SDK | No replay primitive | N/A | N/A | N/A |
+
+Weft is the only framework where replay is a first-class primitive that never calls the model.
