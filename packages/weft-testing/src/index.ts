@@ -1,6 +1,7 @@
 /**
  * @module weft-testing - Testing utilities for Weft agent compositions
- * @description Provides rehearsal and mock utilities for unit testing agent pipelines.
+ * @description Re-exports the complete rehearsal engine from weft-core.
+ *   weft-testing is a re-export shell; all logic lives in weft-core/rehearsal.
  * @rules Uses MIT license; peer depends on weft-core
  */
-export * from "./rehearsal/index";
+export * from "weft-core/rehearsal";

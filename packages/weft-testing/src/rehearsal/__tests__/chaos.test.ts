@@ -243,23 +243,45 @@ describe("Chaos Scenarios", () => {
       vi.restoreAllMocks();
     });
 
-    it("should handle trace with invalid vector clocks", () => {
+    it("should handle trace with invalid vector clocks", async () => {
+      // Build a real DJB2 hash so verifyEventIntegrity passes.
+      // The test intent is that NaN vectorClock entries are handled gracefully
+      // (scheduler falls back to timestamp ordering) — not that hash verification
+      // is skipped.  replay() is async, so we await it properly.
+      function djb2Hash(value: string): string {
+        let hash = 5381;
+        for (let i = 0; i < value.length; i++) {
+          hash = (hash * 33) ^ value.charCodeAt(i);
+        }
+        return (hash >>> 0).toString(16).padStart(8, "0");
+      }
+
+      const ts = Date.now();
+      const eventBase = {
+        id: "e1",
+        type: "operator" as const,
+        agentId: "agent-1",
+        timestamp: ts,
+        vectorClock: { "agent-1": NaN }, // Invalid clock — scheduler fallback target
+        payload: { operator: "test", durationMs: 10 },
+      };
+      const eventHash = djb2Hash(
+        JSON.stringify({
+          id: eventBase.id,
+          type: eventBase.type,
+          agentId: eventBase.agentId,
+          timestamp: eventBase.timestamp,
+          vectorClock: eventBase.vectorClock,
+          payload: eventBase.payload,
+        }),
+      );
+
       const trace: ExecutionTrace<string> = {
         id: "corrupted",
         version: "1.0.0",
-        startTime: Date.now(),
-        endTime: Date.now(),
-        events: [
-          {
-            id: "e1",
-            type: "operator",
-            agentId: "agent-1",
-            timestamp: Date.now(),
-            vectorClock: { "agent-1": NaN }, // Invalid clock
-            payload: { operator: "test", durationMs: 10 },
-            hash: "hash",
-          },
-        ],
+        startTime: ts,
+        endTime: ts,
+        events: [{ ...eventBase, hash: eventHash }],
         checkpoints: [],
         metadata: {
           composition: "test",
@@ -274,9 +296,9 @@ describe("Chaos Scenarios", () => {
         finalOutput: "test",
       };
 
-      // Should handle gracefully (scheduler will use timestamp fallback)
+      // Should handle gracefully — scheduler uses timestamp fallback for NaN clocks
       const replayer = new TraceReplayer(trace);
-      expect(() => replayer.replay()).not.toThrow();
+      await expect(replayer.replay()).resolves.toBeDefined();
     });
   });
 

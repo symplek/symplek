@@ -323,21 +323,29 @@ export class TestHarness {
   }
 
   /**
-   * Record and immediately verify determinism.
-   * Runs the agent twice and compares results.
+   * Verify determinism by running the agent twice and comparing outputs.
    *
-   * @param execute - Function that runs the agent with rehearsal
-   * @throws DeterminismError if runs produce different results
+   * Pre-fix this called execute() once, then replayed the trace — which
+   * trivially returned trace.finalOutput (identical to the original value) and
+   * therefore never detected a non-deterministic agent.
+   *
+   * Fixed: execute() is called twice.  If both calls return the same value the
+   * agent is deterministic.  A mismatch throws DeterminismError with a diff.
+   *
+   * @param execute - Function that runs the agent and returns a RehearsalResult
+   * @throws DeterminismError if the two independent runs produce different values
    */
   async verify<T>(execute: () => Promise<RehearsalResult<T>>): Promise<void> {
-    // First run - record
-    const original = await execute();
+    const run1 = await execute();
+    const run2 = await execute();
 
-    // Second run - replay
-    const replayed = await this.replay(original.trace);
-
-    // Assert determinism
-    assertDeterministic(original, replayed, this.config.compareOptions);
+    if (!deepEqual(run1.value, run2.value, this.config.compareOptions)) {
+      const diffs = diffPath(run1.value, run2.value);
+      throw new DeterminismError(
+        `Agent produced different output on two independent executions (${diffs.length} difference(s))`,
+        diffs,
+      );
+    }
   }
 
   /**

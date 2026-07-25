@@ -45,6 +45,11 @@
       "types": "./dist/operators/index.d.ts",
       "import": "./dist/operators/index.js",
       "require": "./dist/operators/index.cjs"
+    },
+    "./rehearsal": {
+      "types": "./dist/rehearsal/index.d.ts",
+      "import": "./dist/rehearsal/index.js",
+      "require": "./dist/rehearsal/index.cjs"
     }
   },
   "files": [
@@ -75,8 +80,8 @@
   },
   "homepage": "https://github.com/wefthq/weft#readme",
   "scripts": {
-    "build": "tsup src/index.ts src/server.ts src/confidence/index.ts src/coherence/index.ts src/interview/index.ts src/change-kernel/index.ts src/operators/index.ts --format cjs,esm --dts --outDir dist",
-    "dev": "tsup src/index.ts src/server.ts src/confidence/index.ts src/coherence/index.ts src/interview/index.ts src/change-kernel/index.ts src/operators/index.ts --format cjs,esm --watch --dts --outDir dist",
+    "build": "tsup src/index.ts src/server.ts src/confidence/index.ts src/coherence/index.ts src/interview/index.ts src/change-kernel/index.ts src/operators/index.ts src/rehearsal/index.ts --format cjs,esm --dts --outDir dist",
+    "dev": "tsup src/index.ts src/server.ts src/confidence/index.ts src/coherence/index.ts src/interview/index.ts src/change-kernel/index.ts src/operators/index.ts src/rehearsal/index.ts --format cjs,esm --watch --dts --outDir dist",
     "lint": "biome check .",
     "typecheck": "tsc --noEmit",
     "typecheck:boundary": "tsc --noEmit -p tsconfig.boundary.json",

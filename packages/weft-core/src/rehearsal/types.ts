@@ -212,6 +212,13 @@ export interface TraceMetadata {
 
   /** Number of checkpoints */
   readonly checkpointCount: number;
+
+  /**
+   * DJB2 hash of finalOutput computed at record time.
+   * Present on traces produced by the fixed recorder; absent on older traces.
+   * Used by verifyFinalOutputIntegrity() to detect post-record tampering.
+   */
+  readonly outputHash?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

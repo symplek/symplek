@@ -41,20 +41,46 @@ function createTrace<T>(
   };
 }
 
-// Helper to create test event
+// DJB2 hash helpers (matching recorder.ts computeEventHash / replayer.ts computeHash)
+// ---------------------------------------------------------------------------
+
+function djb2Hash(value: string): string {
+  let hash = 5381;
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash * 33) ^ value.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function computeEventHash(event: Omit<TraceEvent, "hash">): string {
+  const content = JSON.stringify({
+    id: event.id,
+    type: event.type,
+    agentId: event.agentId,
+    timestamp: event.timestamp,
+    vectorClock: event.vectorClock,
+    payload: event.payload,
+  });
+  return djb2Hash(content);
+}
+
+// Helper to create test event with a correct DJB2 hash
 function createEvent(
   id: string,
   type: "operator" | "llm_call" | "llm_response" = "operator",
   payload: Record<string, unknown> = { operator: "test", durationMs: 10 },
 ): TraceEvent {
-  return {
+  const base = {
     id,
     type,
     agentId: "agent-1",
     timestamp: Date.now(),
     vectorClock: { "agent-1": 1 },
     payload: payload as TraceEvent["payload"],
-    hash: `hash_${id}`,
+  };
+  return {
+    ...base,
+    hash: computeEventHash(base),
   };
 }
 

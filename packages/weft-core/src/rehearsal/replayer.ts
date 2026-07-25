@@ -147,21 +147,21 @@ export class TraceReplayer<T = unknown> {
     // Check event count, checkpoint count, and start/end consistency
     this.verifyTraceIntegrity(eventsReplayed);
 
+    // ── FATAL #4 HARDENING (2026-07-07): Verify final output integrity ──
+    // Must run BEFORE matched is computed so that a hash mismatch is counted
+    // as a critical divergence in the result (pre-fix: called after → discarded).
+    this.verifyFinalOutputIntegrity();
+
     // Check if we processed all events
     const totalEvents = this.scheduler.getTotalEvents();
     const allProcessed = eventsReplayed === totalEvents;
 
-    // Determine match status
+    // Determine match status — computed after all integrity checks so that
+    // divergences added by verifyFinalOutputIntegrity() are included.
     const criticalDivergences = this.divergences.filter(
       (d) => d.severity === "critical",
     );
     const matched = criticalDivergences.length === 0 && allProcessed;
-
-    // ── FATAL #4 HARDENING (2026-07-07): Verify final output integrity ──
-    // The trace.finalOutput MUST match what we'd compute from the replayed
-    // events. If a trace was tampered with, the final output won't align
-    // with the event stream.
-    this.verifyFinalOutputIntegrity();
 
     return {
       value: this.trace.finalOutput,
@@ -424,20 +424,19 @@ export class TraceReplayer<T = unknown> {
   }
 
   /**
-   * Verify the final output is consistent with the trace data.
-   * A corrupted trace could have arbitrary finalOutput that doesn't
-   * match the actual event stream.
+   * Verify the final output is consistent with the hash stored at record time.
+   *
+   * Pre-fix the hash was computed then discarded, so a tampered finalOutput was
+   * never detected.  Now: if metadata.outputHash is present compare it;
+   * older traces without outputHash are skipped (backward compat).
    * FATAL #4 HARDENING (2026-07-07).
    */
   private verifyFinalOutputIntegrity(): void {
-    // If the trace has no events and no final output, that's valid (empty trace)
     const totalEvents = this.scheduler.getTotalEvents();
     if (totalEvents === 0 && this.trace.finalOutput === undefined) {
       return;
     }
 
-    // Verify that finalOutput is present when events exist
-    // (Traces with events should produce some output)
     if (totalEvents > 0 && this.trace.finalOutput === undefined) {
       this.recordDivergence(
         null,
@@ -445,19 +444,33 @@ export class TraceReplayer<T = unknown> {
         "undefined",
         "warning",
       );
+      return;
     }
 
-    // Compute a content hash of the final output for audit trail
     if (this.trace.finalOutput !== undefined) {
+      const expectedHash = this.trace.metadata?.outputHash;
+      // Older traces have no outputHash — skip rather than falsely flagging.
+      if (expectedHash === undefined) {
+        return;
+      }
+
       try {
         const outputStr =
           typeof this.trace.finalOutput === "string"
             ? this.trace.finalOutput
             : JSON.stringify(this.trace.finalOutput);
-        this.computeHash(outputStr);
+        const actualHash = this.computeHash(outputStr);
+
+        if (actualHash !== expectedHash) {
+          this.recordDivergence(
+            null,
+            expectedHash,
+            actualHash,
+            "critical",
+          );
+        }
       } catch {
-        // finalOutput may not be JSON-serializable — that's fine,
-        // we just can't hash it. Record as info.
+        // finalOutput not JSON-serialisable — cannot verify hash, skip silently.
       }
     }
   }

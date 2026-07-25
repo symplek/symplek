@@ -7,13 +7,16 @@
     "moduleResolution": "node",
     "strict": true,
     "outDir": "./dist",
-    "rootDir": "./src",
     "composite": false,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "weft-core/rehearsal": ["../weft-core/src/rehearsal/index.ts"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": [

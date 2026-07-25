@@ -259,6 +259,19 @@ export class TraceRecorder implements InterceptorRecorder {
     // Compute metadata
     const agentIds = new Set(this.events.map((e) => e.agentId));
 
+    // Compute outputHash for integrity verification on replay.
+    let outputHash: string | undefined;
+    try {
+      const outputStr =
+        typeof finalOutput === "string"
+          ? finalOutput
+          : JSON.stringify(finalOutput);
+      outputHash = djb2Hash(outputStr);
+    } catch {
+      // Non-serialisable output (circular refs, etc.) — omit the hash rather
+      // than crashing. verifyFinalOutputIntegrity() skips checks when absent.
+    }
+
     const metadata: TraceMetadata = {
       composition: this.extractComposition(),
       agentCount: agentIds.size,
@@ -268,6 +281,7 @@ export class TraceRecorder implements InterceptorRecorder {
       operatorChain: this.operatorChain,
       includesPrompts: this.options.includePrompts ?? false,
       checkpointCount: this.checkpoints.length,
+      outputHash,
     };
 
     return {

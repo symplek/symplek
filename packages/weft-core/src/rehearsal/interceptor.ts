@@ -209,13 +209,15 @@ export class RecordingLLMInterceptor implements InterceptorProvider {
     const response = await execute(config);
     const latencyMs = Date.now() - startTime;
 
-    // Record the response event
+    // Record the response event.
+    // The response text is ALWAYS stored (after redaction) so that the replay
+    // interceptor can return the real response rather than falling back to "".
+    // `includePrompts` only gates the PROMPT text (privacy concern); the
+    // response must be present for deterministic replay.
     if (this.recorder) {
       const responsePayload: LLMResponsePayload = {
         model: config.model,
-        response: this.includePrompts
-          ? this.redact(response.response)
-          : undefined,
+        response: this.redact(response.response),
         responseHash: this.hash(response.response),
         tokensUsed: response.tokensUsed,
         finishReason: response.finishReason,
