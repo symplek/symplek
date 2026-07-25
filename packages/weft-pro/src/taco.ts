@@ -146,13 +146,22 @@ function formatRationalesForContext(rationales: string[]): string {
 /**
  * Calculate agreement level from votes.
  *
+ * Measures decision homogeneity: the fraction of voters that chose the
+ * majority outcome. Unanimous approval AND unanimous rejection both score
+ * 1.0, so either direction converges against the threshold without burning
+ * every remaining round.
+ *
  * 📝 BUILD[05.05]: Agreement calculation
+ * Fix[N55]: was approval rate — unanimous rejection scored 0, never converged.
  */
 function calculateAgreement(votes: TaCoVote[]): number {
   if (votes.length === 0) return 0;
 
   const approveCount = votes.filter((v) => v.decision === "approve").length;
-  return approveCount / votes.length;
+  const rejectCount = votes.length - approveCount;
+  // Homogeneity: fraction on the winning side.
+  // unanimous approve → 1.0; unanimous reject → 1.0; 50/50 split → 0.5.
+  return Math.max(approveCount, rejectCount) / votes.length;
 }
 
 /**

@@ -96,7 +96,8 @@ export class TrustRegistry {
       return null;
     }
 
-    return grant;
+    // Fix[N62]: return a copy so callers cannot mutate stored registry state.
+    return { ...grant };
   }
 
   /**
@@ -114,10 +115,20 @@ export class TrustRegistry {
   /**
    * Get all trust grants.
    *
+   * Returns a snapshot Map whose values are copies of the stored grants.
+   * Callers cannot mutate registry state through the returned values.
+   *
+   * Fix[N62]: shallow Map copy carried live value refs; the new copy
+   * spreads each grant so mutations to returned values stay isolated.
+   *
    * 📝 BUILD[05.05]: Grant enumeration
    */
   getAll(): Map<string, TrustGrant> {
-    return new Map(this.grants);
+    const snapshot = new Map<string, TrustGrant>();
+    for (const [id, grant] of this.grants) {
+      snapshot.set(id, { ...grant });
+    }
+    return snapshot;
   }
 
   /**

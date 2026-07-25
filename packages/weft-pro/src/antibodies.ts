@@ -143,6 +143,9 @@ export class AntibodyRegistry {
   private matchesPattern(output: string, matcher: PatternMatcher): boolean {
     switch (matcher.type) {
       case "regex":
+        // Fix[N56]: reset lastIndex before each call so a global/sticky regex
+        // does not alternate match/no-match on identical input across invocations.
+        matcher.pattern.lastIndex = 0;
         return matcher.pattern.test(output);
       case "function":
         return matcher.fn(output);

@@ -54,6 +54,25 @@ export function createConfidentPheromone<T>(
     minConfidence = 0.1,
   } = options;
 
+  // Fix[N71]: validate numeric inputs at the boundary so a caller-supplied
+  // evaporationRate > 1 cannot produce NaN confidence that evades expiry
+  // and min-confidence filters, making a pheromone permanently undetectable.
+  if (!Number.isFinite(evaporationRate) || evaporationRate < 0 || evaporationRate > 1) {
+    throw new RangeError(
+      `evaporationRate must be a finite number in [0, 1], got ${evaporationRate}`,
+    );
+  }
+  if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
+    throw new RangeError(
+      `confidence must be a finite number in [0, 1], got ${confidence}`,
+    );
+  }
+  if (!Number.isFinite(minConfidence) || minConfidence < 0 || minConfidence > 1) {
+    throw new RangeError(
+      `minConfidence must be a finite number in [0, 1], got ${minConfidence}`,
+    );
+  }
+
   const depositedAt = Date.now();
 
   return {

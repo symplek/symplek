@@ -78,6 +78,18 @@ export function routeConsultation(
     requiredSpecialists.includes(s.id),
   );
 
+  // Fix[N66]: surface an error when a required specialist is unavailable.
+  // Previously, unavailable required ids were silently dropped from `selected`
+  // yet still echoed into `budget.requiredSpecialists`, producing a plan whose
+  // stated requirements could never be satisfied.
+  const foundIds = new Set(required.map((s) => s.id));
+  const unmet = requiredSpecialists.filter((id) => !foundIds.has(id));
+  if (unmet.length > 0) {
+    throw new Error(
+      `Required specialists unavailable and cannot be consulted: ${unmet.join(", ")}`,
+    );
+  }
+
   const remainder = availableSpecialists.filter(
     (s) => !required.some((r) => r.id === s.id),
   );
@@ -89,12 +101,14 @@ export function routeConsultation(
 
   const selected = [...required, ...remainder.slice(0, desired)];
 
+  // requiredSpecialists in the plan now only contains ids that were actually
+  // selected — it is a truthful record, not an echo of the caller's wish list.
   return {
     specialists: selected,
     budget: {
       maxSpecialists: budget.maxSpecialists,
       maxLatencyMs: budget.maxLatencyMs,
-      requiredSpecialists,
+      requiredSpecialists: required.map((s) => s.id),
       consensusRequired: budget.consensusRequired,
       includeChallenge: budget.includeChallenge,
     },
@@ -116,12 +130,33 @@ export async function runConsultationWithBudget<T>(
 
   for (const specialist of plan.specialists) {
     const elapsed = Date.now() - startedAt;
-    if (elapsed >= plan.budget.maxLatencyMs) {
+    const remaining = plan.budget.maxLatencyMs - elapsed;
+    if (remaining <= 0) {
+      return { timedOut: true, consulted, results };
+    }
+
+    // Fix[N65]: race each specialist against the remaining wall-clock budget.
+    // The pre-await elapsed check alone cannot bound a specialist that hangs
+    // after it has started — the race closes that window.
+    const deadlineToken = Symbol("consultation_timeout");
+    let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+    const deadlinePromise = new Promise<typeof deadlineToken>((resolve) => {
+      deadlineTimer = setTimeout(() => resolve(deadlineToken), remaining);
+    });
+
+    let outcome: T | typeof deadlineToken;
+    try {
+      outcome = await Promise.race([run(specialist), deadlinePromise]);
+    } finally {
+      clearTimeout(deadlineTimer);
+    }
+
+    if (outcome === deadlineToken) {
       return { timedOut: true, consulted, results };
     }
 
     consulted.push(specialist.id);
-    results.push(await run(specialist));
+    results.push(outcome as T);
   }
 
   return { timedOut: false, consulted, results };

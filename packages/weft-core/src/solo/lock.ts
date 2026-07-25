@@ -208,7 +208,14 @@ export class InMemoryLockManager implements LockManager {
       return false;
     }
 
-    existing.expires += additionalMs;
+    // Fix[CR-306]: write a new Map entry instead of mutating the stored object
+    // in-place.  Callers that captured a reference to the original LockEntry
+    // (e.g. from acquire() or getActiveLocks()) must not observe the extended
+    // expiry through their reference — that is the M7 immutability contract.
+    this.activeLocks.set(resourceId, {
+      ...existing,
+      expires: existing.expires + additionalMs,
+    });
     return true;
   }
 

@@ -103,10 +103,8 @@ describe("Contract 4 — InMemoryLockManager state isolation", () => {
 
   // ── Obligation 4 ──────────────────────────────────────────────────────────
   // extendLock (M7 fix): Map entry after extend is a new object reference.
-  // KNOWN-RED CR-306: extend() mutates the existing Map entry in-place instead of
-  // replacing it with a new object — violates M7 immutability contract. Fix is
-  // Wave 3 lock-correctness story (CR-306 / finding F-04).
-  it.skip("extendLock writes a new Map entry — original object not mutated", async () => {
+  // CR-306 fixed: extend() now writes a new Map entry instead of mutating in-place.
+  it("extendLock writes a new Map entry — original object not mutated", async () => {
     const mgr = new InMemoryLockManager();
     const r = await mgr.acquire("ext-res", "agent-e", 10000);
     expect(r.acquired).toBe(true);
