@@ -103,19 +103,26 @@ describe("add command", () => {
         model: "gpt-4o",
       });
 
+      // Template header still names the agent.
       expect(ts).toContain("my-agent Agent");
-      expect(ts).toContain('name: "my-agent"');
+      // Model is interpolated into the ai() call as a string.
       expect(ts).toContain('model: "gpt-4o"');
-      expect(ts).toContain("export const myAgent");
-      expect(ts).toContain("AgentUnit.of");
+      // Generator emits a factory function, not a const (B11 fix).
+      expect(ts).toContain("export function myAgent");
+      // Uses the correct factory method.
+      expect(ts).toContain("AgentUnit.from");
+      // No deprecated patterns.
+      expect(ts).not.toContain("AgentUnit.of({");
+      expect(ts).not.toContain("AgentUnit.create");
     });
 
     it("uses camelCase for variable name", () => {
       const ts = generateAgentTypeScript("code-reviewer", {
-        model: "claude-3-sonnet",
+        model: "claude-sonnet-4-5",
       });
 
-      expect(ts).toContain("export const codeReviewer");
+      // Generator emits a factory function, not a const.
+      expect(ts).toContain("export function codeReviewer");
     });
   });
 

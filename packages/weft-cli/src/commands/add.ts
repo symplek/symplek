@@ -15,15 +15,15 @@ import {
   type TemplateVars,
 } from "../utils/templates.js";
 
-/** Available models for agent creation */
+/** Available models for agent creation — mirrors weft-core/src/providers/auto.ts PROVIDER_MODEL_DEFAULTS. */
 const AVAILABLE_MODELS = [
   "gpt-4o",
   "gpt-4o-mini",
-  "claude-3-sonnet",
-  "claude-3-opus",
-  "claude-3-haiku",
+  "claude-opus-4-5",
+  "claude-sonnet-4-5",
+  "claude-haiku-3-5",
   "gemini-1.5-pro",
-  "gemini-1.5-flash",
+  "gemini-2.0-flash",
 ] as const;
 
 /** Available tools for agent creation */
@@ -105,6 +105,14 @@ export function generateAgentYaml(
 
   // For custom type, strip most of the template to minimal
   if (options.type === "custom") {
+    // Validate model against the allowlist so a CLI injection via --model
+    // can't embed newlines or colons that break the YAML structure.
+    const safeModel: string = (AVAILABLE_MODELS as readonly string[]).includes(
+      options.model,
+    )
+      ? options.model
+      : "gpt-4o";
+
     content = `# Custom agent - minimal template
 # Created with: Weft add agent ${name} --type custom
 
@@ -112,14 +120,14 @@ name: ${name}
 version: "1.0.0"
 type: custom
 
-model: ${options.model}
+model: ${safeModel}
 
-system_prompt: |
+systemPrompt: |
   You are ${name}, a helpful AI assistant.
   Customize this prompt for your specific use case.
 
 temperature: 0.7
-max_tokens: 2048
+maxTokens: 2048
 `;
   }
 

@@ -92,11 +92,20 @@ systemPrompt: You are a helpful assistant.`,
       expect(existsSync(result.outputFile)).toBe(true);
 
       const content = readFileSync(result.outputFile, "utf-8");
+      // Correct API: imports AgentUnit from the weft-core root and ai() from
+      // the server subpath — no @ai-sdk/* direct imports (B11 fix).
       expect(content).toContain('import { AgentUnit } from "weft-core"');
-      expect(content).toContain('import { openai } from "@ai-sdk/openai"');
-      expect(content).toContain("export const myAgent");
-      expect(content).toContain('name: "my-agent"');
-      expect(content).toContain('model: openai("gpt-4o")');
+      expect(content).toContain('import { ai } from "weft-core/server"');
+      // Generated agent is a factory function (not a const AgentUnit.create call).
+      expect(content).toContain("export function myAgent(prompt: string)");
+      // Model is passed as a string to ai(), not as a provider-SDK call.
+      expect(content).toContain('model: "gpt-4o"');
+      // System prompt is emitted correctly.
+      expect(content).toContain("system:");
+      // No forbidden patterns.
+      expect(content).not.toContain("AgentUnit.create");
+      expect(content).not.toContain("defineTool");
+      expect(content).not.toContain('@ai-sdk/');
     });
 
     it("generates to custom output directory", () => {
@@ -105,7 +114,7 @@ systemPrompt: You are a helpful assistant.`,
       writeFileSync(
         yamlPath,
         `name: output-agent
-model: claude-3-sonnet
+model: claude-sonnet-4-5
 systemPrompt: Test agent.`,
       );
 
@@ -136,8 +145,8 @@ systemPrompt: Nested test.`,
     });
   });
 
-  describe("model mapping", () => {
-    it("maps OpenAI models correctly", () => {
+  describe("model handling", () => {
+    it("passes OpenAI model as a string to ai()", () => {
       const yamlPath = join(testDir, "openai-agent.yaml");
       writeFileSync(
         yamlPath,
@@ -149,16 +158,17 @@ systemPrompt: OpenAI test.`,
       generateFile(yamlPath, undefined, true);
       const content = readFileSync(join(testDir, "openai-agent.ts"), "utf-8");
 
-      expect(content).toContain('import { openai } from "@ai-sdk/openai"');
-      expect(content).toContain('model: openai("gpt-4o-mini")');
+      // Model is a plain string passed to ai(); no @ai-sdk/* import.
+      expect(content).toContain('model: "gpt-4o-mini"');
+      expect(content).not.toContain("@ai-sdk/");
     });
 
-    it("maps Anthropic models correctly", () => {
+    it("passes Anthropic model as a string to ai()", () => {
       const yamlPath = join(testDir, "anthropic-agent.yaml");
       writeFileSync(
         yamlPath,
         `name: anthropic-agent
-model: claude-3-sonnet
+model: claude-sonnet-4-5
 systemPrompt: Anthropic test.`,
       );
 
@@ -168,13 +178,11 @@ systemPrompt: Anthropic test.`,
         "utf-8",
       );
 
-      expect(content).toContain(
-        'import { anthropic } from "@ai-sdk/anthropic"',
-      );
-      expect(content).toContain('model: anthropic("claude-3-sonnet")');
+      expect(content).toContain('model: "claude-sonnet-4-5"');
+      expect(content).not.toContain("@ai-sdk/");
     });
 
-    it("maps Google models correctly", () => {
+    it("passes Google model as a string to ai()", () => {
       const yamlPath = join(testDir, "google-agent.yaml");
       writeFileSync(
         yamlPath,
@@ -186,8 +194,22 @@ systemPrompt: Google test.`,
       generateFile(yamlPath, undefined, true);
       const content = readFileSync(join(testDir, "google-agent.ts"), "utf-8");
 
-      expect(content).toContain('import { google } from "@ai-sdk/google"');
-      expect(content).toContain('model: google("gemini-2.0-flash")');
+      expect(content).toContain('model: "gemini-2.0-flash"');
+      expect(content).not.toContain("@ai-sdk/");
+    });
+
+    it("rejects deprecated claude-3-* model IDs", () => {
+      const yamlPath = join(testDir, "old-model-agent.yaml");
+      writeFileSync(
+        yamlPath,
+        `name: old-model-agent
+model: claude-3-opus
+systemPrompt: Test.`,
+      );
+
+      const result = generateFile(yamlPath, undefined, true);
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Unsupported model");
     });
   });
 
@@ -205,7 +227,8 @@ description: A helpful agent for testing.`,
       generateFile(yamlPath, undefined, true);
       const content = readFileSync(join(testDir, "desc-agent.ts"), "utf-8");
 
-      expect(content).toContain('description: "A helpful agent for testing."');
+      // Generator emits description as a JSDoc comment above the export.
+      expect(content).toContain("/** A helpful agent for testing. */");
     });
 
     it("includes temperature when present", () => {
@@ -273,10 +296,10 @@ tools:
       generateFile(yamlPath, undefined, true);
       const content = readFileSync(join(testDir, "tools-agent.ts"), "utf-8");
 
+      // Generator emits a reminder comment inside the ai() options block.
       expect(content).toContain(
-        '// TODO: Import tools: "webSearch", "calculator"',
+        '// TODO: wire tools: "webSearch", "calculator"',
       );
-      expect(content).toContain('// tools: ["webSearch", "calculator"]');
     });
 
     it("handles tool config objects", () => {
@@ -312,13 +335,14 @@ systemPrompt: Test.
 operators:
   retry:
     maxAttempts: 5
-    backoffMs: 2000`,
+    baseDelayMs: 2000`,
       );
 
       generateFile(yamlPath, undefined, true);
       const content = readFileSync(join(testDir, "retry-agent.ts"), "utf-8");
 
-      expect(content).toContain("export const retryAgentWithOperators");
+      // Operator variant is a function, not a const (B11 fix).
+      expect(content).toContain("export function retryAgentWithOperators");
       expect(content).toContain(".retry(5, { baseDelayMs: 2000 })");
     });
 
@@ -358,7 +382,12 @@ operators:
       generateFile(yamlPath, undefined, true);
       const content = readFileSync(join(testDir, "fallback-agent.ts"), "utf-8");
 
-      expect(content).toContain(".fallback(backupAgent)");
+      // Generator imports the fallback factory and calls it with the same prompt
+      // so .fallback() receives an AgentUnit<string>, not a bare function.
+      expect(content).toContain(
+        'import { backupAgent } from "./backup-agent"',
+      );
+      expect(content).toContain(".fallback(backupAgent(prompt))");
     });
 
     it("generates multiple operators", () => {
@@ -402,9 +431,9 @@ systemPrompt: |
         "utf-8",
       );
 
-      // Multi-line prompts now emit as JSON-quoted strings with \n escapes
-      // (safe emitter — no template literals, no injection surface).
-      expect(content).toContain('systemPrompt: "');
+      // Generator emits multi-line prompts as a JSON double-quoted string
+      // in the ai() `system` field — no template literals, no injection surface.
+      expect(content).toContain('system: "');
       expect(content).toContain("You are a helpful assistant.");
     });
 
@@ -439,8 +468,9 @@ systemPrompt: Test.`,
       generateFile(yamlPath, undefined, true);
       const content = readFileSync(join(testDir, "type-agent.ts"), "utf-8");
 
+      // ReturnType of the factory function (AgentUnit) then of .run() on that.
       expect(content).toContain(
-        "export type TypeAgentResult = Awaited<ReturnType<typeof typeAgent.run>>",
+        'export type TypeAgentResult = Awaited<ReturnType<ReturnType<typeof typeAgent>["run"]>>',
       );
     });
 
@@ -575,8 +605,9 @@ systemPrompt: Test.`,
         "utf-8",
       );
 
-      expect(content).toContain("export const kebabCaseAgent");
-      expect(content).not.toContain("export const kebab-case-agent");
+      // Generator emits a factory function, not a const.
+      expect(content).toContain("export function kebabCaseAgent");
+      expect(content).not.toContain("kebab-case-agent(");
     });
 
     it("converts to PascalCase for types", () => {

@@ -335,6 +335,12 @@ export async function installDependencies(
 
     let stderr = "";
 
+    // Drain stdout — without a consumer the pipe buffer fills on verbose installs
+    // and blocks the "close" event, hanging the CLI indefinitely (N59).
+    child.stdout?.on("data", () => {
+      /* intentionally discarded */
+    });
+
     child.stderr?.on("data", (data) => {
       stderr += data.toString();
     });

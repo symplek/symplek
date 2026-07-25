@@ -12,18 +12,19 @@ import { glob } from "glob";
 import yaml from "js-yaml";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TYPES (inline to avoid cross-package imports)
+// TYPES
 // ─────────────────────────────────────────────────────────────────────────────
+// Model IDs mirror the canonical table in weft-core/src/providers/auto.ts.
+// Update here whenever weft-core's provider defaults change.
 
 type SupportedModel =
   | "gpt-4o"
   | "gpt-4o-mini"
-  | "claude-3-opus"
-  | "claude-3-sonnet"
-  | "claude-3-haiku"
-  | "gemini-2.0-flash"
-  | "gemini-2.5-pro"
-  | "gemini-3.1-flash-lite-preview";
+  | "claude-opus-4-5"
+  | "claude-sonnet-4-5"
+  | "claude-haiku-3-5"
+  | "gemini-1.5-pro"
+  | "gemini-2.0-flash";
 
 interface ToolConfig {
   name: string;
@@ -33,9 +34,10 @@ interface ToolConfig {
 
 type ToolReference = string | ToolConfig;
 
+// Field name matches weft-core's RetryOptions.baseDelayMs so generated code is correct.
 interface RetryOperatorConfig {
   maxAttempts?: number;
-  backoffMs?: number;
+  baseDelayMs?: number;
 }
 
 interface TimeoutOperatorConfig {
@@ -69,11 +71,6 @@ interface YamlAgentConfig {
   metadata?: Record<string, unknown>;
 }
 
-interface ModelImportInfo {
-  pkg: string;
-  fn: string;
-}
-
 /** Result of generating a single file */
 export interface GenerateResult {
   inputFile: string;
@@ -90,29 +87,18 @@ interface GenerateOptions {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MODEL MAPPING
+// MODEL LIST
 // ─────────────────────────────────────────────────────────────────────────────
-
-const MODEL_IMPORTS: Record<SupportedModel, ModelImportInfo> = {
-  "gpt-4o": { pkg: "@ai-sdk/openai", fn: "openai" },
-  "gpt-4o-mini": { pkg: "@ai-sdk/openai", fn: "openai" },
-  "claude-3-opus": { pkg: "@ai-sdk/anthropic", fn: "anthropic" },
-  "claude-3-sonnet": { pkg: "@ai-sdk/anthropic", fn: "anthropic" },
-  "claude-3-haiku": { pkg: "@ai-sdk/anthropic", fn: "anthropic" },
-  "gemini-2.0-flash": { pkg: "@ai-sdk/google", fn: "google" },
-  "gemini-2.5-pro": { pkg: "@ai-sdk/google", fn: "google" },
-  "gemini-3.1-flash-lite-preview": { pkg: "@ai-sdk/google", fn: "google" },
-};
+// Canonical IDs matching weft-core/src/providers/auto.ts PROVIDER_MODEL_DEFAULTS.
 
 const SUPPORTED_MODELS: readonly SupportedModel[] = [
   "gpt-4o",
   "gpt-4o-mini",
-  "claude-3-opus",
-  "claude-3-sonnet",
-  "claude-3-haiku",
+  "claude-opus-4-5",
+  "claude-sonnet-4-5",
+  "claude-haiku-3-5",
+  "gemini-1.5-pro",
   "gemini-2.0-flash",
-  "gemini-2.5-pro",
-  "gemini-3.1-flash-lite-preview",
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -125,10 +111,6 @@ function isSupportedModel(value: string): value is SupportedModel {
 
 function isToolConfig(tool: ToolReference): tool is ToolConfig {
   return typeof tool === "object" && "name" in tool;
-}
-
-function getModelImport(model: SupportedModel): ModelImportInfo {
-  return MODEL_IMPORTS[model];
 }
 
 function toCamelCase(str: string): string {
@@ -278,96 +260,60 @@ function generateTypeScript(
   config: YamlAgentConfig,
   sourceFile: string,
 ): string {
-  const modelInfo = getModelImport(config.model);
   const exportName = toCamelCase(config.name);
-
   const lines: string[] = [];
 
   // Validate identifiers up-front so failures surface before any code is emitted.
   const safeExportName = emitIdentifier(exportName, "exportName");
-  // `modelInfo.fn` and `modelInfo.pkg` come from a static lookup table
-  // (MODEL_IMPORTS) keyed by a value that already passed `isSupportedModel`,
-  // so they're trusted by construction. Still validate the fn name as an
-  // identifier — defence in depth against a future table-edit mistake.
-  const safeModelFn = emitIdentifier(modelInfo.fn, "modelInfo.fn");
 
-  // Imports — modelInfo.pkg is a fixed npm package name, safe to emit
-  // as a string literal via emitString.
-  lines.push(`// Generated from ${emitString(sourceFile)}`);
-  lines.push("// Do not edit directly - regenerate with: npx Weft generate");
-  lines.push("");
-  lines.push('import { AgentUnit } from "weft-core";');
-  lines.push(`import { ${safeModelFn} } from ${emitString(modelInfo.pkg)};`);
+  // Collect extra import lines required by operators (e.g. fallback agent).
+  const extraImports: string[] = [];
 
-  // Tool import comments — tool names emitted as JSON-quoted strings so a
-  // YAML tool name like `*/ evil()` can't terminate the comment line.
-  if (config.tools && config.tools.length > 0) {
-    const toolNames = config.tools.map((tool) =>
-      isToolConfig(tool) ? tool.name : tool,
-    );
-    lines.push(
-      `// TODO: Import tools: ${toolNames.map((n) => emitString(n)).join(", ")}`,
-    );
-  }
-
-  lines.push("");
-
-  // Agent definition. Every interpolated value is either an identifier
-  // (validated above) or a JSON-stringified literal — no raw concatenation.
-  lines.push(`export const ${safeExportName} = AgentUnit.create({`);
-  lines.push(`  name: ${emitString(config.name)},`);
-  lines.push(`  model: ${safeModelFn}(${emitString(config.model)}),`);
-  lines.push(`  systemPrompt: ${emitString(config.systemPrompt)},`);
-
-  if (config.description !== undefined) {
-    lines.push(`  description: ${emitString(config.description)},`);
-  }
+  // Build ai() options object fields.
+  const aiOptions: string[] = [];
+  aiOptions.push(`    model: ${emitString(config.model)},`);
+  aiOptions.push(`    system: ${emitString(config.systemPrompt)},`);
 
   if (config.temperature !== undefined) {
-    lines.push(
-      `  temperature: ${emitNumber(config.temperature, "temperature")},`,
+    aiOptions.push(
+      `    temperature: ${emitNumber(config.temperature, "temperature")},`,
     );
   }
 
   if (config.maxTokens !== undefined) {
-    lines.push(`  maxTokens: ${emitNumber(config.maxTokens, "maxTokens")},`);
+    aiOptions.push(
+      `    maxTokens: ${emitNumber(config.maxTokens, "maxTokens")},`,
+    );
   }
 
   if (config.timeout !== undefined) {
-    lines.push(`  timeout: ${emitNumber(config.timeout, "timeout")},`);
+    // timeout is a top-level YAML field; wire through the ai() options object.
+    aiOptions.push(
+      `    timeout: ${emitNumber(config.timeout, "timeout")},`,
+    );
   }
 
-  // Tools comment
+  // Tool stubs comment — tool integration requires custom wiring; emit a
+  // reminder so the developer knows what to add, but no speculative code.
   if (config.tools && config.tools.length > 0) {
     const toolNames = config.tools.map((tool) =>
       isToolConfig(tool) ? tool.name : tool,
     );
-    lines.push(
-      `  // tools: [${toolNames.map((n) => emitString(n)).join(", ")}], // TODO: Wire up tools`,
+    aiOptions.push(
+      `    // TODO: wire tools: ${toolNames.map((n) => emitString(n)).join(", ")}`,
     );
   }
 
-  lines.push("});");
-  lines.push("");
+  // Resolve operator chains — must happen before header emit so we can
+  // collect extraImports that need to appear at the top of the file.
+  const operatorChains: string[] = [];
+  let enhancedName = "";
 
-  // Type export — typeName is derived from exportName which we already
-  // validated as an identifier; PascalCase of that is also a valid identifier.
-  const typeName = emitIdentifier(
-    `${toPascalCase(safeExportName)}Result`,
-    "typeName",
-  );
-  lines.push(
-    `export type ${typeName} = Awaited<ReturnType<typeof ${safeExportName}.run>>;`,
-  );
-
-  // Add operator-enhanced version if operators are configured
   if (config.operators) {
-    const operatorChains: string[] = [];
-
     if (config.operators.retry) {
-      const { maxAttempts = 3, backoffMs = 1000 } = config.operators.retry;
+      const { maxAttempts = 3, baseDelayMs = 1000 } = config.operators.retry;
       operatorChains.push(
-        `.retry(${emitNumber(maxAttempts, "operators.retry.maxAttempts")}, { baseDelayMs: ${emitNumber(backoffMs, "operators.retry.backoffMs")} })`,
+        `.retry(${emitNumber(maxAttempts, "operators.retry.maxAttempts")}, { baseDelayMs: ${emitNumber(baseDelayMs, "operators.retry.baseDelayMs")} })`,
       );
     }
 
@@ -380,40 +326,100 @@ function generateTypeScript(
 
     if (config.operators.fallback) {
       if (config.operators.fallback.agent) {
-        // The fallback agent identifier becomes a bare reference in the
-        // emitted code. Validate that the camelCase form is a real JS
-        // identifier so a malicious YAML can't inject arbitrary code here.
+        // .fallback() takes an AgentUnit<T>, not a factory function.
+        // We call the fallback factory with the same prompt so the caller's
+        // intent (retry with a different model) is preserved.
+        const fallbackModule = config.operators.fallback.agent;
         const fallbackAgent = emitIdentifier(
-          toCamelCase(config.operators.fallback.agent),
+          toCamelCase(fallbackModule),
           "operators.fallback.agent",
         );
-        operatorChains.push(`.fallback(${fallbackAgent})`);
+        // Import the fallback agent from its module (assumed same directory).
+        extraImports.push(
+          `import { ${fallbackAgent} } from "./${fallbackModule}";`,
+        );
+        // Pass prompt to the fallback factory so it returns an AgentUnit<string>.
+        operatorChains.push(`.fallback(${fallbackAgent}(prompt))`);
       } else if (config.operators.fallback.value !== undefined) {
-        operatorChains.push(`.orElse(${JSON.stringify(config.operators.fallback.value)})`);
+        operatorChains.push(
+          `.orElse(${JSON.stringify(config.operators.fallback.value)})`,
+        );
       }
     }
 
     if (operatorChains.length > 0) {
-      const enhancedName = emitIdentifier(
+      enhancedName = emitIdentifier(
         `${safeExportName}WithOperators`,
         "enhancedName",
       );
-      lines.push("");
-      lines.push("// Agent with operators configured");
-      lines.push(`export const ${enhancedName} = ${safeExportName}`);
-      for (const chain of operatorChains) {
-        lines.push(`  ${chain}`);
-      }
-      lines.push(";");
-      lines.push("");
-      const enhancedTypeName = emitIdentifier(
-        `${toPascalCase(enhancedName)}Result`,
-        "enhancedTypeName",
-      );
-      lines.push(
-        `export type ${enhancedTypeName} = Awaited<ReturnType<typeof ${enhancedName}.run>>;`,
-      );
     }
+  }
+
+  // ── Emit ───────────────────────────────────────────────────────────────────
+
+  // Header
+  lines.push(`// Generated from ${emitString(sourceFile)}`);
+  lines.push("// Do not edit directly - regenerate with: npx Weft generate");
+  lines.push("");
+  // Imports: AgentUnit from the public weft-core root; ai() from the server
+  // subpath (requires "weft-core" in the consuming project's dependencies).
+  lines.push('import { AgentUnit } from "weft-core";');
+  lines.push('import { ai } from "weft-core/server";');
+  for (const imp of extraImports) {
+    lines.push(imp);
+  }
+  lines.push("");
+
+  if (config.description !== undefined) {
+    lines.push(`/** ${emitString(config.description).slice(1, -1)} */`);
+  }
+
+  // The agent is a factory function that binds the static config (model,
+  // system prompt, etc.) and defers the runtime prompt to the caller.
+  // Using AgentUnit.from — the correct factory for async computations.
+  lines.push(
+    `export function ${safeExportName}(prompt: string): AgentUnit<string> {`,
+  );
+  lines.push("  return AgentUnit.from((_ctx) =>");
+  lines.push("    ai(prompt, {");
+  for (const opt of aiOptions) {
+    lines.push(`  ${opt}`);
+  }
+  lines.push("    }),");
+  lines.push("  );");
+  lines.push("}");
+  lines.push("");
+
+  // Type alias — ReturnType of the function (an AgentUnit), then of its .run().
+  const typeName = emitIdentifier(
+    `${toPascalCase(safeExportName)}Result`,
+    "typeName",
+  );
+  lines.push(
+    `export type ${typeName} = Awaited<ReturnType<ReturnType<typeof ${safeExportName}>["run"]>>;`,
+  );
+
+  // Add operator-enhanced variant if operators are configured in the YAML.
+  if (enhancedName && operatorChains.length > 0) {
+    lines.push("");
+    lines.push("/** Agent with operators from YAML operators block. */");
+    lines.push(
+      `export function ${enhancedName}(prompt: string): AgentUnit<string> {`,
+    );
+    lines.push(`  return ${safeExportName}(prompt)`);
+    for (const chain of operatorChains) {
+      lines.push(`    ${chain}`);
+    }
+    lines.push("    ;");
+    lines.push("}");
+    lines.push("");
+    const enhancedTypeName = emitIdentifier(
+      `${toPascalCase(enhancedName)}Result`,
+      "enhancedTypeName",
+    );
+    lines.push(
+      `export type ${enhancedTypeName} = Awaited<ReturnType<ReturnType<typeof ${enhancedName}>["run"]>>;`,
+    );
   }
 
   return lines.join("\n");
