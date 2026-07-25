@@ -15,8 +15,12 @@ import { spawn } from "node:child_process";
 // Everything after the binary name is forwarded verbatim to `weft init`.
 const forwardedArgs = process.argv.slice(2);
 
-// Resolve weft-cli at the same version as this create-weft package
-// to guarantee compatibility.
+// Resolve weft-cli at the same version as this create-weft package.
+// Version parity is enforced at release time: create-weft and weft-cli
+// are in the same Changesets linked group (.changeset/config.json), so
+// every release publishes both packages at the same version.  The npx
+// call below is therefore guaranteed to find weft-cli@<this version>
+// on the registry — the two packages cannot drift independently.
 const weftVersion = require("../package.json").version;
 
 const npxArgs = [

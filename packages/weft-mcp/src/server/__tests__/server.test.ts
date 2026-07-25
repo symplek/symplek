@@ -133,6 +133,52 @@ describe("weft_debate handler", () => {
       "Cached on first call",
     );
   });
+
+  // N52 regression guard: agents must be fixture stubs (no LLM calls).
+  // If someone wires real LLM-backed agents, result.result will diverge from
+  // the input and this test will fail — the correct signal to update the description.
+  it("fixture agents return input unchanged with hasMore:false (N52 regression guard)", async () => {
+    type AgentContribution = {
+      result: string;
+      hasMore: boolean;
+      reasoning?: string;
+    };
+    type FixtureAgent = (
+      current: string,
+      round: number,
+    ) => AgentContribution | Promise<AgentContribution>;
+
+    let capturedAgents: FixtureAgent[] = [];
+    mockDebate.mockImplementationOnce(
+      (agents: FixtureAgent[], _opts: unknown) => {
+        capturedAgents = agents;
+        return { run: mockRun };
+      },
+    );
+    mockRun.mockResolvedValueOnce({
+      value: {
+        finalState: "test prompt",
+        votes: [],
+        rounds: 1,
+        outcome: "consensus",
+        contributions: [],
+        attempts: 1,
+        converged: true,
+      },
+    });
+
+    await debateTool.execute({
+      prompt: "test prompt",
+      roles: [{ role: "Critic", model: "gpt-4" }],
+    });
+
+    expect(capturedAgents).toHaveLength(1);
+    const contribution = await capturedAgents[0]("test prompt", 0);
+    expect(contribution.result).toBe("test prompt"); // no transformation applied
+    expect(contribution.hasMore).toBe(false);         // single-shot fixture
+    // reasoning must disclose the fixture nature (guards against misleading label regressions)
+    expect(contribution.reasoning).toContain("fixture");
+  });
 });
 
 // ─── Consensus Handler ────────────────────────────────────────────────────────
@@ -313,5 +359,13 @@ describe("WEFT_MCP_TOOLS registry", () => {
       expect(tool.description.length).toBeGreaterThan(10);
       expect(tool.inputSchema.required.length).toBeGreaterThan(0);
     }
+  });
+
+  // N52 regression guard: the debate tool description must disclose that agents
+  // are fixtures.  If this fails, the description went back to claiming real analysis.
+  it("debate tool description discloses fixture / simulation nature (N52)", () => {
+    const tool = WEFT_MCP_TOOLS.find((t) => t.name === "weft_debate");
+    expect(tool).toBeDefined();
+    expect(tool!.description.toLowerCase()).toMatch(/fixture|simul|stub/);
   });
 });

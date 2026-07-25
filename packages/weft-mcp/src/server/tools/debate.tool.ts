@@ -42,8 +42,15 @@ function setSessionEntry(id: string, entry: DebateSessionEntry): void {
 
 export const debateTool = {
   name: "weft_debate",
+  // N52 fix: previous description claimed real multi-perspective LLM analysis.
+  // Agents in this tool are fixture stubs — they return the input unchanged.
+  // The description now discloses simulation so no caller mistakes output for analysis.
   description:
-    "Run a structured multi-agent debate. Multiple specialist agents review a prompt from their role perspectives, then a synthesizer produces a final synthesis. Returns the synthesis and all votes.",
+    "Fixture: exercises the Weft debate operator wiring without making LLM calls. " +
+    "Role agents are deterministic stubs — each returns the input prompt unchanged with hasMore:false. " +
+    "The synthesis output equals the original prompt. " +
+    "Use for operator wiring tests, session-caching demos, and result-shape validation. " +
+    "For real multi-perspective analysis use AgentUnit.debate() with model-backed agents.",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -101,11 +108,12 @@ export const debateTool = {
 
     // Build simulated DebateAgents — one per role.
     // Each agent signals hasMore: false after one round (single-shot per call).
+    // N52: fixture agents — input is returned unchanged; no LLM call is made.
     const agents: Array<DebateAgent<string>> = input.roles.map(
       (r) => (current: string, _round: number) => ({
         result: current,
         hasMore: false,
-        reasoning: `${r.role} perspective applied to: ${current.slice(0, 60)}`,
+        reasoning: `fixture agent for role "${r.role}" — input returned unchanged, no LLM call`,
       }),
     );
 
