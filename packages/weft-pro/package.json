@@ -39,7 +39,7 @@
     "url": "https://github.com/wefthq/weft/issues"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts --outDir dist",

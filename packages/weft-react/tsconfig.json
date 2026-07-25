@@ -4,7 +4,7 @@
     "module": "ESNext",
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "skipLibCheck": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "strict": true,
     "outDir": "./dist",
     "rootDir": "./src",

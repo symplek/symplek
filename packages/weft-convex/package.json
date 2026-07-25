@@ -25,7 +25,8 @@
     "lint": "biome check .",
     "typecheck": "tsc --noEmit",
     "typecheck:boundary": "tsc --noEmit -p tsconfig.boundary.json",
-    "test:contract": "vitest run src/__tests__/contractSmoke.test.ts"
+    "test:contract": "vitest run src/__tests__/contractSmoke.test.ts",
+    "test": "vitest run"
   },
   "peerDependencies": {
     "weft-core": "workspace:*",

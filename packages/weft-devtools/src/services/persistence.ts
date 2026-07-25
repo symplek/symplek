@@ -78,7 +78,11 @@ export class DevToolsPersistence {
 
   async getRecentExecutions(limit = 50): Promise<StoredExecution[]> {
     if (!this.db) await this.init();
-    const tx = this.db?.transaction("executions", "readonly");
+    // db is non-null after init(); the optional-chain in saveExecution is defensive
+    // but here we need the non-null db to open a transaction directly.
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const db = this.db!;
+    const tx = db.transaction("executions", "readonly");
     const index = tx.store.index("by-timestamp");
     let cursor = await index.openCursor(null, "prev");
     const results: StoredExecution[] = [];
@@ -93,13 +97,16 @@ export class DevToolsPersistence {
 
   async getStepsForExecution(executionId: string): Promise<ExecutionStep[]> {
     if (!this.db) await this.init();
-    return this.db?.getAllFromIndex("steps", "by-execution", executionId);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    return this.db!.getAllFromIndex("steps", "by-execution", executionId);
   }
 
   async clearOldExecutions(maxAge = MAX_AGE_MS): Promise<void> {
     if (!this.db) await this.init();
     const cutoff = Date.now() - maxAge;
-    const tx = this.db?.transaction(["executions", "steps"], "readwrite");
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const db = this.db!;
+    const tx = db.transaction(["executions", "steps"], "readwrite");
     const executionStore = tx.objectStore("executions");
     const stepStore = tx.objectStore("steps");
     const index = executionStore.index("by-timestamp");
@@ -108,13 +115,16 @@ export class DevToolsPersistence {
     while (cursor) {
       const executionId = cursor.value.executionId;
 
-      // Delete all steps for this execution
-      const stepCursor = await stepStore
+      // Fix N45: reassign stepCursor each iteration — without this assignment
+      // the while loop never terminates because `const stepCursor` holds the
+      // initial cursor reference and `await stepCursor.continue()` returns the
+      // next cursor but the loop condition never sees the updated value.
+      let stepCursor = await stepStore
         .index("by-execution")
         .openKeyCursor(IDBKeyRange.only(executionId));
       while (stepCursor) {
         await stepStore.delete(stepCursor.primaryKey);
-        await stepCursor.continue();
+        stepCursor = await stepCursor.continue();
       }
 
       await cursor.delete();
@@ -126,17 +136,20 @@ export class DevToolsPersistence {
 
   async deleteExecution(executionId: string): Promise<void> {
     if (!this.db) await this.init();
-    const tx = this.db?.transaction(["executions", "steps"], "readwrite");
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const db = this.db!;
+    const tx = db.transaction(["executions", "steps"], "readwrite");
     await tx.objectStore("executions").delete(executionId);
 
     const stepStore = tx.objectStore("steps");
     const stepIndex = stepStore.index("by-execution");
-    const stepCursor = await stepIndex.openKeyCursor(
+    // Fix N45 companion: reassign cursor each iteration to prevent infinite loop.
+    let stepCursor = await stepIndex.openKeyCursor(
       IDBKeyRange.only(executionId),
     );
     while (stepCursor) {
       await stepStore.delete(stepCursor.primaryKey);
-      await stepCursor.continue();
+      stepCursor = await stepCursor.continue();
     }
 
     await tx.done;

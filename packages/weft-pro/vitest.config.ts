@@ -13,5 +13,12 @@ export default defineConfig({
     environment: "node",
     globals: true,
     include: ["src/**/*.test.ts"],
+    // Format-valid test license so the module-level Pro gate (license-gate.ts)
+    // loads under test the same way a licensed consumer runs it. Format-only
+    // key (weft_pro_<40 hex>); no server/signature check exists yet.
+    env: {
+      // Synthesised format-valid mock (weft_pro_<40 hex>), not a real credential.
+      WEFT_PRO_LICENSE_KEY: `weft_pro_${"deadbeef".repeat(5)}`,
+    },
   },
 });

@@ -18,6 +18,7 @@ export function StepSlider({
       <div className="step-slider-track">
         {steps.map((_, index) => (
           <button
+            // biome-ignore lint/suspicious/noArrayIndexKey: step indices ARE the identity
             key={index}
             type="button"
             className={`step-tick ${index <= value ? "active" : ""} ${index === value ? "current" : ""}`}

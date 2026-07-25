@@ -30,7 +30,7 @@
     "dev": "tsc --watch",
     "lint": "biome check .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest"
+    "test": "vitest run"
   },
   "dependencies": {
     "ajv": "^8.17.0",
@@ -47,10 +47,10 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.11.0",
     "typescript": "^5.5.0",
-    "vitest": "^2.0.0"
+    "vitest": "^4.0.17"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20"
   },
   "publishConfig": {
     "access": "public",

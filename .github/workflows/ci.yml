@@ -17,9 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      # No explicit version — action reads packageManager field from package.json
+      # so CI always installs the exact pnpm revision the repo was tested with.
       - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
-        with:
-          version: 9
       - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: "20"
@@ -27,9 +27,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Lint packages
-        run: pnpm --filter "weft-*" run lint
+        run: pnpm --filter "weft-*" --filter "create-weft" run lint
       - name: Type check packages
-        run: pnpm --filter "weft-*" run typecheck
+        run: pnpm --filter "weft-*" --filter "create-weft" run typecheck
 
   tier-boundary:
     runs-on: ubuntu-latest
@@ -37,7 +37,9 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Fail if @weft/core imports weft-pro
         run: |
-          matches=$(grep -rEl 'weft-pro' packages/weft-core/src --include='*.ts' || true)
+          # Match only actual import/require statements, not comments or prose.
+          # Previous grep for bare 'weft-pro' false-positived on comment text.
+          matches=$(grep -rEl "from ['\"]weft-pro" packages/weft-core/src --include='*.ts' || true)
           if [ -n "$matches" ]; then
             echo "Error: @weft/core must not import weft-pro. Offending files:"
             echo "$matches"
@@ -51,8 +53,6 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
-        with:
-          version: 9
       - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: "20"
@@ -60,10 +60,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Build packages
-        run: pnpm --filter "weft-*" run build
+        run: pnpm --filter "weft-*" --filter "create-weft" run build
       - name: Check build artefacts present
         run: |
-          for package in weft-core weft-convex weft-react weft-pro; do
+          for package in weft-core weft-convex weft-react weft-pro weft-mcp weft-harness weft-testing; do
             if [ ! -d "packages/$package/dist" ]; then
               echo "Error: packages/$package/dist not found"
               exit 1
@@ -72,6 +72,11 @@ jobs:
           # weft-cli builds via `tsc && copy-templates`; its entry is dist/index.js.
           if [ ! -f "packages/weft-cli/dist/index.js" ]; then
             echo "Error: packages/weft-cli/dist/index.js not found"
+            exit 1
+          fi
+          # create-weft builds to dist/index.js (CJS bundle).
+          if [ ! -f "packages/create-weft/dist/index.js" ]; then
+            echo "Error: packages/create-weft/dist/index.js not found"
             exit 1
           fi
           echo "OK: all published packages emitted their build artefacts"
@@ -103,8 +108,6 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
-        with:
-          version: 9
       - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: "20"
@@ -112,7 +115,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Build packages
-        run: pnpm --filter "weft-*" run build
+        run: pnpm --filter "weft-*" --filter "create-weft" run build
       - name: Test packages
         run: pnpm --filter "weft-*" test
 
@@ -131,8 +134,6 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
-        with:
-          version: 9
       - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: "20"
