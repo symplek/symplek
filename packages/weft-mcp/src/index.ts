@@ -78,9 +78,11 @@ export type {
   MCPToolDescriptor,
   MCPTransportConfig,
 } from "./client/MCPTransportClient";
+// N44/N47: HttpMCPTransport removed — it spoke private REST routes incompatible
+// with spec-compliant MCP servers. Use @modelcontextprotocol/sdk SSEClientTransport
+// for HTTP/SSE, or switch to the stdio transport.
 export {
   createTransport,
-  HttpMCPTransport,
   MCPTransportClient,
   StdioMCPTransport,
 } from "./client/MCPTransportClient";
@@ -90,7 +92,13 @@ export {
 // ---------------------------------------------------------------------------
 
 export type { MCPUnitConfig } from "./MCPUnit";
-export { MCPCallError, MCPPolicyDeniedError, MCPUnit } from "./MCPUnit";
+export {
+  MCPCallError,
+  MCPPolicyDegradedError,
+  MCPPolicyDeniedError,
+  MCPPolicyQuarantinedError,
+  MCPUnit,
+} from "./MCPUnit";
 
 // ---------------------------------------------------------------------------
 // Version

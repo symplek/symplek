@@ -149,10 +149,27 @@ export class MCPUnit {
       );
       evidence.mcp.policyVerdict = evaluation.finalVerdict;
 
+      // B6 fix: every verdict must have a real enforcement arm. Previously only
+      // "deny" threw; "degrade" and "quarantine" fell through to `return evidence`,
+      // making them decorative. Now each non-allow verdict throws a typed error that
+      // callers can catch and handle according to their risk tolerance.
       if (evaluation.finalVerdict === "deny") {
         throw new MCPPolicyDeniedError(
           toolName,
           evaluation.deniedBy ?? "unknown",
+          evidence as MCPEvidenceData<unknown>,
+        );
+      }
+      if (evaluation.finalVerdict === "quarantine") {
+        throw new MCPPolicyQuarantinedError(
+          toolName,
+          evidence as MCPEvidenceData<unknown>,
+        );
+      }
+      if (evaluation.finalVerdict === "degrade") {
+        throw new MCPPolicyDegradedError(
+          toolName,
+          evaluation.policyResults,
           evidence as MCPEvidenceData<unknown>,
         );
       }
@@ -194,5 +211,48 @@ export class MCPPolicyDeniedError extends Error {
     public readonly evidence: MCPEvidenceData<unknown>,
   ) {
     super(`MCP tool "${toolName}" denied by policy "${deniedBy}"`);
+  }
+}
+
+/**
+ * Thrown when a policy returns "quarantine" — the tool executed but the result
+ * must not be used. Callers may inspect `evidence` for diagnostic purposes only.
+ */
+export class MCPPolicyQuarantinedError extends Error {
+  public readonly name = "MCPPolicyQuarantinedError";
+
+  constructor(
+    public readonly toolName: string,
+    public readonly evidence: MCPEvidenceData<unknown>,
+  ) {
+    super(
+      `MCP tool "${toolName}" result quarantined — origin could not be verified`,
+    );
+  }
+}
+
+/**
+ * Thrown when a policy returns "degrade" — the tool executed but the result
+ * is restricted (e.g. read-only access only). Callers that explicitly handle
+ * degraded results may catch this error and inspect `evidence`.
+ */
+export class MCPPolicyDegradedError extends Error {
+  public readonly name = "MCPPolicyDegradedError";
+
+  constructor(
+    public readonly toolName: string,
+    public readonly policyResults: Array<{
+      policy: string;
+      verdict: import("./types").MCPPolicyVerdict;
+    }>,
+    public readonly evidence: MCPEvidenceData<unknown>,
+  ) {
+    const degraders = policyResults
+      .filter((r) => r.verdict === "degrade")
+      .map((r) => r.policy)
+      .join(", ");
+    super(
+      `MCP tool "${toolName}" degraded by ${degraders || "policy"} — result restricted to read-only access`,
+    );
   }
 }

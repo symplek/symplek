@@ -49,6 +49,9 @@ export interface MCPRegistryConfig {
 export class MCPRegistry {
   private servers = new Map<string, MCPServerEntry>();
   private clients = new Map<string, MCPTransportClient>();
+  /** N69: in-flight connect promises, keyed by server id. Concurrent first callers
+   *  share the same promise instead of each spawning an independent child process. */
+  private connecting = new Map<string, Promise<MCPTransportClient>>();
   private config: Required<MCPRegistryConfig>;
 
   constructor(config: MCPRegistryConfig = {}) {
@@ -86,19 +89,43 @@ export class MCPRegistry {
     return entry;
   }
 
+  /**
+   * Return an active transport client for the given server id.
+   *
+   * N69 fix: the previous implementation had an `await` between the miss check
+   * and `this.clients.set`, creating a race window where concurrent first callers
+   * each spawned a separate child process. The overwritten clients were then
+   * unreachable by `disconnectAll()`, leaking stdio children.
+   *
+   * The single-flight map (`this.connecting`) ensures that concurrent first callers
+   * await the same connect promise and share the resulting client.
+   */
   async getClient(id: string): Promise<MCPTransportClient> {
     const entry = this.servers.get(id);
     if (!entry) throw new Error(`MCP server "${id}" not registered`);
 
-    let client = this.clients.get(id);
-    if (!client || !client.isConnected) {
-      client = createTransport(entry.config);
-      await client.connect();
-      this.clients.set(id, client);
-      entry.status = "active";
-      entry.lastHealthCheckAt = Date.now();
-    }
-    return client;
+    const existing = this.clients.get(id);
+    if (existing?.isConnected) return existing;
+
+    // Single-flight: if a connect is already in progress for this id, join it
+    const inflight = this.connecting.get(id);
+    if (inflight) return inflight;
+
+    const connectPromise = (async (): Promise<MCPTransportClient> => {
+      try {
+        const client = createTransport(entry.config);
+        await client.connect();
+        this.clients.set(id, client);
+        entry.status = "active";
+        entry.lastHealthCheckAt = Date.now();
+        return client;
+      } finally {
+        this.connecting.delete(id);
+      }
+    })();
+
+    this.connecting.set(id, connectPromise);
+    return connectPromise;
   }
 
   recordFailure(id: string, error?: string): void {
@@ -160,6 +187,9 @@ export class MCPRegistry {
   }
 
   async disconnectAll(): Promise<void> {
+    // Clear in-flight connects so new callers don't join stale promises
+    this.connecting.clear();
+
     for (const [, client] of this.clients) {
       try {
         await client.disconnect();

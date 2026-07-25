@@ -249,7 +249,9 @@ describe("weft_tracked handler", () => {
     expect(result.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
-  it("hash is deterministic for the same prompt", async () => {
+  it("hash is deterministic for the same prompt and source URI", async () => {
+    // N57 fix: hash now covers both prompt and source URI.
+    // Same prompt + same source → same hash.
     mockRun
       .mockResolvedValueOnce({
         value: "hello",
@@ -265,17 +267,33 @@ describe("weft_tracked handler", () => {
     const [r1, r2] = await Promise.all([
       trackedTool.execute({
         prompt: "hello",
-        source: "file://a.ts",
+        source: "file://same-source.ts",
         confidence: 0.8,
       }),
       trackedTool.execute({
         prompt: "hello",
-        source: "file://b.ts",
+        source: "file://same-source.ts",
         confidence: 0.8,
       }),
     ]);
 
     expect(r1.hash).toBe(r2.hash);
+  });
+
+  it("hash differs when source URI differs (N57 source-binding)", async () => {
+    // N57 fix: before the fix, only the prompt was hashed, so callers could
+    // substitute any source URI without breaking the hash. Now the source URI
+    // is bound into the hash — different sources must produce different hashes.
+    mockRun
+      .mockResolvedValueOnce({ value: "hello", source: "agent", confidence: 0.8 })
+      .mockResolvedValueOnce({ value: "hello", source: "agent", confidence: 0.8 });
+
+    const [r1, r2] = await Promise.all([
+      trackedTool.execute({ prompt: "hello", source: "file://a.ts", confidence: 0.8 }),
+      trackedTool.execute({ prompt: "hello", source: "file://b.ts", confidence: 0.8 }),
+    ]);
+
+    expect(r1.hash).not.toBe(r2.hash);
   });
 });
 

@@ -24,13 +24,13 @@
     }
   },
   "bin": {
-    "weft-mcp": "./dist/server.cjs"
+    "weft-mcp": "./dist/bin.cjs"
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsup --entry.index=src/index.ts --entry.server=src/server/index.ts --format cjs,esm --dts --outDir dist",
+    "build": "tsup",
     "dev": "tsup src/index.ts --format cjs,esm --watch --dts --outDir dist",
     "lint": "biome check .",
     "test": "vitest run",

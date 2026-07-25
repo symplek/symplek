@@ -70,7 +70,8 @@ async function handleRequest(request: JsonRpcRequest): Promise<unknown> {
         serverInfo: { name: "weft", version: "0.1.0" },
       };
 
-    case "initialized":
+    case "notifications/initialized":
+    case "initialized": // backward-compat: some clients omit the "notifications/" prefix
       // Notification — no response needed.
       return undefined;
 
@@ -184,10 +185,6 @@ export async function startWeftMcpServer(): Promise<void> {
 
 // ─── Entry Point ──────────────────────────────────────────────────────────────
 
-// Run as binary when executed directly.
-if (import.meta.url === `file://${process.argv[1]}`) {
-  startWeftMcpServer().catch((err) => {
-    console.error("[weft-mcp] Fatal error:", err);
-    process.exit(1);
-  });
-}
+// Binary startup is handled by src/server/bin.ts, which calls startWeftMcpServer()
+// unconditionally and is compiled to dist/bin.cjs. The previous import.meta.url
+// guard was CJS-unsafe (import.meta is undefined in CommonJS) — see B9 fix.

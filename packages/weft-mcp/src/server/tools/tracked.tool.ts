@@ -13,8 +13,11 @@ import { AgentUnit, createContext } from "weft-core";
 
 export const trackedTool = {
   name: "weft_tracked",
+  // N57 fix: removed "verifiable source" language. The hash now covers both the
+  // prompt text and the source URI so the binding is tamper-evident, but we make
+  // no claim about verifying the source's external trustworthiness.
   description:
-    "Wrap a value with source chain provenance. Records the source URI, confidence score, and content hash so downstream consumers can verify every claim traces back to a verifiable source.",
+    "Wrap a value with source-chain provenance. Records the source URI, confidence score, and a SHA-256 content hash (covers prompt text + source URI) for downstream tracking.",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -56,7 +59,14 @@ export const trackedTool = {
       .tracked({ source: "agent", confidence: input.confidence })
       .run(ctx, { trustMode: "legacy" });
 
-    const hash = `sha256:${createHash("sha256").update(input.prompt).digest("hex")}`;
+    // N57 fix: bind source URI into the hash so the same prompt at a different
+    // source produces a different hash. Previously hashing only the prompt meant
+    // callers could substitute an arbitrary source URI without breaking the hash.
+    const hash = `sha256:${createHash("sha256")
+      .update(input.prompt)
+      .update("|")
+      .update(input.source)
+      .digest("hex")}`;
 
     return {
       value: tracked.value,
