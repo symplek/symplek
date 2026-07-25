@@ -64,6 +64,7 @@ export function createConvergeComputation<T>(
 ): AgentComputation<ConvergeResult<T>> {
   const maxRounds = (options.maxRounds ?? 5) < 1 ? 1 : (options.maxRounds ?? 5);
   const parallel = options.parallel ?? true;
+  const mergeStrategy = options.mergeStrategy;
 
   return async (ctx: AgentContext): Promise<ConvergeResult<T>> => {
     let currentState = initialValue;
@@ -133,15 +134,35 @@ export function createConvergeComputation<T>(
       // Promise.all preserves the agents' input order, so this fold is deterministic
       // even when agents resolve at different times.
       if (parallel) {
-        for (const { contribution } of roundContributions) {
-          if (
-            contribution.result !== null &&
-            contribution.result !== undefined
-          ) {
-            currentState = mergeContributionResult(
-              currentState,
-              contribution.result,
-            );
+        if (mergeStrategy === "last") {
+          // Take the last agent's non-null result as-is (no merging).
+          for (let i = roundContributions.length - 1; i >= 0; i--) {
+            const { contribution } = roundContributions[i];
+            if (contribution.result !== null && contribution.result !== undefined) {
+              currentState = contribution.result;
+              break;
+            }
+          }
+        } else if (mergeStrategy === "reduce") {
+          // Left-to-right fold: each non-null result replaces the accumulator.
+          for (const { contribution } of roundContributions) {
+            if (contribution.result !== null && contribution.result !== undefined) {
+              currentState = contribution.result;
+            }
+          }
+        } else {
+          // Default (mergeStrategy not set): shallow-merge for plain objects,
+          // last-wins for all other types. Backward-compatible behavior.
+          for (const { contribution } of roundContributions) {
+            if (
+              contribution.result !== null &&
+              contribution.result !== undefined
+            ) {
+              currentState = mergeContributionResult(
+                currentState,
+                contribution.result,
+              );
+            }
           }
         }
       }

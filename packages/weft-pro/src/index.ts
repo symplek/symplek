@@ -134,7 +134,7 @@ export {
   hasVotes,
   meetsCoherenceThreshold,
   mergeWeights,
-  normalizeWeights as normalizeCoherenceWeights,
+  normalizeCoherenceWeights,
   quickCoherence,
   resolveThreshold,
   validateWeightSum,

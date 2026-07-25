@@ -3,11 +3,17 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   resolve: {
-    alias: {
-      "weft-core": resolve(__dirname, "../weft-core/src/index.ts"),
-      "weft-core/solo": resolve(__dirname, "../weft-core/src/solo/index.ts"),
-      "weft-core/": resolve(__dirname, "../weft-core/src/"),
-    },
+    alias: [
+      // Subpath exports — must come before the root alias
+      { find: "weft-core/solo", replacement: resolve(__dirname, "../weft-core/src/solo/index.ts") },
+      { find: "weft-core/confidence", replacement: resolve(__dirname, "../weft-core/src/confidence/index.ts") },
+      { find: "weft-core/coherence", replacement: resolve(__dirname, "../weft-core/src/coherence/index.ts") },
+      { find: "weft-core/interview", replacement: resolve(__dirname, "../weft-core/src/interview/index.ts") },
+      { find: "weft-core/change-kernel", replacement: resolve(__dirname, "../weft-core/src/change-kernel/index.ts") },
+      { find: "weft-core/operators", replacement: resolve(__dirname, "../weft-core/src/operators/index.ts") },
+      // Root alias — must be after all subpath aliases
+      { find: "weft-core", replacement: resolve(__dirname, "../weft-core/src/index.ts") },
+    ],
   },
   test: {
     environment: "node",

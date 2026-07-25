@@ -1,18 +1,12 @@
-﻿/**
- * @fileoverview Teams module exports for weft-core
- * @description Re-exports Team, TeamRegistry, and types
- * @module weft-core/teams
- * @since 1.0.0-beta.2
- *
- * 📝 BUILD[F-048-01.10]: Teams barrel exports
+/**
+ * @fileoverview Teams module (re-export from weft-core)
+ * @description License-gated re-export. Implementation lives in weft-core.
+ * @module weft-pro/teams
+ * @since 2.2.1
  */
 
-// License gate — FATAL #6 HARDENING (2026-07-07)
+// License gate — fires at import time
 import "../license-gate";
 
-// Export Team class (Story 01.08)
-export { Team } from "./Team";
-// Export TeamRegistry class and singleton (Story 01.09)
-export { TeamRegistry, teams } from "./TeamRegistry";
-// Export types
-export type { TeamConfig, TeamMode, TeamResult } from "./types";
+export type { TeamConfig, TeamMode, TeamResult } from "weft-core";
+export { Team, TeamRegistry, teams } from "weft-core";

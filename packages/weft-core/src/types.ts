@@ -210,8 +210,8 @@ export interface ConvergeOptions {
    * Run agents in parallel each round.
    *
    * When true: all agents execute simultaneously per round and receive the
-   * same `currentState` snapshot. Results are merged using "last non-null wins"
-   * strategy — agents cannot see each other's changes within the same round.
+   * same `currentState` snapshot. Results are combined in agent-array order
+   * according to `mergeStrategy`.
    *
    * When false: agents execute sequentially and each agent's result is
    * applied before the next agent runs.
@@ -219,6 +219,23 @@ export interface ConvergeOptions {
    * @default true
    */
   parallel?: boolean;
+  /**
+   * How to combine parallel agent contributions within a round.
+   *
+   * - `"last"`: the last agent's result in the array replaces the current
+   *   state. Deterministic by array position. For plain-object states,
+   *   fields from earlier agents are dropped.
+   * - `"reduce"`: contributions are applied left-to-right; each agent's
+   *   non-null result replaces the running accumulator. All agents still
+   *   execute from the **original** round state (not from each other's
+   *   output), so this is not equivalent to serial mode.
+   *
+   * When omitted, the default is a shallow-merge for plain objects and
+   * last-wins for all other types (backward-compatible).
+   *
+   * Only applies when `parallel` is true (or unset). Ignored in serial mode.
+   */
+  mergeStrategy?: "last" | "reduce";
 }
 
 /**

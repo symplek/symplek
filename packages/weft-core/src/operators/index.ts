@@ -17,3 +17,22 @@ export { createRetryComputation } from "./retry";
 export { createSoloComputation, extractSignals } from "./solo";
 export { createTrackedComputation } from "./sourceTracking";
 export { createTimeoutComputation } from "./timeout";
+// ─── Operator type surface (for pro re-exports via weft-core/operators subpath) ─
+export type {
+  AdvisorAgent,
+  CoherenceOptions,
+  CoherenceResult,
+  ConvergeContribution,
+  ConvergentAgent,
+  ConvergeOptions,
+  ConvergeResult,
+  Critique,
+  DebateAgent,
+  DebateOptions,
+  DebateResult,
+  DialecticOptions,
+  DialecticResult,
+  LeaderAgent,
+  SynthesisResponse,
+  ThesisResponse,
+} from "../types";

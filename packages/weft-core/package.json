@@ -20,6 +20,31 @@
       "types": "./dist/server.d.ts",
       "import": "./dist/server.js",
       "require": "./dist/server.cjs"
+    },
+    "./confidence": {
+      "types": "./dist/confidence/index.d.ts",
+      "import": "./dist/confidence/index.js",
+      "require": "./dist/confidence/index.cjs"
+    },
+    "./coherence": {
+      "types": "./dist/coherence/index.d.ts",
+      "import": "./dist/coherence/index.js",
+      "require": "./dist/coherence/index.cjs"
+    },
+    "./interview": {
+      "types": "./dist/interview/index.d.ts",
+      "import": "./dist/interview/index.js",
+      "require": "./dist/interview/index.cjs"
+    },
+    "./change-kernel": {
+      "types": "./dist/change-kernel/index.d.ts",
+      "import": "./dist/change-kernel/index.js",
+      "require": "./dist/change-kernel/index.cjs"
+    },
+    "./operators": {
+      "types": "./dist/operators/index.d.ts",
+      "import": "./dist/operators/index.js",
+      "require": "./dist/operators/index.cjs"
     }
   },
   "files": [
@@ -50,8 +75,8 @@
   },
   "homepage": "https://github.com/wefthq/weft#readme",
   "scripts": {
-    "build": "tsup src/index.ts src/server.ts --format cjs,esm --dts --outDir dist",
-    "dev": "tsup src/index.ts src/server.ts --format cjs,esm --watch --dts --outDir dist",
+    "build": "tsup src/index.ts src/server.ts src/confidence/index.ts src/coherence/index.ts src/interview/index.ts src/change-kernel/index.ts src/operators/index.ts --format cjs,esm --dts --outDir dist",
+    "dev": "tsup src/index.ts src/server.ts src/confidence/index.ts src/coherence/index.ts src/interview/index.ts src/change-kernel/index.ts src/operators/index.ts --format cjs,esm --watch --dts --outDir dist",
     "lint": "biome check .",
     "typecheck": "tsc --noEmit",
     "typecheck:boundary": "tsc --noEmit -p tsconfig.boundary.json",
