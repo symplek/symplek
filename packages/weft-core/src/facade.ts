@@ -244,9 +244,24 @@ function _configure(options: WeftConfigOptions): void {
   // mergeGlobalConfig() so accumulated fields (e.g. apiKey from a prior call)
   // are visible.
   const merged = getGlobalConfig();
-  if (merged.provider && merged.apiKey) {
-    setInitPromise(_bootstrapProvider(merged.provider, merged.apiKey));
+  const resolvedKey =
+    merged.apiKey ??
+    (merged.provider ? _apiKeyFromEnv(merged.provider) : undefined);
+  if (merged.provider && resolvedKey) {
+    setInitPromise(_bootstrapProvider(merged.provider, resolvedKey));
   }
+}
+
+/**
+ * Resolve a provider's key from its conventional environment variable when
+ * configure() was called without an explicit apiKey. Every provider SDK in
+ * this ecosystem reads its key from the environment by default, and the
+ * documented quick-start relies on it — without this, configure({ provider })
+ * enqueues no bootstrap and the first call fails on an unregistered provider.
+ */
+function _apiKeyFromEnv(provider: string): string | undefined {
+  const envKey = KNOWN_PROVIDERS.find((p) => p.id === provider)?.envKey;
+  return envKey ? process.env[envKey] : undefined;
 }
 
 

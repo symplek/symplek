@@ -729,3 +729,51 @@ describe("Regression — OPENROUTER_API_KEY alone does not auto-detect openroute
     expect(why).not.toMatch(/not found in registry/i);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// N21 — the documented quick-start must work on a first run.
+//
+// README shows `Weft.configure({ provider, model })` with no apiKey, relying
+// on the conventional environment variable. Previously the bootstrap only ran
+// when BOTH provider and apiKey were supplied, so this path enqueued nothing
+// and the first call failed on an unregistered provider.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("N21 — configure() resolves the API key from the environment", () => {
+  afterEach(() => {
+    _resetForTesting();
+  });
+
+  it("enqueues a bootstrap when apiKey is omitted but the env var is set", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant-test-key");
+    const { getInitPromise } = await import("../globalConfig");
+
+    Weft.configure({
+      provider: "anthropic",
+      model: "claude-sonnet-4-20250514",
+    });
+
+    expect(getInitPromise()).not.toBeNull();
+    vi.unstubAllEnvs();
+  });
+
+  it("prefers an explicit apiKey over the environment variable", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant-from-env");
+    const { getInitPromise } = await import("../globalConfig");
+
+    Weft.configure({ provider: "anthropic", apiKey: "sk-ant-explicit" });
+
+    expect(getInitPromise()).not.toBeNull();
+    vi.unstubAllEnvs();
+  });
+
+  it("enqueues nothing when neither an apiKey nor the env var is available", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
+    const { getInitPromise } = await import("../globalConfig");
+
+    Weft.configure({ provider: "anthropic" });
+
+    expect(getInitPromise()).toBeNull();
+    vi.unstubAllEnvs();
+  });
+});
