@@ -95,11 +95,15 @@ async function appendTrace(tracePath: string, entry: unknown): Promise<void> {
  * @param session  - An SdkSession provided by the adapter (W1-B).
  * @param verified - The consensus-approved VerifiedPlan to execute.
  * @param options  - Optional rehearsal trace and deviation behaviour.
+ * @param context  - Execution context. Pass `{ isStub: true }` when the session
+ *                   is a no-op stub (SDK not installed) so the result is honestly
+ *                   labelled `source:"synthesized"` instead of `source:"verified"`.
  */
 export function execute<T>(
   session: SdkSession,
   verified: VerifiedPlan<T>,
   options: ExecuteOptions = {},
+  context: { isStub?: boolean } = {},
 ): AgentUnit<TrackedResult<T>> {
   return AgentUnit.from<TrackedResult<T>>(async (_ctx) => {
     const bridge = buildPermissionBridge(verified as VerifiedPlan<unknown>);
@@ -207,15 +211,22 @@ export function execute<T>(
     }
 
     // Build a TrackedResult<T> inheriting source chain from the verified plan.
-    // Sources come from VerifiedPlan.plan.sources (SourceRef[]), mapped to the
-    // "verified" ResultSource since the plan passed consensus approval.
+    // source:"verified" is only honest when a real SDK session executed the plan.
+    // When the SDK is absent and the session is a stub, use source:"synthesized"
+    // so callers can distinguish un-run stub results from genuinely executed ones.
+    const source: ResultSource = context.isStub ? "synthesized" : "verified";
     const tracked = createTrackedResult(sdkResult.finalMessage as unknown as T, {
-      source: "verified" as ResultSource,
+      source,
       confidence: verified.approvalScore,
-      sourceChain: verified.plan.sources.map(() => "verified" as ResultSource),
+      sourceChain: verified.plan.sources.map(() => source),
       minChainConfidence: verified.approvalScore,
-      verifiedAt: Date.now(),
-      verifiedBy: `weft-harness/execute@${verified.plan.id}`,
+      // verifiedAt/verifiedBy only make sense when a real execution happened.
+      ...(source === "verified"
+        ? {
+            verifiedAt: Date.now(),
+            verifiedBy: `weft-harness/execute@${verified.plan.id}`,
+          }
+        : {}),
     });
 
     return tracked;

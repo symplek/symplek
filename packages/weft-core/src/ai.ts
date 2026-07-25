@@ -18,7 +18,7 @@ import type { AIMessage, AIRequest } from "./providers/interface";
 import { providerRegistry } from "./providers/registry";
 import type { InferOutput } from "./schema";
 import { stream } from "./streaming";
-import { type Trace, traceManager } from "./trace";
+import { type Trace, type TraceRedactor, traceManager } from "./trace";
 
 /**
  * Extended options for the ai() function.
@@ -294,6 +294,21 @@ export interface AIFunction {
   withScope: <T>(
     fn: () => Promise<T>,
   ) => Promise<{ result: T; traces: Trace[] }>;
+  /**
+   * Install a redaction hook applied to every trace before storage, broadcast,
+   * and downstream forwarding (including the activity-middleware path). Pass
+   * `null` to remove a previously installed hook.
+   *
+   * Without a redactor, `Trace.prompt` and `Trace.response` store the full
+   * content. Install a redactor to truncate or strip sensitive data.
+   *
+   * @example
+   * ai.setRedactor(({ prompt, response }) => ({
+   *   prompt: prompt.slice(0, 200),
+   *   response: response.slice(0, 200),
+   * }));
+   */
+  setRedactor: (redactor: TraceRedactor | null) => void;
 }
 
 /**
@@ -309,6 +324,8 @@ export const ai: AIFunction = Object.assign(
     onTrace: (callback: (trace: Trace) => void) =>
       traceManager.onTrace(callback),
     withScope: <T>(fn: () => Promise<T>) => traceManager.withScope(fn),
+    setRedactor: (redactor: TraceRedactor | null) =>
+      traceManager.setRedactor(redactor),
   },
 );
 

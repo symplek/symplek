@@ -52,15 +52,12 @@ describe("openai-agents adapter", () => {
       tools: ["Read"],
     });
 
-    // AgentUnit.run() wraps the computation result in an outer TrackedResult.
-    // The computation itself returns TrackedResult<PlanArtifact>, so the full
-    // shape is TrackedResult<TrackedResult<PlanArtifact>>:
-    //   result         → outer TrackedResult (from AgentUnit.run)
-    //   result.value   → inner TrackedResult<PlanArtifact> (from makePlanUnit)
-    //   result.value.value → PlanArtifact
+    // FIXED (N70): AgentUnit.run() wraps the PlanArtifact in a single TrackedResult.
+    // makePlanUnit now returns AgentUnit<PlanArtifact>, so the shape is:
+    //   result         → TrackedResult<PlanArtifact> (from AgentUnit.run)
+    //   result.value   → PlanArtifact (directly accessible — no double-wrap)
     const result = await unit.run(ctx);
-    const inner = result.value; // TrackedResult<PlanArtifact>
-    const artifact = inner.value; // PlanArtifact
+    const artifact = result.value; // PlanArtifact
 
     expect(artifact).toBeDefined();
     expect(typeof artifact.id).toBe("string");

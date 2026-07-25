@@ -88,6 +88,7 @@ function tryLoadSession(
  *
  * const unit = harness.plan("migrate auth to PKCE", { tools: ["Read", "Grep"] });
  * const result = await unit.run(ctx);
+ * // result is TrackedResult<PlanArtifact> — a single wrap, not double-wrapped.
  * console.log(result.value.id); // SHA-256 plan ID — same shape for both adapters
  * ```
  */
@@ -102,10 +103,12 @@ export function createHarness(config: HarnessConfig): Harness {
     },
 
     execute<T>(verified: VerifiedPlan<T>, options?: ExecuteOptions) {
-      const sdkSession =
-        tryLoadSession(config, verified.plan.intent) ??
-        buildStubSession(`execute:${verified.plan.id}`);
-      return executeOperator(sdkSession, verified, options);
+      // isStub:true when SDK is absent so execute() stamps source:"synthesized"
+      // not source:"verified" — un-run stub results must not claim verification.
+      // Set isStub:false once tryLoadSession returns a real session (W2-D wiring).
+      const realSession = tryLoadSession(config, verified.plan.intent);
+      const sdkSession = realSession ?? buildStubSession(`execute:${verified.plan.id}`);
+      return executeOperator(sdkSession, verified, options, { isStub: !realSession });
     },
 
     session(prompt: string) {

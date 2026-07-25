@@ -99,6 +99,7 @@ async function tryLoadOpenAISession(
  * const harness = createOpenAIHarness({ adapter: "openai-agents", tools: ["Read", "Grep"] });
  * const unit = harness.plan("migrate auth to PKCE", { tools: ["Read", "Grep"] });
  * const result = await unit.run(ctx);
+ * // result is TrackedResult<PlanArtifact> — single wrap, result.value.id is the plan ID.
  * console.log(result.value.id); // SHA-256 plan ID — identical to Claude adapter output
  * ```
  */
@@ -114,6 +115,10 @@ export function createOpenAIHarness(config: HarnessConfig): Harness {
     execute<T>(verified: VerifiedPlan<T>, options?: ExecuteOptions) {
       // The permission bridge is constructed inside executeOperator from the verified plan.
       // This adapter provides the SdkSession; executeOperator applies the bridge to it.
+      //
+      // isStub:true because tryLoadOpenAISession currently always returns null — the
+      // session always falls through to buildStubSession. Set isStub:false here once
+      // tryLoadOpenAISession is wired to a real @openai/agents session (W2-D).
       const sdkSession: OpenAIAgentSession = {
         async run(runOptions) {
           const real = await tryLoadOpenAISession(config);
@@ -122,7 +127,7 @@ export function createOpenAIHarness(config: HarnessConfig): Harness {
           return effective.run(runOptions);
         },
       };
-      return executeOperator(sdkSession, verified, options);
+      return executeOperator(sdkSession, verified, options, { isStub: true });
     },
 
     session(prompt: string) {

@@ -74,6 +74,12 @@ export interface PlanArtifact {
   readonly expectedOutputShape?: unknown;
   readonly estimatedImpact: ImpactTier;
   readonly sources: readonly SourceRef[];
+  /**
+   * True when this plan was synthesised from declared tools without a real SDK
+   * session running. A synthesised plan's sources are heuristic estimates, not
+   * execution records — no tool was actually called.
+   */
+  readonly synthesized?: boolean;
 }
 
 // ─── Verified Plan ────────────────────────────────────────────────────────────
@@ -104,13 +110,20 @@ export interface PlanOptions {
 /**
  * An AgentUnit produced by `harness.plan()` that additionally exposes a
  * `requireMinChainConfidence` gate. The gate creates a new AgentUnit that
- * re-throws a `LowProvenanceError` when the source-chain mean confidence is
- * below the given threshold, allowing callers to enforce a minimum evidence bar.
+ * re-throws a `LowProvenanceError` when the mean source confidence across all
+ * sources in the PlanArtifact is below the given threshold.
+ *
+ * `harness.plan()` returns `AgentUnit<PlanArtifact>`. Calling `.run(ctx)` on the
+ * unit (or the gated variant) wraps the artifact in a single `TrackedResult`:
+ *
+ * ```typescript
+ * const result = await harness.plan("intent").run(ctx);
+ * result.value.id;  // SHA-256 plan ID
+ * result.value.sources; // provenance records
+ * ```
  */
-export type PlanUnit = AgentUnit<TrackedResult<PlanArtifact>> & {
-  requireMinChainConfidence(
-    threshold: number,
-  ): AgentUnit<TrackedResult<PlanArtifact>>;
+export type PlanUnit = AgentUnit<PlanArtifact> & {
+  requireMinChainConfidence(threshold: number): AgentUnit<PlanArtifact>;
 };
 
 export interface ExecuteOptions {

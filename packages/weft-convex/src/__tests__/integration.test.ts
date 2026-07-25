@@ -157,9 +157,11 @@ describe("weft-convex Integration", () => {
       const logActivityRef = "internal.ai.logActivity" as any;
 
       mockProvider.setResponse("Activity test", "Activity response");
+      // FIXED (withAI scoping): activityContext required when logActivity is provided.
       const convexAI = withAI(mockCtx, {
         logActivity: true,
         mutations: { logActivity: logActivityRef },
+        activityContext: { projectId: "test-project", threadId: "test-thread" },
       });
 
       await convexAI.generate("Activity test");
@@ -172,9 +174,11 @@ describe("weft-convex Integration", () => {
       const trackCostRef = "internal.ai.trackCost" as any;
 
       mockProvider.setResponse("Cost test", "Cost response");
+      // FIXED (withAI scoping): costContext.userId required when trackCost is provided.
       const convexAI = withAI(mockCtx, {
         trackCosts: true,
         mutations: { trackCost: trackCostRef },
+        costContext: { userId: "test-user-id" },
       });
 
       await convexAI.generate("Cost test");

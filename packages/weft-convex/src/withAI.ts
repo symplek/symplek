@@ -63,11 +63,41 @@ export interface ConvexAI {
  * @param ctx The Convex ActionCtx
  * @param options Configuration options
  * @returns ConvexAI interface
+ *
+ * @throws When `mutations.logActivity` is provided without `activityContext`.
+ *   Pass `activityContext: { projectId, threadId }` to prevent cross-user
+ *   activity misattribution. See FIX-GUARD[FP-LOGACTIVITY-SCOPE-20260303].
+ *
+ * @throws When `mutations.trackCost` is provided without `costContext.userId`.
+ *   Pass `costContext: { userId }` to prevent cross-user cost misattribution.
+ *   See FIX-GUARD[FP-TRACKCOST-SCOPE-20260303].
  */
 export function withAI(
   ctx: GenericActionCtx<any>,
   options?: ConvexAIOptions,
 ): ConvexAI {
+  // ── Scope context enforcement ──────────────────────────────────────────────
+  // Middleware that writes per-user data MUST have a scope context to prevent
+  // cross-user record misattribution. Fail loudly at construction time, not
+  // silently at record time when the mutation fires with undefined owner fields.
+  //
+  // Note: these guards fire only when a real FunctionReference is provided.
+  // Passing `logActivity: undefined` or omitting `mutations` entirely is fine.
+  if (options?.mutations?.logActivity && !options.activityContext) {
+    throw new Error(
+      "[withAI] activityContext is required when mutations.logActivity is provided. " +
+        "Pass { projectId, threadId } to prevent cross-user activity misattribution. " +
+        "FIX-GUARD[FP-LOGACTIVITY-SCOPE-20260303]",
+    );
+  }
+  if (options?.mutations?.trackCost && !options.costContext?.userId) {
+    throw new Error(
+      "[withAI] costContext.userId is required when mutations.trackCost is provided. " +
+        "Pass { userId } to prevent cross-user cost misattribution. " +
+        "FIX-GUARD[FP-TRACKCOST-SCOPE-20260303]",
+    );
+  }
+
   const stack = new MiddlewareStackImpl();
 
   if (options?.logActivity !== false && options?.mutations?.logActivity) {

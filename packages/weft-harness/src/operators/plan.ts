@@ -1,15 +1,15 @@
 /**
  * @module PlanOperator
  * @description plan() operator for weft-harness — runs the Claude Agent SDK in read-only
- * mode, accumulates tool calls, and produces a deterministically-IDed PlanArtifact wrapped
- * in TrackedResult<PlanArtifact> inside an AgentUnit. When the SDK is not installed the
- * operator falls back to a stub plan built from declared tools.
+ * mode, accumulates tool calls, and produces a deterministically-IDed PlanArtifact inside
+ * an AgentUnit<PlanArtifact>. Calling .run(ctx) wraps the artifact in a single TrackedResult
+ * so result.value.id is the plan ID. When the SDK is not installed the operator falls back
+ * to a synthesised stub plan; PlanArtifact.synthesized=true signals no real tool was called.
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */
 
 import { createHash } from "node:crypto";
-import { AgentUnit, createTrackedResult } from "weft-core";
-import type { ResultSource, TrackedResult } from "weft-core";
+import { AgentUnit } from "weft-core";
 import { LowProvenanceError } from "../errors";
 import type {
   HarnessConfig,
@@ -119,6 +119,7 @@ function resolveUri(args: unknown): string {
 async function buildPlanArtifact(
   intent: string,
   accumulator: ToolCallRecord[],
+  wasRealExecution: boolean,
 ): Promise<PlanArtifact> {
   const steps: PlanStep[] = accumulator.map((record, i) => ({
     index: i,
@@ -164,7 +165,16 @@ async function buildPlanArtifact(
   const estimatedImpact = await classifyImpactTier(intent, requiredTools);
   const id = computePlanId(steps);
 
-  return { id, intent, steps, requiredTools, estimatedImpact, sources };
+  return {
+    id,
+    intent,
+    steps,
+    requiredTools,
+    estimatedImpact,
+    sources,
+    // Flag synthesised plans so consumers know no real tool call was made.
+    ...(wasRealExecution ? {} : { synthesized: true as const }),
+  };
 }
 
 // ─── SDK session factory (optional peer dep) ──────────────────────────────
@@ -184,23 +194,31 @@ async function tryLoadSession(
 // ─── Exported operator ────────────────────────────────────────────────────
 
 /**
- * Creates an AgentUnit that produces a TrackedResult<PlanArtifact>.
+ * Creates an AgentUnit<PlanArtifact>.
  *
  * The unit runs the Claude Agent SDK in read-only permission mode, recording
  * every permitted tool call (Read, Glob, Grep, WebSearch, WebFetch) into an
  * accumulator. After the session the accumulator is shaped into a PlanArtifact
- * with a deterministic SHA-256 ID and wrapped in TrackedResult.
+ * with a deterministic SHA-256 ID.
+ *
+ * `AgentUnit.run(ctx)` wraps the artifact in a single TrackedResult:
+ *   `result.value` is the PlanArtifact → `result.value.id` is the plan ID.
+ *
+ * When the SDK is not installed the operator falls back to a synthesised plan
+ * built from the declared tool list. The resulting artifact carries
+ * `synthesized: true` — no real tool was called and no real provenance exists.
  */
 export function makePlanUnit(
   intent: string,
   options: PlanOptions | undefined,
   config: HarnessConfig,
 ): PlanUnit {
-  const unit = AgentUnit.from(async (_ctx) => {
+  const unit = AgentUnit.from<PlanArtifact>(async (_ctx) => {
     const accumulator: ToolCallRecord[] = [];
     let lastAssistantText = "";
 
     const sdkSession = await tryLoadSession(config);
+    const wasRealExecution = Boolean(sdkSession);
 
     config.onProgress?.({
       phase: "planning",
@@ -233,6 +251,7 @@ export function makePlanUnit(
       });
     } else {
       // Stub path: synthesise a plan from the declared tool list.
+      // The resulting artifact carries synthesized:true — no tools actually ran.
       const declaredTools = options?.tools ?? config.tools ?? ["Read", "Grep"];
       const maxSteps = options?.maxSteps ?? declaredTools.length;
       for (const tool of declaredTools.slice(0, maxSteps)) {
@@ -247,7 +266,7 @@ export function makePlanUnit(
       }
     }
 
-    const artifact = await buildPlanArtifact(intent, accumulator);
+    const artifact = await buildPlanArtifact(intent, accumulator, wasRealExecution);
 
     config.onProgress?.({
       phase: "planning",
@@ -273,38 +292,29 @@ export function makePlanUnit(
       }
     }
 
-    const meanConfidence =
-      artifact.sources.length > 0
-        ? artifact.sources.reduce((sum, s) => sum + s.confidence, 0) /
-          artifact.sources.length
-        : 0.8;
-
-    const tracked = createTrackedResult(artifact, {
-      source: "tool" as ResultSource,
-      confidence: meanConfidence,
-      sourceChain: ["tool" as ResultSource],
-      minChainConfidence: meanConfidence,
-    });
-
-    return tracked;
+    // Return the artifact directly. AgentUnit.run() wraps it in a single
+    // TrackedResult<PlanArtifact>, so result.value.id is the plan ID — no
+    // double-wrap hazard.
+    return artifact;
   });
 
   return Object.assign(unit, {
-    requireMinChainConfidence(
-      threshold: number,
-    ): AgentUnit<TrackedResult<PlanArtifact>> {
-      return unit.flatMap((innerTracked) => {
-        const chainLen = innerTracked.sourceChain?.length ?? 0;
-        const mean = chainLen > 0 ? innerTracked.confidence : 0;
+    requireMinChainConfidence(threshold: number): AgentUnit<PlanArtifact> {
+      return unit.flatMap((artifact) => {
+        const mean =
+          artifact.sources.length > 0
+            ? artifact.sources.reduce((sum, s) => sum + s.confidence, 0) /
+              artifact.sources.length
+            : 0;
         if (mean < threshold) {
           throw new LowProvenanceError(
-            `Source chain mean confidence ${mean.toFixed(3)} below required ${threshold}`,
+            `Plan source confidence ${mean.toFixed(3)} below required ${threshold}`,
             threshold,
             mean,
-            chainLen,
+            artifact.sources.length,
           );
         }
-        return AgentUnit.of(innerTracked);
+        return AgentUnit.of(artifact);
       });
     },
   }) as PlanUnit;

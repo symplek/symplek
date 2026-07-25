@@ -26,7 +26,7 @@ describe("requireMinChainConfidence gate", () => {
     const unit = makePlanUnit("test intent", { tools: ["WebFetch"] }, config);
     const gated = unit.requireMinChainConfidence(0.75);
 
-    // zero-trust run returns TrackedResult<TrackedResult<PlanArtifact>>
+    // AgentUnit.run() produces TrackedResult<PlanArtifact> (single wrap — no double-wrap).
     await expect(gated.run(ctx)).resolves.toBeDefined();
   });
 
@@ -46,7 +46,7 @@ describe("requireMinChainConfidence gate", () => {
     const err = caught as LowProvenanceError;
     expect(err.threshold).toBe(0.9);
     expect(err.actual).toBeCloseTo(0.7, 5);
-    // sourceChain: ["tool"] → length 1
+    // artifact.sources has 1 entry (one WebSearch source)
     expect(err.sourceCount).toBe(1);
     expect(err.message).toContain("0.700");
     expect(err.message).toContain("0.9");
@@ -62,8 +62,9 @@ describe("per-tool source confidence values", () => {
       config,
     );
     const fetchResult = await fetchUnit.run(ctx);
-    // result shape: TrackedResult<TrackedResult<PlanArtifact>> (outer = zero-trust wrap)
-    const fetchArtifact = fetchResult.value.value;
+    // FIXED (N70): result shape is TrackedResult<PlanArtifact> — single wrap.
+    // result.value is the PlanArtifact; no double-wrap via inner createTrackedResult.
+    const fetchArtifact = fetchResult.value;
 
     expect(fetchArtifact.sources).toHaveLength(1);
     expect(fetchArtifact.sources[0].confidence).toBe(0.85);
@@ -77,7 +78,7 @@ describe("per-tool source confidence values", () => {
       config,
     );
     const searchResult = await searchUnit.run(ctx);
-    const searchArtifact = searchResult.value.value;
+    const searchArtifact = searchResult.value; // PlanArtifact — single wrap
 
     expect(searchArtifact.sources).toHaveLength(1);
     expect(searchArtifact.sources[0].confidence).toBe(0.7);
@@ -87,7 +88,7 @@ describe("per-tool source confidence values", () => {
     // ── Read (file tool) ──────────────────────────────────────────────────────
     const readUnit = makePlanUnit("read intent", { tools: ["Read"] }, config);
     const readResult = await readUnit.run(ctx);
-    const readArtifact = readResult.value.value;
+    const readArtifact = readResult.value; // PlanArtifact — single wrap
 
     expect(readArtifact.sources).toHaveLength(1);
     expect(readArtifact.sources[0].confidence).toBe(0.8);

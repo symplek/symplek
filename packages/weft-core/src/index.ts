@@ -193,7 +193,7 @@ export type { TeamConfig, TeamMode, TeamResult } from "./teams";
 // ─── Teams (free tier — basic team; Pro tier extends in weft-pro) ────────────
 export { Team, TeamRegistry, teams } from "./teams";
 // ─── Trace ───────────────────────────────────────────────────────────────────
-export type { Trace, TraceCallback } from "./trace";
+export type { Trace, TraceCallback, TraceRedactor } from "./trace";
 // ─── Source Tracking ─────────────────────────────────────────────────────────
 // ─── Consensus (single-round, MIT) ───────────────────────────────────────────
 // ─── Resilience ──────────────────────────────────────────────────────────────
