@@ -51,80 +51,104 @@ export function createConsensusComputation<T>(
     // Get the proposal
     const proposal = await innerComputation(ctx);
 
+    /**
+     * Execute the full voter pipeline — including any AgentUnit.run() — and
+     * return a resolved VoteInput.  Accepts an optional AbortSignal that is
+     * threaded into the AgentContext so downstream streaming / LLM calls can
+     * be cancelled when a vote timeout fires.
+     *
+     * H-F03 fix: the previous code only raced `voter(proposal)` (the *call*)
+     * against the timeout, not the actual LLM execution.  For AgentUnit voters
+     * `voter(proposal)` returns the AgentUnit synchronously, so the race
+     * resolved immediately and `unit.run()` ran outside the timeout window.
+     * Moving the entire execution inside `executeVoterFully` and racing *that*
+     * against the timeout ensures the LLM call is actually bounded.
+     */
+    const executeVoterFully = async (
+      v: Voter<T>,
+      signal?: AbortSignal,
+    ): Promise<VoteInput> => {
+      const runCtx = signal ? { ...ctx, signal } : ctx;
+      const voterCallResult = v(proposal);
+
+      let voteInput: VoteInput;
+      if (
+        typeof voterCallResult === "object" &&
+        voterCallResult !== null &&
+        "run" in voterCallResult
+      ) {
+        // AgentUnit — execute with the cancellable context
+        const unit = voterCallResult as import("../AgentUnit").AgentUnit<
+          Vote | VoteInput
+        >;
+        const result = await unit.run(runCtx, { trustMode: "legacy" });
+        voteInput =
+          "agentId" in result
+            ? {
+                decision: result.decision,
+                confidence: result.confidence,
+                reasoning: result.reasoning,
+              }
+            : result;
+      } else if (voterCallResult instanceof Promise) {
+        const result = await voterCallResult;
+        voteInput =
+          "agentId" in result
+            ? {
+                decision: result.decision,
+                confidence: result.confidence,
+                reasoning: result.reasoning,
+              }
+            : result;
+      } else {
+        voteInput =
+          "agentId" in voterCallResult
+            ? {
+                decision: voterCallResult.decision,
+                confidence: voterCallResult.confidence,
+                reasoning: voterCallResult.reasoning,
+              }
+            : voterCallResult;
+      }
+      return voteInput;
+    };
+
     // Collect all votes in parallel
     const votePromises = voters.map(async (voter, index) => {
       const agentId = `voter_${index}`;
       const weight = weights[agentId] ?? 1.0;
 
       try {
-        let voteResult:
-          | import("../AgentUnit").AgentUnit<Vote | VoteInput>
-          | Promise<Vote | VoteInput>
-          | Vote
-          | VoteInput;
+        let voteInput: VoteInput;
 
         if (voteTimeout) {
           // ⚠️ FIX-GUARD[FP-CONSENSUS-TIMER-LEAK-20260313]: Clear timeout
           // handle when vote resolves first to prevent timer leak.
+          //
+          // H-F03 fix: create an AbortController per voter so the LLM call
+          // can be cancelled when the timeout fires, not just the race boundary.
+          const controller = new AbortController();
           let timer: ReturnType<typeof setTimeout> | undefined;
           const timeoutPromise = new Promise<never>((_, reject) => {
             timer = setTimeout(() => {
+              controller.abort();
               reject(new Error(`Vote timeout after ${voteTimeout}ms`));
             }, voteTimeout);
           });
 
           try {
-            voteResult = await Promise.race([
-              Promise.resolve(voter(proposal)),
+            voteInput = await Promise.race([
+              executeVoterFully(voter, controller.signal),
               timeoutPromise,
             ]);
           } finally {
             if (timer !== undefined) clearTimeout(timer);
+            // Abort the controller when the race settles for any reason
+            // (no-op if the timeout already fired it).
+            controller.abort();
           }
         } else {
-          voteResult = voter(proposal);
-        }
-
-        // Handle different return types
-        let voteInput: VoteInput;
-        if (
-          typeof voteResult === "object" &&
-          voteResult !== null &&
-          "run" in voteResult
-        ) {
-          // AgentUnit-like object - use legacy mode for internal calls
-          // Consensus handles confidence internally through votes, not TrackedResult
-          const unit = voteResult as import("../AgentUnit").AgentUnit<
-            Vote | VoteInput
-          >;
-          const result = await unit.run(ctx, { trustMode: "legacy" });
-          voteInput =
-            "agentId" in result
-              ? {
-                  decision: result.decision,
-                  confidence: result.confidence,
-                  reasoning: result.reasoning,
-                }
-              : result;
-        } else if (voteResult instanceof Promise) {
-          const result = await voteResult;
-          voteInput =
-            "agentId" in result
-              ? {
-                  decision: result.decision,
-                  confidence: result.confidence,
-                  reasoning: result.reasoning,
-                }
-              : result;
-        } else {
-          voteInput =
-            "agentId" in voteResult
-              ? {
-                  decision: voteResult.decision,
-                  confidence: voteResult.confidence,
-                  reasoning: voteResult.reasoning,
-                }
-              : voteResult;
+          voteInput = await executeVoterFully(voter);
         }
 
         return { ...voteInput, agentId, weight };

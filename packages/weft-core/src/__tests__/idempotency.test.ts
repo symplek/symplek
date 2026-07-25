@@ -10,9 +10,11 @@ import {
   AgentUnit,
   createContext,
   IdempotencyError,
+  IdempotencyStoreWriteError,
   InMemoryIdempotencyStore,
   isTracked,
 } from "../index";
+import type { IdempotencyStore } from "../idempotency";
 import type { AgentContext } from "../types";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -117,6 +119,56 @@ describe("idempotency", () => {
         idempotency: { key: "ctx-key", strategy: "reject", store },
       });
       expect(seenKey).toBe("ctx-key");
+    });
+
+    it("B3 — concurrent runs on the same key execute the computation exactly once", async () => {
+      // Two concurrent run() calls with the same key must not both execute the
+      // computation. The second call should await the first run's in-flight
+      // promise and return the same result without a second execution.
+      const store = new InMemoryIdempotencyStore();
+      let executions = 0;
+      const unit = AgentUnit.from(async () => {
+        executions++;
+        // Simulate async work so the second call actually races the first.
+        await sleep(10);
+        return `exec-${executions}`;
+      });
+
+      const [r1, r2] = await Promise.all([
+        unit.run(ctx, { idempotency: { key: "concurrent-key", strategy: "return-cached", store } }),
+        unit.run(ctx, { idempotency: { key: "concurrent-key", strategy: "return-cached", store } }),
+      ]);
+
+      // Computation must have run exactly once.
+      expect(executions).toBe(1);
+      // Both callers must receive the same result value.
+      expect(isTracked(r1) && r1.value).toBe("exec-1");
+      expect(isTracked(r2) && r2.value).toBe("exec-1");
+    });
+
+    it("B3 — store-write failure after successful computation surfaces IdempotencyStoreWriteError", async () => {
+      // When the store write fails after the computation succeeds, the caller
+      // must NOT receive a generic error that looks like a computation failure.
+      // Instead IdempotencyStoreWriteError is thrown so the caller knows:
+      // the side effect ran, do NOT retry as if it failed.
+      const failingStore: IdempotencyStore = {
+        async get() { return null; },
+        async set() { throw new Error("Redis is down"); },
+      };
+
+      let executed = false;
+      const unit = AgentUnit.from(async () => {
+        executed = true;
+        return "side-effect-ran";
+      });
+
+      const err = await unit
+        .run(ctx, { idempotency: { key: "write-fail-key", strategy: "return-cached", store: failingStore } })
+        .catch((e) => e);
+
+      expect(executed).toBe(true); // computation ran
+      expect(err).toBeInstanceOf(IdempotencyStoreWriteError);
+      expect(err.message).toContain("Redis is down");
     });
 
     it("does not interfere with execution when no idempotency config is given", async () => {

@@ -11,6 +11,7 @@
  * @surface internal
  */
 
+import { CompensationError } from "../../errors";
 import type { AgentContext } from "../../types";
 import type { AgentComputation } from "../AgentUnit";
 import { AgentUnit } from "../AgentUnit";
@@ -65,14 +66,28 @@ AgentUnit.prototype.saga = function <T>(
           const originalError =
             err instanceof Error ? err : new Error(String(err));
 
-          // Rollback completed steps in LIFO order
+          // Rollback completed steps in LIFO order.
+          // N68: collect any undo failures so they are not silently swallowed.
+          const undoErrors: Error[] = [];
           for (let i = log.length - 1; i >= 0; i--) {
             const { step: completedStep, result: completedResult } = log[i]!;
             try {
               await completedStep.undo(ctx, completedResult);
-            } catch {
-              // Undo errors suppressed — original error always wins
+            } catch (undoErr) {
+              undoErrors.push(
+                undoErr instanceof Error
+                  ? undoErr
+                  : new Error(String(undoErr)),
+              );
             }
+          }
+
+          // If any undo step failed, surface via CompensationError so the
+          // caller knows external state may be partially restored.
+          if (undoErrors.length > 0) {
+            // Report the first undo failure (subsequent ones are lost, but the
+            // partially-restored state is the critical signal).
+            throw new CompensationError(originalError, undoErrors[0]!);
           }
 
           throw originalError;

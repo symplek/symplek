@@ -47,6 +47,12 @@ export interface AIRequest {
   seed?: number;
   /** Response format (e.g., { type: 'json_object' }) */
   responseFormat?: { type: "text" | "json_object" };
+  /**
+   * AbortSignal for cancelling in-flight requests.
+   * N61 fix: wired through streaming.ts and into each provider's SDK call
+   * so a stalled stream can be interrupted mid-stream, not just between chunks.
+   */
+  signal?: AbortSignal;
 }
 
 /**

@@ -134,25 +134,17 @@ export function createConvergeComputation<T>(
       // Promise.all preserves the agents' input order, so this fold is deterministic
       // even when agents resolve at different times.
       if (parallel) {
-        if (mergeStrategy === "last") {
-          // Take the last agent's non-null result as-is (no merging).
-          for (let i = roundContributions.length - 1; i >= 0; i--) {
-            const { contribution } = roundContributions[i];
-            if (contribution.result !== null && contribution.result !== undefined) {
-              currentState = contribution.result;
-              break;
-            }
-          }
-        } else if (mergeStrategy === "reduce") {
+        if (mergeStrategy === "reduce") {
           // Left-to-right fold: each non-null result replaces the accumulator.
           for (const { contribution } of roundContributions) {
             if (contribution.result !== null && contribution.result !== undefined) {
               currentState = contribution.result;
             }
           }
-        } else {
-          // Default (mergeStrategy not set): shallow-merge for plain objects,
-          // last-wins for all other types. Backward-compatible behavior.
+        } else if (mergeStrategy === "merge") {
+          // Explicit merge: shallow-merge for plain objects (fields from later
+          // agents overwrite earlier ones), last-wins for non-object types.
+          // Use only when agents own independent, non-overlapping fields.
           for (const { contribution } of roundContributions) {
             if (
               contribution.result !== null &&
@@ -162,6 +154,18 @@ export function createConvergeComputation<T>(
                 currentState,
                 contribution.result,
               );
+            }
+          }
+        } else {
+          // Default ("last" or unset): take the last agent's non-null result.
+          // F-08 fix: the previous implicit shallow-merge default could silently
+          // corrupt results when agents returned overlapping object keys.
+          // "last" is explicit, deterministic, and safe by default.
+          for (let i = roundContributions.length - 1; i >= 0; i--) {
+            const { contribution } = roundContributions[i];
+            if (contribution.result !== null && contribution.result !== undefined) {
+              currentState = contribution.result;
+              break;
             }
           }
         }

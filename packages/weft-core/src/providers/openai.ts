@@ -152,23 +152,29 @@ export async function createOpenAIProvider(
 
     async *stream(request: AIRequest): AsyncIterable<StreamChunk> {
       try {
-        const stream = await client.chat.completions.create({
-          model: request.model,
-          messages: transformMessages(request.messages),
-          temperature: request.temperature,
-          max_tokens: request.maxTokens,
-          stop: request.stop,
-          top_p: request.topP,
-          frequency_penalty: request.frequencyPenalty,
-          presence_penalty: request.presencePenalty,
-          seed: request.seed,
-          response_format:
-            request.responseFormat?.type === "json_object"
-              ? { type: "json_object" }
-              : undefined,
-          stream: true,
-          stream_options: { include_usage: true },
-        });
+        // N61 fix: pass signal as the second options argument so the OpenAI SDK
+        // can abort the in-flight HTTP request rather than only stopping
+        // iteration between chunks.
+        const stream = await client.chat.completions.create(
+          {
+            model: request.model,
+            messages: transformMessages(request.messages),
+            temperature: request.temperature,
+            max_tokens: request.maxTokens,
+            stop: request.stop,
+            top_p: request.topP,
+            frequency_penalty: request.frequencyPenalty,
+            presence_penalty: request.presencePenalty,
+            seed: request.seed,
+            response_format:
+              request.responseFormat?.type === "json_object"
+                ? { type: "json_object" }
+                : undefined,
+            stream: true,
+            stream_options: { include_usage: true },
+          },
+          request.signal ? { signal: request.signal } : undefined,
+        );
 
         for await (const chunk of stream) {
           const choice = chunk.choices[0];

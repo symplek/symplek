@@ -9,6 +9,7 @@
  * @surface internal
  */
 
+import { CompensationError } from "../../errors";
 import type { AgentContext } from "../../types";
 import type { AgentComputation } from "../AgentUnit";
 import { AgentUnit } from "../AgentUnit";
@@ -41,8 +42,14 @@ AgentUnit.prototype.compensate = function <T>(
         const error = err instanceof Error ? err : new Error(String(err));
         try {
           await compensateFn({ error, agentContext: ctx });
-        } catch {
-          // Compensation errors are suppressed — original error always wins
+        } catch (compErr) {
+          // N68: Surface the compensation failure — silently discarding it
+          // leaves partially-restored external state indistinguishable from
+          // a clean rollback. Wrap both errors in CompensationError so the
+          // caller sees what failed and can investigate state consistency.
+          const compensationError =
+            compErr instanceof Error ? compErr : new Error(String(compErr));
+          throw new CompensationError(error, compensationError);
         }
         throw error;
       }

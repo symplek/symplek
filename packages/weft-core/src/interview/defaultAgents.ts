@@ -9,6 +9,7 @@
 
 import { z } from "zod";
 import { AgentUnit } from "../AgentUnit";
+import { WeftError } from "../errors";
 import type {
   ClarityScore,
   EvaluatorAgent,
@@ -377,9 +378,20 @@ export function createDefaultExtractor<T>(
         return result.data;
       }
 
-      // If validation fails, return what we have (partial context)
-      // The Interview class should handle this gracefully
-      return extracted as T;
+      // N64 fix: fail loudly instead of returning schema-invalid partial data
+      // cast as T. The InterviewResult<TContext>.context type documents
+      // "validated at extraction time" — returning an invalid value silently
+      // violates that contract.
+      const issuesSummary = result.error.issues
+        .map((i) => `${i.path.join(".")}: ${i.message}`)
+        .join("; ");
+      throw new WeftError({
+        code: "VALIDATION_ERROR",
+        why: `Interview extractor failed schema validation: ${issuesSummary}`,
+        action:
+          "Ensure the interview collects enough information to satisfy all required schema fields, or make optional fields nullable/optional in the schema.",
+        context: { issues: result.error.issues, extractedKeys: Object.keys(extracted) },
+      });
     });
   };
 }

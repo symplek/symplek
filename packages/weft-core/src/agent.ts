@@ -46,8 +46,15 @@ export class PromptBuilder {
 
   /** Execute the prompt against the configured agent. */
   async run(): Promise<TrackedResult<string>> {
-    const opts: WeftOptions<string> = {};
-    if (this.config.model) opts.model = this.config.model;
+    // N50 fix: forward all AgentConfig fields to WeftOptions.
+    // Previously only `model` was forwarded; provider, system, and temperature
+    // were accepted in AgentConfig but silently dropped here.
+    const opts: WeftOptions<string> = {
+      model: this.config.model,
+      provider: this.config.provider,
+      system: this.config.system,
+      temperature: this.config.temperature,
+    };
     return new WeftBuilder<string>(this.promptText, opts).run();
   }
 }

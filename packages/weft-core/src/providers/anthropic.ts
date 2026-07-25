@@ -155,15 +155,21 @@ export async function createAnthropicProvider(
     async *stream(request: AIRequest): AsyncIterable<StreamChunk> {
       try {
         const { system, messages } = transformMessages(request.messages);
-        const stream = await client.messages.stream({
-          model: request.model,
-          system,
-          messages,
-          max_tokens: request.maxTokens || 4096,
-          temperature: request.temperature,
-          stop_sequences: request.stop,
-          top_p: request.topP,
-        });
+        // N61 fix: pass the AbortSignal as an HTTP-level option so the Anthropic
+        // SDK can abort the in-flight request rather than just breaking out of
+        // the for-await loop after the next chunk arrives.
+        const stream = await client.messages.stream(
+          {
+            model: request.model,
+            system,
+            messages,
+            max_tokens: request.maxTokens || 4096,
+            temperature: request.temperature,
+            stop_sequences: request.stop,
+            top_p: request.topP,
+          },
+          request.signal ? { signal: request.signal } : undefined,
+        );
 
         // H5 fix: track prompt tokens from message_start so the message_delta
         // usage chunk can emit a complete (promptTokens + completionTokens) total.

@@ -490,6 +490,164 @@ describe("Bug 3 — configure({ provider: 'openrouter' }) throws PROVIDER_ERROR"
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// N67 — cross-provider key leak: configure({ provider }) without apiKey must
+// clear the stale key rather than bootstrapping the new vendor with it.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("N67 — configure() cross-provider key safety", () => {
+  afterEach(() => {
+    _resetForTesting();
+    providerRegistry.clear();
+  });
+
+  it("provider-only reconfigure does not bootstrap with previous vendor's apiKey", async () => {
+    // First configure: anthropic + real-looking key
+    Weft.configure({ provider: "anthropic", apiKey: "sk-ant-stale-key" });
+
+    // Second configure: only change provider, no new key
+    Weft.configure({ provider: "openai" });
+
+    // Drain any pending init promise
+    const { getInitPromise, clearInitPromise, getGlobalConfig } = await import("../globalConfig");
+    const p = getInitPromise();
+    if (p) { try { await p; } catch { /* bootstrap may fail — that's fine */ } clearInitPromise(); }
+
+    // The global config must NOT carry the stale anthropic key after the
+    // provider was changed to openai without a new key.
+    const cfg = getGlobalConfig();
+    expect(cfg.provider).toBe("openai");
+    expect(cfg.apiKey).toBeUndefined();
+  });
+
+  it("same-provider reconfigure preserves the existing apiKey", async () => {
+    Weft.configure({ provider: "openai", apiKey: "sk-test-123" });
+    // Second configure: update model only — same provider
+    Weft.configure({ provider: "openai", model: "gpt-4o-mini" });
+
+    const { getGlobalConfig } = await import("../globalConfig");
+    const cfg = getGlobalConfig();
+    expect(cfg.apiKey).toBe("sk-test-123");
+    expect(cfg.model).toBe("gpt-4o-mini");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// N41 — builder resilience bypass: schema branch and timeout+retry must compose
+// N50 — Weft.agent provider/system/temperature forwarding
+// N51 — WeftOptions.confidence applied to result
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("N41 — WeftBuilder resilience: schema + timeout + retry compose", () => {
+  it("schema branch applies timeout: computation times out", async () => {
+    const { WeftBuilder } = await import("../builder");
+    const { z } = await import("zod");
+
+    // Register a hanging provider so the schema-branch ai() call never returns.
+    // Without the N41 fix, the timeout wrapper was absent in the schema branch
+    // and this would hang indefinitely.
+    const hangingProvider: Provider = {
+      id: "mock",
+      name: "Mock",
+      capabilities: { streaming: false, tools: false, vision: false, structuredOutput: false, maxContextTokens: 4096 },
+      async generate() {
+        // Never resolves — simulates a slow provider
+        await new Promise(() => {});
+        return { text: "", usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 }, finishReason: "stop" as const };
+      },
+      async *stream() {},
+      identify() { return { id: "mock", name: "Mock" }; },
+    };
+    providerRegistry.clear();
+    providerRegistry.register(hangingProvider, true);
+
+    const builder = new WeftBuilder<{ name: string }>("slow task", {
+      schema: z.object({ name: z.string() }),
+      timeout: 30, // 30ms — should fire before any real work completes
+    });
+
+    // The timeout operator throws a plain Error (not WeftError) — assert on message.
+    await expect(builder.run()).rejects.toThrow(/timed out/i);
+  });
+
+  it("schema branch applies retry: computation is retried on failure", async () => {
+    // Use a real AgentUnit to verify retry wraps the schema branch
+    const { WeftBuilder } = await import("../builder");
+    const { z } = await import("zod");
+
+    let attempts = 0;
+    // Override ai() behavior by registering a failing mock provider
+    const failingProvider: Provider = {
+      id: "mock",
+      name: "Mock",
+      capabilities: { streaming: false, tools: false, vision: false, structuredOutput: false, maxContextTokens: 4096 },
+      async generate() {
+        attempts++;
+        throw new Error(`attempt ${attempts} failed`);
+      },
+      async *stream() {},
+      identify() { return { id: "mock", name: "Mock" }; },
+    };
+    providerRegistry.clear();
+    providerRegistry.register(failingProvider, true);
+
+    const builder = new WeftBuilder<{ name: string }>("retry task", {
+      schema: z.object({ name: z.string() }),
+      retry: 2, // maxAttempts = 2
+    });
+
+    await expect(builder.run()).rejects.toBeDefined();
+    // retry: 2 means up to 2 total attempts
+    expect(attempts).toBeGreaterThanOrEqual(2);
+  });
+
+  it("non-schema branch applies both timeout AND retry when both specified", async () => {
+    const { WeftBuilder } = await import("../builder");
+
+    let attempts = 0;
+    const slowProvider: Provider = {
+      id: "mock",
+      name: "Mock",
+      capabilities: { streaming: false, tools: false, vision: false, structuredOutput: false, maxContextTokens: 4096 },
+      async generate() {
+        attempts++;
+        // Slow enough to time out
+        await new Promise((r) => setTimeout(r, 100));
+        return { text: "ok", usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 }, finishReason: "stop" as const };
+      },
+      async *stream() {},
+      identify() { return { id: "mock", name: "Mock" }; },
+    };
+    providerRegistry.clear();
+    providerRegistry.register(slowProvider, true);
+
+    const builder = new WeftBuilder("timeout+retry task", {
+      timeout: 20,  // 20ms — times out
+      retry: 2,     // retries 2 times
+    });
+
+    await expect(builder.run()).rejects.toBeDefined();
+    // Both timeout and retry must be active: multiple attempts should have occurred
+    expect(attempts).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("N51 — WeftOptions.confidence applied to TrackedResult", () => {
+  it("result.confidence equals the user-specified value", async () => {
+    const { WeftBuilder } = await import("../builder");
+    const { isTracked } = await import("../index");
+
+    const builder = new WeftBuilder<string>("any task", {
+      confidence: 0.42,
+    });
+
+    // The mock provider is already registered; this will execute normally
+    const result = await builder.run();
+    expect(isTracked(result)).toBe(true);
+    expect(result.confidence).toBe(0.42);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // REGRESSION — OPENROUTER_API_KEY must not produce a broken registry-miss path
 // ─────────────────────────────────────────────────────────────────────────────
 

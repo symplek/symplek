@@ -222,20 +222,23 @@ export interface ConvergeOptions {
   /**
    * How to combine parallel agent contributions within a round.
    *
-   * - `"last"`: the last agent's result in the array replaces the current
-   *   state. Deterministic by array position. For plain-object states,
-   *   fields from earlier agents are dropped.
+   * - `"last"` (default): the last agent's non-null result replaces current
+   *   state. Deterministic by array position.
    * - `"reduce"`: contributions are applied left-to-right; each agent's
-   *   non-null result replaces the running accumulator. All agents still
-   *   execute from the **original** round state (not from each other's
-   *   output), so this is not equivalent to serial mode.
+   *   non-null result replaces the running accumulator. All agents execute
+   *   from the **original** round state, so this is not equivalent to serial
+   *   mode.
+   * - `"merge"`: shallow-merge for plain objects (properties from later agents
+   *   overwrite earlier ones), last-wins for non-object types. Use when
+   *   agents own independent, non-overlapping fields.
    *
-   * When omitted, the default is a shallow-merge for plain objects and
-   * last-wins for all other types (backward-compatible).
+   * When omitted, defaults to `"last"` (F-08 fix: the previous implicit
+   * shallow-merge default could silently corrupt results when agents returned
+   * overlapping plain-object keys; `"last"` is explicit and unambiguous).
    *
    * Only applies when `parallel` is true (or unset). Ignored in serial mode.
    */
-  mergeStrategy?: "last" | "reduce";
+  mergeStrategy?: "last" | "reduce" | "merge";
 }
 
 /**

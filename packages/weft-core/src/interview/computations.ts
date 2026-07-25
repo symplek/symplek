@@ -173,6 +173,24 @@ export function createConductComputation<TContext>(
       // STEP 5: UPDATE STATE AND CALLBACKS
       // -----------------------------------------------------------------------
 
+      // N63 fix: run the extractor after each answer and write the result back
+      // to state.currentContext so the NEXT round's evaluator can see the
+      // accumulated context. Previously extractor only ran once after the loop,
+      // so state.currentContext was always {} during evaluation — the evaluator's
+      // hasValue branches were dead and clarity was capped at 50 forever.
+      try {
+        const contextUpdate = await extractor(state).run(ctx, {
+          trustMode: "legacy",
+        });
+        if (contextUpdate !== null && contextUpdate !== undefined && typeof contextUpdate === "object") {
+          state.currentContext = contextUpdate as Record<string, unknown>;
+        }
+      } catch {
+        // Mid-loop extraction failure is non-fatal: the evaluator will score
+        // based on the previous context. The final extraction after the loop
+        // will fail loudly if it cannot produce valid context.
+      }
+
       // Call progress callback
       if (handlers.onProgress) {
         const progress = calculateProgress(state, currentClarity, options);

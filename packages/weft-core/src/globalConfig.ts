@@ -24,9 +24,30 @@ export function getGlobalConfig(): Readonly<WeftGlobalConfig> {
   return _config;
 }
 
-/** Merge new values into the global config (second call wins per field). */
+/**
+ * Merge new values into the global config (second call wins per field).
+ *
+ * N67 safety: when `provider` changes to a different vendor and `apiKey` is
+ * NOT present in the incoming options object, the existing `apiKey` is cleared.
+ * This prevents the new vendor's adapter from being bootstrapped with the
+ * previous vendor's secret.
+ *
+ * Callers that change provider must supply the new `apiKey` in the same call,
+ * or call `configure({ apiKey })` as a follow-up before any `ai()` call.
+ */
 export function mergeGlobalConfig(options: WeftGlobalConfig): void {
+  const providerChanging =
+    options.provider !== undefined &&
+    _config.provider !== undefined &&
+    options.provider !== _config.provider;
+
   _config = { ..._config, ...options };
+
+  // When the provider changes without an explicit new apiKey, delete the
+  // stale key so no bootstrap fires for the new vendor with the old secret.
+  if (providerChanging && !("apiKey" in options)) {
+    delete _config.apiKey;
+  }
 }
 
 /** Reset config to empty. Used in tests via facade._resetForTesting(). */

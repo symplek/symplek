@@ -362,8 +362,11 @@ describe("Converge Operator", () => {
         hasMore: false,
       });
 
+      // F-08 fix: shallow-merge is now opt-in via mergeStrategy: "merge".
+      // The old implicit default was silent corruption when agents returned
+      // overlapping keys. This test validates the explicit opt-in path.
       const result = await AgentUnit.of({})
-        .converge([agent0, agent1], { parallel: true })
+        .converge([agent0, agent1], { parallel: true, mergeStrategy: "merge" })
         .run(ctx, { trustMode: "legacy" });
 
       expect(result.finalResult).toEqual({
@@ -544,6 +547,70 @@ describe("Converge Operator", () => {
       expect(result.finalResult.count).toBe(2);
       expect(result.finalResult.items).toEqual(["item-1", "item-2"]);
       expect(result.finalResult.metadata.updated).toBe(true);
+    });
+  });
+
+  describe("F-08 — default merge strategy safety", () => {
+    // The old default was a shallow-merge for plain objects, which could silently
+    // corrupt results when agents returned overlapping keys with conflicting values.
+    // The new default is "last" (final agent's non-null result wins).
+
+    it("default strategy takes the last agent's result (not a merge)", async () => {
+      // Two agents both return objects with conflicting keys.
+      // With the old implicit shallow-merge, the result would mix both objects.
+      // With the new default "last", only the second agent's result survives.
+      const agent1 = (): ConvergeContribution<{ x: number; y: number }> => ({
+        result: { x: 1, y: 10 },
+        hasMore: false,
+      });
+      const agent2 = (): ConvergeContribution<{ x: number; y: number }> => ({
+        result: { x: 2, y: 20 },
+        hasMore: false,
+      });
+
+      const result = await AgentUnit.of({ x: 0, y: 0 })
+        .converge([agent1, agent2])
+        .run(ctx, { trustMode: "legacy" });
+
+      // Default "last": agent2's result wins entirely — no field mixing.
+      expect(result.finalResult).toEqual({ x: 2, y: 20 });
+    });
+
+    it('mergeStrategy: "merge" applies shallow-merge for plain objects', async () => {
+      // Explicit "merge" strategy retains the old shallow-merge behavior.
+      // Agent1 sets { x: 1 }, agent2 sets { y: 20 } — both fields are preserved.
+      const agent1 = (): ConvergeContribution<{ x?: number; y?: number }> => ({
+        result: { x: 1 },
+        hasMore: false,
+      });
+      const agent2 = (): ConvergeContribution<{ x?: number; y?: number }> => ({
+        result: { y: 20 },
+        hasMore: false,
+      });
+
+      const result = await AgentUnit.of<{ x?: number; y?: number }>({})
+        .converge([agent1, agent2], { mergeStrategy: "merge" })
+        .run(ctx, { trustMode: "legacy" });
+
+      // Merge: fields from both agents are present
+      expect(result.finalResult).toEqual({ x: 1, y: 20 });
+    });
+
+    it('mergeStrategy: "last" explicitly takes the last non-null result', async () => {
+      const agent1 = (): ConvergeContribution<string> => ({
+        result: "from-agent-1",
+        hasMore: false,
+      });
+      const agent2 = (): ConvergeContribution<string> => ({
+        result: "from-agent-2",
+        hasMore: false,
+      });
+
+      const result = await AgentUnit.of("initial")
+        .converge([agent1, agent2], { mergeStrategy: "last" })
+        .run(ctx, { trustMode: "legacy" });
+
+      expect(result.finalResult).toBe("from-agent-2");
     });
   });
 

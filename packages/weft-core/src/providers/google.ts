@@ -164,6 +164,11 @@ export async function createGoogleProvider(
 
     async *stream(request: AIRequest): AsyncIterable<StreamChunk> {
       try {
+        // N61 fix: early-exit if already cancelled before starting the request.
+        if (request.signal?.aborted) {
+          return;
+        }
+
         const { systemInstruction, contents } = transformMessages(
           request.messages,
         );
@@ -187,6 +192,11 @@ export async function createGoogleProvider(
         });
 
         for await (const chunk of result.stream) {
+          // N61 fix: check the signal on each chunk so a cancelled stream stops
+          // as soon as the current chunk yields, rather than continuing to the end.
+          if (request.signal?.aborted) {
+            return;
+          }
           yield {
             textDelta: chunk.text(),
             usage: chunk.usageMetadata

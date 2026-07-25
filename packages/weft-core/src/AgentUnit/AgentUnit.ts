@@ -13,8 +13,10 @@
 import type { z } from "zod";
 import type { HasVotes } from "../coherence/types";
 import type { ContractOptions } from "../contract";
-import { WeftError } from "../errors";
+import { IdempotencyStoreWriteError, WeftError } from "../errors";
 import {
+  _idempotencyInFlight,
+  buildFlightKey,
   defaultIdempotencyStore,
   IdempotencyError,
   type IdempotencyStore,
@@ -532,11 +534,17 @@ export class AgentUnit<T> {
     // ─── Idempotency pre-check (before execution) ──────────────────────────
     // Resolved here so a `reject` throw propagates cleanly, ahead of the
     // try/catch that would otherwise re-route it through handleError().
+    //
+    // B3 FIX: single-flight per key to ensure at-most-once execution.
+    // A concurrent caller that arrives while the key is in-flight awaits the
+    // first run's settled promise rather than launching a second execution.
     const idempotency = options?.idempotency;
     let idemStore: IdempotencyStore | null = null;
     let runCtx = ctx;
     if (idempotency) {
       idemStore = idempotency.store ?? defaultIdempotencyStore;
+
+      // ── Step 1: check persistent store ──
       const cached = await idemStore.get(idempotency.key);
       if (cached !== null) {
         if (idempotency.strategy === "reject") {
@@ -555,25 +563,73 @@ export class AgentUnit<T> {
             action: `Clear the cache for key "${idempotency.key}" and re-run.`,
           });
         }
-        // Also verify the key matches the operation to prevent cross-operation
-        // cache poisoning.
         return trustMode === "legacy" ? cached.value : cached;
       }
-      // Fresh key — propagate it to tool calls via the context.
+
+      // ── Step 2: check in-flight map (single-flight on concurrent same-key calls) ──
+      const flightKey = buildFlightKey(idemStore, idempotency.key);
+      const inFlight = _idempotencyInFlight.get(flightKey);
+      if (inFlight !== undefined) {
+        // A concurrent run is already executing for this key. Await its result
+        // instead of executing the computation a second time.
+        const result = await inFlight;
+        if (idempotency.strategy === "reject") {
+          throw new IdempotencyError(idempotency.key);
+        }
+        return trustMode === "legacy" ? (result as TrackedResult<T>).value : (result as TrackedResult<T>);
+      }
+
+      // ── Step 3: register in-flight promise before computing ──
+      // Fresh key with no concurrent run — execute and register.
       runCtx = { ...ctx, idempotencyKey: idempotency.key };
+
+      // Build the execution promise and register it synchronously before any
+      // awaits, so a concurrent caller that arrives after this point shares it.
+      const executePromise = (async (): Promise<TrackedResult<T>> => {
+        const value = await this.computation(runCtx);
+        const tracked = wrapInTrackedResult(this._metadata, value);
+        // ── Step 4: write to persistent store (may fail) ──
+        // If the store write fails, we still return the successfully computed
+        // result to the caller — but we surface the store failure explicitly
+        // via IdempotencyStoreWriteError so callers know the key was not
+        // durably persisted (future calls will re-execute).
+        try {
+          await idemStore!.set(idempotency.key, tracked, idempotency.ttl);
+        } catch (storeErr) {
+          // Store write failed: the computation ran and succeeded.
+          // Remove from in-flight before throwing so concurrent waiters get
+          // the same error (they won't retry the computation).
+          _idempotencyInFlight.delete(flightKey);
+          throw new IdempotencyStoreWriteError(
+            idempotency.key,
+            storeErr,
+            tracked,
+          );
+        }
+        return tracked;
+      })();
+
+      _idempotencyInFlight.set(flightKey, executePromise as Promise<TrackedResult<unknown>>);
+
+      try {
+        const tracked = await executePromise;
+        if (trustMode === "legacy") {
+          emitDeprecationWarning(AgentUnit);
+          return tracked.value;
+        }
+        return tracked;
+      } catch (error) {
+        if (error instanceof Error) {
+          handleError(error, this._metadata.operatorChain);
+        }
+        handleError(new Error(String(error)), this._metadata.operatorChain);
+      } finally {
+        _idempotencyInFlight.delete(flightKey);
+      }
     }
 
     try {
       const value = await this.computation(runCtx);
-      if (idempotency && idemStore) {
-        const tracked = wrapInTrackedResult(this._metadata, value);
-        await idemStore.set(idempotency.key, tracked, idempotency.ttl);
-        if (trustMode === "legacy") {
-          emitDeprecationWarning(AgentUnit);
-          return value;
-        }
-        return tracked;
-      }
       if (trustMode === "legacy") {
         emitDeprecationWarning(AgentUnit);
         return value;

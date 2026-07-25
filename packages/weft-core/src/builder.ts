@@ -21,16 +21,23 @@ export interface WeftOptions<T = unknown> {
   /** Zod schema for output validation and type inference. */
   schema?: z.ZodType<T>;
   /**
-   * Confidence score attached to the TrackedResult wrapper.
+   * Confidence score to attach to the returned TrackedResult.
+   * When set, overrides the confidence computed from the operator chain.
    * @default 0.85
    */
   confidence?: number;
-  /** Execution timeout in milliseconds. */
+  /** Execution timeout in milliseconds. Applies to both schema and non-schema paths. */
   timeout?: number;
   /** Model override for this specific call. */
   model?: string;
-  /** Retry configuration for failed operations. */
+  /** Retry configuration for failed operations. Applies to both schema and non-schema paths. */
   retry?: RetryOptions | number;
+  /** Provider override for this specific call (e.g. "openai", "anthropic"). */
+  provider?: string;
+  /** System prompt prepended to the request. */
+  system?: string;
+  /** Sampling temperature (0-2). */
+  temperature?: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -91,7 +98,14 @@ export class WeftBuilder<T = unknown> implements PromiseLike<TrackedResult<T>> {
   /** Execute the underlying AgentUnit and return its tracked result. */
   async run(): Promise<TrackedResult<T>> {
     const ctx = createContext();
-    return this.coordinate().run(ctx);
+    const result = await this.coordinate().run(ctx);
+    // N51 fix: apply the user-specified confidence to the result.
+    // Previously, WeftOptions.confidence was accepted but silently ignored;
+    // the confidence was always recomputed from the operator chain.
+    if (this.options.confidence !== undefined) {
+      result.confidence = this.options.confidence;
+    }
+    return result;
   }
 
   then<TResult1 = TrackedResult<T>, TResult2 = never>(
@@ -111,41 +125,53 @@ export class WeftBuilder<T = unknown> implements PromiseLike<TrackedResult<T>> {
     const task = this.task;
     const opts = this.options;
 
+    // N50 fix: forward all AgentConfig fields to ai() — provider, system, and
+    // temperature were previously accepted in WeftOptions but silently dropped.
+    const aiOpts = {
+      model: opts.model,
+      provider: opts.provider,
+      system: opts.system,
+      temperature: opts.temperature,
+    };
+
+    let unit: AgentUnit<T>;
+
     if (opts.schema) {
       // Schema provided: ai() returns the parsed output type.
       // We narrow through opts.schema to preserve the Zod inference chain.
       const schema = opts.schema;
-      const unit = AgentUnit.from<T>(async () => {
-        const result = await ai(task, {
-          model: opts.model,
-          schema,
-        });
+      const base = AgentUnit.from<T>(async () => {
+        const result = await ai(task, { ...aiOpts, schema });
         return result as T;
       });
-      return unit.provides(schema) as AgentUnit<T>;
+      unit = base.provides(schema) as AgentUnit<T>;
+    } else {
+      // No schema: ai() returns string. We cast through unknown to prevent
+      // leaking unknown/any through the type system.
+      unit = AgentUnit.from<T>(async () => {
+        const result = await ai(task, aiOpts);
+        return result as unknown as T;
+      });
     }
 
-    // No schema: ai() returns string. We cast through unknown to prevent
-    // leaking unknown/any through the type system — callers of WeftBuilder<string>
-    // get a properly typed string result.
-    const unit = AgentUnit.from<T>(async () => {
-      const result = await ai(task, {
-        model: opts.model,
-      });
-      return result as unknown as T;
-    });
-
+    // N41 fix: apply resilience wrappers to BOTH schema and non-schema paths.
+    // Previously the schema branch applied neither, and the non-schema branch
+    // dropped retry when timeout was also set (if/else-if ordering bug).
+    //
+    // Order: timeout first (per-attempt bound), then retry wraps the timed unit
+    // so each attempt independently gets a fresh timeout window.
     if (opts.timeout !== undefined) {
-      return unit.timeout(opts.timeout) as unknown as AgentUnit<T>;
+      unit = unit.timeout(opts.timeout) as unknown as AgentUnit<T>;
     }
     if (opts.retry !== undefined) {
       const retryConfig =
         typeof opts.retry === "number"
           ? { maxAttempts: opts.retry }
           : opts.retry;
-      return unit
-        .retry(retryConfig.maxAttempts ?? 3, retryConfig)
-        .timeout(opts.timeout ?? 30_000) as unknown as AgentUnit<T>;
+      unit = unit.retry(
+        retryConfig.maxAttempts ?? 3,
+        retryConfig,
+      ) as unknown as AgentUnit<T>;
     }
 
     return unit;

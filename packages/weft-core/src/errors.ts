@@ -55,6 +55,9 @@ export type WeftErrorCode =
   | "TIMEOUT"
   | "NETWORK_ERROR"
   | "IDEMPOTENCY_VIOLATION"
+  | "IDEMPOTENCY_STORE_WRITE_FAILED"
+  | "COMPENSATION_FAILED"
+  | "VALIDATION_ERROR"
   | "UNKNOWN_ERROR";
 
 // ── WeftError Detail (attached to enhanced errors) ──────────────────────────
@@ -226,5 +229,69 @@ export class WeftError extends Error {
       example: this.example,
       context: this.context,
     };
+  }
+}
+
+/**
+ * Thrown when a compensation (rollback) action itself fails after the primary
+ * operation failed. Carries both the original error and the compensation error
+ * so partially-restored external state is never silently concealed.
+ *
+ * @example
+ * ```typescript
+ * try { ... } catch (err) {
+ *   if (err instanceof CompensationError) {
+ *     console.error("Primary:", err.originalError.message);
+ *     console.error("Rollback failed:", err.compensationError.message);
+ *   }
+ * }
+ * ```
+ */
+export class CompensationError extends WeftError {
+  /** The error thrown by the primary computation that triggered rollback. */
+  readonly originalError: Error;
+  /** The error thrown by the compensation / undo action itself. */
+  readonly compensationError: Error;
+
+  constructor(originalError: Error, compensationError: Error) {
+    super({
+      code: "COMPENSATION_FAILED",
+      why: `Compensation failed: original error: "${originalError.message}"; rollback error: "${compensationError.message}". External state may be partially restored.`,
+      action:
+        "Inspect both originalError and compensationError on this instance. Manually verify external state consistency.",
+      cause: originalError,
+    });
+    this.name = "CompensationError";
+    this.originalError = originalError;
+    this.compensationError = compensationError;
+  }
+}
+
+/**
+ * Thrown when the idempotency store successfully persisted the computation
+ * result but a later `set()` call failed. The computation DID execute and
+ * succeed; the result is returned to the caller despite the store error, but
+ * future calls with the same key will re-execute because the key was never
+ * durably persisted.
+ *
+ * Callers MUST NOT retry on this error as if the computation failed — the
+ * side effects already occurred.
+ */
+export class IdempotencyStoreWriteError extends WeftError {
+  /** The computation result that was produced successfully. */
+  readonly computationResult: unknown;
+
+  constructor(key: string, storeError: unknown, computationResult: unknown) {
+    const detail =
+      storeError instanceof Error ? storeError.message : String(storeError);
+    super({
+      code: "IDEMPOTENCY_STORE_WRITE_FAILED",
+      why: `Idempotency store write failed for key "${key}": ${detail}. The computation ran and succeeded; future calls with this key will re-execute.`,
+      action:
+        "Do NOT retry this error as a computation failure — the side effect already ran. Investigate the idempotency store health.",
+      cause: storeError instanceof Error ? storeError : new Error(detail),
+    });
+    this.name = "IdempotencyStoreWriteError";
+    this.computationResult = computationResult;
   }
 }

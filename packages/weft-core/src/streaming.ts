@@ -92,13 +92,15 @@ export async function* stream(
     }
     messages.push({ role: "user", content: prompt });
 
-    // 4. Execute stream
+    // 4. Execute stream — forward the AbortSignal so the provider SDK can
+    // interrupt the request when the caller cancels (N61 fix).
     const chunkStream = provider.stream({
       model,
       messages,
       temperature: options?.temperature,
       maxTokens: options?.maxTokens,
       stop: options?.stop,
+      signal: options?.signal,
     });
 
     // 5. Iterate over chunks, accumulate usage, and yield text.

@@ -218,3 +218,52 @@ export class InMemoryIdempotencyStore implements IdempotencyStore {
  * Process-wide default store used when an {@link IdempotencyConfig} omits `store`.
  */
 export const defaultIdempotencyStore = new InMemoryIdempotencyStore();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SINGLE-FLIGHT IN-FLIGHT MAP (B3 at-most-once fix)
+//
+// Guarantees that two concurrent runs with the same key execute the
+// computation exactly once within a single process. Concurrent calls that
+// arrive while a key is in-flight await the in-progress promise and share
+// its result without re-executing the side effect.
+//
+// Guarantee provided: at-most-once per key per process lifetime (between
+// in-flight-map eviction). Cross-process at-most-once still requires the
+// external IdempotencyStore to be reliable.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Per-key in-flight promise map.
+ * Populated when a run begins and deleted when it settles (success or error).
+ * Keyed by `"${storeId}::${key}"` so separate stores don't share slots.
+ *
+ * @internal
+ */
+export const _idempotencyInFlight: Map<
+  string,
+  Promise<TrackedResult<any>>
+> = new Map();
+
+/**
+ * Return the composite flight key used to isolate entries per store.
+ * We use the store's object identity (via a WeakMap) so different store
+ * instances for the same logical key don't collide.
+ * @internal
+ */
+const _storeIds = new WeakMap<IdempotencyStore, number>();
+let _storeIdCounter = 0;
+
+function getStoreId(store: IdempotencyStore): string {
+  if (!_storeIds.has(store)) {
+    _storeIds.set(store, ++_storeIdCounter);
+  }
+  return String(_storeIds.get(store)!);
+}
+
+/**
+ * Build the in-flight map key for a given store + idempotency key.
+ * @internal
+ */
+export function buildFlightKey(store: IdempotencyStore, key: string): string {
+  return `${getStoreId(store)}::${key}`;
+}

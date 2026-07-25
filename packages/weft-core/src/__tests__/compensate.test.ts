@@ -5,7 +5,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CompensateFn } from "../AgentUnit/operators/compensate";
-import { AgentUnit, createContext } from "../index";
+import { AgentUnit, CompensationError, createContext } from "../index";
 import type { AgentContext } from "../types";
 
 describe("AgentUnit.compensate()", () => {
@@ -66,17 +66,40 @@ describe("AgentUnit.compensate()", () => {
     expect(capturedContext!.agentContext).toBe(ctx);
   });
 
-  it("Story 4: compensation that itself throws — original error still propagates", async () => {
+  it("Story 4: compensation that itself throws — surfaces CompensationError with both errors", async () => {
+    // N68 fix: compensation errors were previously silently swallowed so
+    // partially-restored external state was indistinguishable from a clean
+    // rollback. The new contract: when compensation itself throws, wrap both
+    // errors in CompensationError so the caller can investigate state.
     const primaryError = new Error("primary failed");
+    const compensationThrow = new Error("compensation error");
 
     const compensateFn: CompensateFn = () => {
-      throw new Error("compensation error");
+      throw compensationThrow;
     };
+
+    const err = await AgentUnit.fail<string>(primaryError)
+      .compensate(compensateFn)
+      .run(ctx, { trustMode: "legacy" })
+      .catch((e) => e);
+
+    expect(err).toBeInstanceOf(CompensationError);
+    expect(err.originalError).toBe(primaryError);
+    expect(err.compensationError).toBe(compensationThrow);
+    expect(err.message).toContain("primary failed");
+    expect(err.message).toContain("compensation error");
+  });
+
+  it("Story 5: compensation succeeds — original error propagates unchanged", async () => {
+    const primaryError = new Error("primary failed");
+    const compensateFn = vi.fn<CompensateFn>().mockResolvedValue(undefined);
 
     await expect(
       AgentUnit.fail<string>(primaryError)
         .compensate(compensateFn)
         .run(ctx, { trustMode: "legacy" }),
     ).rejects.toThrow("primary failed");
+
+    expect(compensateFn).toHaveBeenCalledTimes(1);
   });
 });
