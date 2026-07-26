@@ -217,6 +217,10 @@ export type {
 } from "./types";
 // ─── Trust / TrackedResult (unforgeable — marker is module-private) ──────────
 export { createTrackedResult, isTrackedResult, unwrapTrackedResult, extractTrackedConfidence } from "./trust";
+// Durable execution (CR-403) is published on the `@symplek/core/store` subpath,
+// matching every other Wave 5 capability (`./uncertainty`, `./rehearsal`,
+// `./agent`). Keeping new capability surface off the root barrel is what lets
+// boundaryTest and exportCount stay meaningful as the framework grows.
 export { isTracked, unwrapTracked } from "./utils";
 // ─── Version ─────────────────────────────────────────────────────────────────
 export { VERSION } from "./version";

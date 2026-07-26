@@ -24,6 +24,8 @@ export default defineConfig({
     "src/operators/index.ts",
     "src/rehearsal/index.ts",
     "src/uncertainty/index.ts",
+    "src/store/index.ts",
+    "src/agent/index.ts",
   ],
   format: ["cjs", "esm"],
   dts: true,

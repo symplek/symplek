@@ -16,6 +16,7 @@ export * from "./compensate";
 export * from "./contracts";
 export * from "./coordination";
 export * from "./interview";
+export * from "./loop";
 export * from "./model";
 export * from "./parallel";
 export * from "./reflection";

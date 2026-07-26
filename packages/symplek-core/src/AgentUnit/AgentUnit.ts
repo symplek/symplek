@@ -73,6 +73,7 @@ import type {
   SupervisedDecision,
   SupervisedOptions,
 } from "./operators/supervised";
+import type { LoopOperatorOptions } from "./operators/loop";
 import { emitDeprecationWarning, wrapInTrackedResult } from "./zeroTrust";
 
 export type { AgentComputation, AgentUnitMetadata };
@@ -864,6 +865,20 @@ export interface AgentUnit<T> {
     reviewFn: (value: T) => Promise<SupervisedDecision<T>>,
     options?: SupervisedOptions<T>,
   ): AgentUnit<T>;
+
+  // ─── loop ─────────────────────────────────────────────────────────────────────
+  /**
+   * Drive a multi-turn LLM tool-call cycle.
+   *
+   * Takes the current unit's resolved value as the initial user prompt, calls
+   * the provider iteratively, executes tool calls, and stops when the stop
+   * condition fires or maxSteps is reached.
+   *
+   * Tools with requiresApproval gate through the requireApproval callback
+   * in options before execution. Without the callback, encountering such a
+   * tool throws ToolApprovalRequiredError.
+   */
+  loop(options?: LoopOperatorOptions): AgentUnit<import("../agent/executor").AgentResult>;
 
   // ─── runStandalone ───────────────────────────────────────────────────────
   /** Execute without a pre-created AgentContext. */

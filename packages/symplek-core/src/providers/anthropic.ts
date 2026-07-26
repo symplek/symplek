@@ -9,6 +9,7 @@ import type {
   Provider,
   ProviderCapabilities,
   StreamChunk,
+  ToolCall,
 } from "./interface";
 
 // ── Lazy SDK loader ──────────────────────────────────────────────────────────
@@ -92,7 +93,23 @@ export async function createAnthropicProvider(
             role: "assistant",
             content: m.content,
           } as Anthropic.MessageParam;
-        // Anthropic handles tool messages differently, but for basic chat:
+        // CR-402 fix: Anthropic requires tool results as content blocks with
+        // type:"tool_result", not as plain user messages. The previous coercion
+        // (role:"user" with string content) silently dropped the tool_use_id
+        // link, causing Anthropic to reject multi-turn tool conversations.
+        if (m.role === "tool") {
+          return {
+            role: "user",
+            content: [
+              {
+                type: "tool_result" as const,
+                tool_use_id: m.toolCallId ?? "",
+                content: m.content,
+              },
+            ],
+          } as Anthropic.MessageParam;
+        }
+        // Fallback for any unknown role — plain user message
         return { role: "user", content: m.content } as Anthropic.MessageParam;
       });
 
@@ -125,13 +142,27 @@ export async function createAnthropicProvider(
     async generate(request: AIRequest): Promise<AIResponse> {
       try {
         const { system, messages } = transformMessages(request.messages);
-        const response = await client.messages.create({
+
+        // Translate provider-neutral ToolDefinition[] to Anthropic's tool format.
+        // Anthropic uses "input_schema" (snake_case) instead of "inputSchema".
+        const anthropicTools = request.tools?.map((t) => ({
+          name: t.name,
+          description: t.description,
+          input_schema: t.inputSchema,
+        }));
+
+        // Never pass stream:true, so the SDK always returns a Message.
+        // Cast params as `any` to avoid the overload-union inference trap;
+        // cast result as `Anthropic.Message` so downstream accesses are typed.
+        const response = (await client.messages.create({
           model: request.model,
           system,
           messages,
           max_tokens: request.maxTokens || DEFAULT_MAX_TOKENS,
           stop_sequences: request.stop,
-        });
+          ...(anthropicTools?.length ? { tools: anthropicTools } : {}),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any)) as Anthropic.Message;
 
         // Current Claude models think by default, so the reply is a list of
         // blocks with thinking first and the answer after it. The answer is
@@ -142,6 +173,19 @@ export async function createAnthropicProvider(
           .map((block) => (block as Anthropic.TextBlock).text)
           .join("");
 
+        // Extract tool calls from ToolUseBlock items (tool_use responses have no text block).
+        const toolCalls: ToolCall[] = response.content
+          .filter((block) => block.type === "tool_use")
+          .map((block) => {
+            const tb = block as {
+              type: "tool_use";
+              id: string;
+              name: string;
+              input: unknown;
+            };
+            return { id: tb.id, name: tb.name, input: tb.input };
+          });
+
         return {
           text,
           usage: {
@@ -151,6 +195,7 @@ export async function createAnthropicProvider(
               response.usage.input_tokens + response.usage.output_tokens,
           },
           finishReason: transformFinishReason(response.stop_reason),
+          ...(toolCalls.length > 0 ? { toolCalls } : {}),
           raw: response,
         };
       } catch (error: unknown) {
