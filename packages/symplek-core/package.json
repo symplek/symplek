@@ -42,6 +42,10 @@
     "./rehearsal": {
       "import": { "types": "./dist/rehearsal/index.d.ts", "default": "./dist/rehearsal/index.js" },
       "require": { "types": "./dist/rehearsal/index.d.cts", "default": "./dist/rehearsal/index.cjs" }
+    },
+    "./uncertainty": {
+      "import": { "types": "./dist/uncertainty/index.d.ts", "default": "./dist/uncertainty/index.js" },
+      "require": { "types": "./dist/uncertainty/index.d.cts", "default": "./dist/uncertainty/index.cjs" }
     }
   },
   "files": [

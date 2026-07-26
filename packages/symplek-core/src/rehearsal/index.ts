@@ -151,3 +151,17 @@ export {
   // Test harness
   TestHarness,
 } from "./testing";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GOLDEN TRACES
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type { GoldenTrace, GoldenTraceContract } from "./golden";
+
+export {
+  _clearMigrationsForTest,
+  extractLLMCallsFromTrace,
+  registerTraceMigration,
+  replayAgentWithTrace,
+  toGoldenTrace,
+} from "./golden";

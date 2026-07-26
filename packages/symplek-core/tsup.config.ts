@@ -23,6 +23,7 @@ export default defineConfig({
     "src/change-kernel/index.ts",
     "src/operators/index.ts",
     "src/rehearsal/index.ts",
+    "src/uncertainty/index.ts",
   ],
   format: ["cjs", "esm"],
   dts: true,

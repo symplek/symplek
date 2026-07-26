@@ -8,6 +8,7 @@
  * @surface internal
  */
 
+import { calculateCompositeCoherence } from "../../coherence";
 import type { HasVotes } from "../../coherence/types";
 import {
   createCoherenceComputation,
@@ -49,7 +50,18 @@ AgentUnit.prototype.consensus = function <T>(
     .computation;
   const selfMeta = this.getMetadata();
   return AgentUnit._make<ConsensusResult>(
-    createConsensusComputation(selfComp, voters, selfMeta, options),
+    async (ctx) => {
+      const raw = await createConsensusComputation(
+        selfComp,
+        voters,
+        selfMeta,
+        options,
+      )(ctx);
+      // Compute ensemble coherence from the votes so wrapInTrackedResult can
+      // thread it onto the resulting TrackedResult (CR-503).
+      const coherence = calculateCompositeCoherence({ votes: raw.votes });
+      return { ...raw, coherence };
+    },
     {
       id: AgentUnit._generateId(),
       operatorChain: [...selfMeta.operatorChain, "consensus"],
@@ -69,11 +81,17 @@ AgentUnit.prototype.converge = function <T>(
   return AgentUnit._make<ConvergeResult<T>>(
     async (ctx) => {
       const initialValue = await selfComp(ctx);
-      return createConvergeComputation(
+      const raw = await createConvergeComputation(
         initialValue,
         agents,
         options ?? {},
       )(ctx);
+      // Compute ensemble coherence from convergence contributions (CR-503).
+      const coherence = calculateCompositeCoherence({
+        contributions: raw.contributions,
+        convergenceRounds: raw.rounds,
+      });
+      return { ...raw, coherence };
     },
     {
       id: AgentUnit._generateId(),
@@ -94,7 +112,18 @@ AgentUnit.prototype.debate = function <T>(
   return AgentUnit._make<DebateResult<T>>(
     async (ctx) => {
       const initialValue = await selfComp(ctx);
-      return createDebateComputation(initialValue, agents, options ?? {})(ctx);
+      const raw = await createDebateComputation(
+        initialValue,
+        agents,
+        options ?? {},
+      )(ctx);
+      // Compute ensemble coherence combining votes and convergence (CR-503).
+      const coherence = calculateCompositeCoherence({
+        votes: raw.votes ?? [],
+        contributions: raw.contributions,
+        convergenceRounds: raw.rounds,
+      });
+      return { ...raw, coherence };
     },
     {
       id: AgentUnit._generateId(),

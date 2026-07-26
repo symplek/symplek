@@ -72,6 +72,17 @@ export interface TrackedResult<T> {
    * @since 1.0.0-beta.1
    */
   objectiveConfidence?: import("./confidence").ObjectiveConfidence;
+
+  /**
+   * Ensemble coherence of the multi-agent process that produced this result.
+   * @remarks
+   * Populated by coordination operators (consensus, converge, debate) when
+   * multiple agents participated. Use {@link getUncertainty} from
+   * `@symplek/core/uncertainty` to access this alongside confidence as a single
+   * composable signal.
+   * @since 2.1.0 — CR-503
+   */
+  coherence?: import("./coherence/types").EnsembleCoherence;
 }
 
 /**

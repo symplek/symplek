@@ -7,6 +7,11 @@
 
 // W1-B: real createHarness factory backed by the Claude Agent SDK adapter.
 export { createHarness } from "./adapter/claude-agent-sdk.js";
+// CR-501: AgentUnitHarness — interceptor injection for replay-based CI tests.
+export {
+  AgentUnitHarness,
+  INTERCEPTOR_EXTENSION_KEY,
+} from "./agent-unit-harness.js";
 export type { ConsensusDefaults } from "./consensus-defaults.js";
 export { getConsensusDefaults } from "./consensus-defaults.js";
 export {
