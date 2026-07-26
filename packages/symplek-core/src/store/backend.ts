@@ -72,9 +72,14 @@ export interface DurableStoreOptions {
   /** Durable {@link IdempotencyStore} — persists results across process restarts. */
   idempotency: IdempotencyStore;
   /**
-   * Write-through {@link TransactionLogManager} — in-memory reads,
-   * best-effort async writes to the backend. Durability of individual
-   * entries is not guaranteed if the process crashes mid-write.
+   * Session-local {@link TransactionLogManager} — in-memory reads with best-effort
+   * async writes to the backend for observability.
+   *
+   * `get()`, `query()`, and `getPending()` only reflect entries from the CURRENT
+   * process session. The in-memory map is NOT hydrated from the backend on
+   * construction, so a restarted process sees an empty log even if committed
+   * entries exist in the backend. To query across restarts, read the backend
+   * directly using the `txn:` key prefix.
    */
   transactions: TransactionLogManager;
 }

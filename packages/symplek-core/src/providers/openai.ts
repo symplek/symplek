@@ -12,7 +12,9 @@ import type {
   ResponseFormat,
   StreamChunk,
   StreamPart,
+  ToolCall,
   ToolCallPart,
+  ToolDefinition,
 } from "./interface";
 
 // ── Lazy SDK loader ──────────────────────────────────────────────────────────
@@ -38,6 +40,71 @@ async function loadOpenAISdk(): Promise<typeof import("openai")["default"]> {
       example: "pnpm add openai",
     });
   }
+}
+
+// ── Exported helpers (tested directly in openai-tool-loop.test.ts) ──────────
+
+/**
+ * Convert Symplek ToolDefinition[] to the OpenAI function-tools format.
+ * Returns undefined when the tools array is absent or empty so callers can
+ * omit the `tools` field from the request body entirely (OpenAI rejects an
+ * explicit empty `tools: []` in some model versions).
+ *
+ * Exported for direct unit testing — must stay in sync with the generate/stream
+ * request bodies below.
+ */
+export function buildOpenAITools(
+  tools: ToolDefinition[] | undefined,
+):
+  | Array<{
+      type: "function";
+      function: {
+        name: string;
+        description: string;
+        parameters: Record<string, unknown>;
+      };
+    }>
+  | undefined {
+  if (!tools || tools.length === 0) return undefined;
+  return tools.map((t) => ({
+    type: "function" as const,
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: t.inputSchema as Record<string, unknown>,
+    },
+  }));
+}
+
+/**
+ * Parse OpenAI's tool_calls array into Symplek's ToolCall[] shape.
+ * Returns undefined when there are no tool calls so AIResponse.toolCalls is
+ * only populated when the model actually requested tool execution.
+ *
+ * Exported for direct unit testing — must stay in sync with the generate path
+ * below.
+ */
+export function parseOpenAIToolCalls(
+  toolCalls:
+    | Array<{
+        id: string;
+        function: { name: string; arguments: string };
+      }>
+    | null
+    | undefined,
+): ToolCall[] | undefined {
+  if (!toolCalls || toolCalls.length === 0) return undefined;
+  return toolCalls.map((tc) => ({
+    id: tc.id,
+    name: tc.function.name,
+    input: (() => {
+      try {
+        return JSON.parse(tc.function.arguments || "{}");
+      } catch {
+        return tc.function.arguments;
+      }
+    })(),
+  }));
 }
 
 /**
@@ -134,6 +201,7 @@ export async function createOpenAIProvider(
 
     async generate(request: AIRequest): Promise<AIResponse> {
       try {
+        const openAITools = buildOpenAITools(request.tools);
         const response = await client.chat.completions.create({
           model: request.model,
           messages: transformMessages(request.messages),
@@ -145,6 +213,7 @@ export async function createOpenAIProvider(
           presence_penalty: request.presencePenalty,
           seed: request.seed,
           response_format: buildOpenAIResponseFormat(request.responseFormat),
+          ...(openAITools ? { tools: openAITools } : {}),
         });
 
         const choice = response.choices[0];
@@ -156,6 +225,7 @@ export async function createOpenAIProvider(
             totalTokens: response.usage?.total_tokens || 0,
           },
           finishReason: transformFinishReason(choice.finish_reason),
+          toolCalls: parseOpenAIToolCalls(choice.message.tool_calls as Parameters<typeof parseOpenAIToolCalls>[0]),
           raw: response,
         };
       } catch (error: unknown) {
@@ -176,6 +246,7 @@ export async function createOpenAIProvider(
 
     async *stream(request: AIRequest): AsyncIterable<StreamChunk> {
       try {
+        const openAIStreamTools = buildOpenAITools(request.tools);
         // N61 fix: pass signal as the second options argument so the OpenAI SDK
         // can abort the in-flight HTTP request rather than only stopping
         // iteration between chunks.
@@ -193,6 +264,7 @@ export async function createOpenAIProvider(
             response_format: buildOpenAIResponseFormat(request.responseFormat),
             stream: true,
             stream_options: { include_usage: true },
+            ...(openAIStreamTools ? { tools: openAIStreamTools } : {}),
           },
           request.signal ? { signal: request.signal } : undefined,
         );
@@ -234,6 +306,7 @@ export async function createOpenAIProvider(
 
     async *streamParts(request: AIRequest): AsyncIterable<StreamPart> {
       try {
+        const openAIPartsTools = buildOpenAITools(request.tools);
         const stream = await client.chat.completions.create(
           {
             model: request.model,
@@ -248,6 +321,7 @@ export async function createOpenAIProvider(
             response_format: buildOpenAIResponseFormat(request.responseFormat),
             stream: true,
             stream_options: { include_usage: true },
+            ...(openAIPartsTools ? { tools: openAIPartsTools } : {}),
           },
           request.signal ? { signal: request.signal } : undefined,
         );

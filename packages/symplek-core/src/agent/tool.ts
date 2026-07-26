@@ -47,6 +47,13 @@ export interface Tool<P extends z.ZodType = any, R = any> {
 /**
  * Helper to define a tool with full type inference.
  *
+ * Using `T extends Tool<P, R>` preserves the exact argument type (including
+ * whether `name` is present as a required string). When the caller supplies
+ * `name: "search"`, the return type carries `name: string` (required), making
+ * the result directly assignable to `Array<Tool & { name: string }>` without
+ * any type assertion. Without this, `tool()` would widen to `Tool<P,R>` whose
+ * `name` is optional, forcing every `.loop()` call site to cast.
+ *
  * @example
  * ```typescript
  * const search = tool({
@@ -55,9 +62,12 @@ export interface Tool<P extends z.ZodType = any, R = any> {
  *   parameters: z.object({ query: z.string() }),
  *   execute: async ({ query }) => fetchResults(query),
  * });
+ * // search.name is string (required) — pass directly to .loop({ tools: [search] })
  * ```
  */
-export function tool<P extends z.ZodType, R>(config: Tool<P, R>): Tool<P, R> {
+export function tool<P extends z.ZodType, R, T extends Tool<P, R>>(
+  config: T,
+): T {
   return config;
 }
 

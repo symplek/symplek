@@ -468,6 +468,153 @@ describe("createFileBackend — injective key encoding", () => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Finding 4 — structural validation before trusting a deserialized entry
+//
+// Pre-fix: `DurableIdempotencyStore.get()` passed any JSON-parseable value
+// directly to `deserializeTrackedResult`, which does NOT validate its input.
+// A structurally empty entry `{}` would produce a TrackedResult with undefined
+// metadata, get added to the WeakSet, and be returned as a genuine cache hit —
+// causing `resume()` to skip a computation that never actually committed.
+//
+// Post-fix: `isValidSerializedShape()` gates the entry before deserialization.
+// A structurally invalid entry throws `IdempotencyStoreCorruptedError` rather
+// than being silently promoted to a trusted result.
+//
+// Rule 015: tests FAIL pre-fix (get() returns a bogus result instead of throwing)
+// and PASS post-fix.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("DurableIdempotencyStore — structural validation (finding 4)", () => {
+  it("throws for a structurally empty entry {} — pre-fix returns a bogus TrackedResult", async () => {
+    const dir = subdir("idem-finding4-empty");
+    const backend = createFileBackend(dir);
+    const store = createDurableStore(backend);
+
+    // Write {} directly — syntactically valid JSON, structurally not a TrackedResult
+    await backend.set("idem:empty-key", new TextEncoder().encode("{}"));
+
+    // Pre-fix: deserializeTrackedResult({}) silently creates a result with undefined
+    // metadata and returns it as a cache hit → get() does NOT throw.
+    // Post-fix: isValidSerializedShape({}) fails → IdempotencyStoreCorruptedError thrown.
+    await expect(store.idempotency.get("empty-key")).rejects.toThrow();
+  });
+
+  it("throws for an entry with value but missing source and confidence fields", async () => {
+    const dir = subdir("idem-finding4-partial");
+    const backend = createFileBackend(dir);
+    const store = createDurableStore(backend);
+
+    const partial = { value: "some-result" }; // missing source, confidence, sourceChain, minChainConfidence
+    await backend.set("idem:partial-key", new TextEncoder().encode(JSON.stringify(partial)));
+
+    await expect(store.idempotency.get("partial-key")).rejects.toThrow();
+  });
+
+  it("throws for an entry with wrong types (confidence is a string, not a number)", async () => {
+    const dir = subdir("idem-finding4-wrongtype");
+    const backend = createFileBackend(dir);
+    const store = createDurableStore(backend);
+
+    const wrong = { value: "x", source: "agent", confidence: "high", sourceChain: [], minChainConfidence: "medium" };
+    await backend.set("idem:wrongtype-key", new TextEncoder().encode(JSON.stringify(wrong)));
+
+    await expect(store.idempotency.get("wrongtype-key")).rejects.toThrow();
+  });
+
+  it("a valid serialized entry still round-trips correctly after the guard is added", async () => {
+    const dir = subdir("idem-finding4-valid");
+    const store = createDurableStore(createFileBackend(dir));
+
+    const original = createTrackedResult("valid-result", { source: "agent", confidence: 0.9 });
+    await store.idempotency.set("valid-key", original);
+    const fetched = await store.idempotency.get("valid-key");
+
+    expect(fetched).not.toBeNull();
+    expect(isTrackedResult(fetched!)).toBe(true);
+    expect(fetched!.value).toBe("valid-result");
+  });
+
+  it("absent key returns null (absence and structural corruption remain distinct)", async () => {
+    const dir = subdir("idem-finding4-absent");
+    const store = createDurableStore(createFileBackend(dir));
+    expect(await store.idempotency.get("no-such-key")).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Finding 5 — transaction log is session-local (no hydration)
+//
+// Pre-fix finding: the class was documented as providing durability but the
+// in-memory map was never hydrated from the backend. After a restart,
+// get(), query(), and getPending() operate on an empty map regardless of what
+// is in the backend — the claim was false.
+//
+// Fix chosen: NARROW THE CLAIM (not implement hydration). Hydration would
+// require making the initialization async, breaking the synchronous
+// TransactionLogManager interface that all callers depend on. The simpler honest
+// change is to document that the log is session-local.
+//
+// Exact wording the user now reads (in DurableTransactionLogManager class doc):
+//   "The in-memory map is NOT hydrated from the backend on construction.
+//    get(), query(), and getPending() reflect only entries created in the
+//    CURRENT process session. A restarted process sees an empty map regardless
+//    of what is persisted in the backend."
+//
+// The test below pins the actual (correctly documented) behavior. It passes both
+// pre-fix and post-fix because the behavior was already correct — only the
+// documentation was wrong. There is no code behavior change for Finding 5.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("DurableTransactionLogManager — session-local reads (finding 5)", () => {
+  it("get() returns undefined for a transaction committed in a prior session (expected no-hydration behavior)", async () => {
+    const storage = new Map<string, Uint8Array>();
+    const backend: DurableStoreBackend = {
+      async get(k) { return storage.get(k) ?? null; },
+      async set(k, v) { storage.set(k, v); },
+      async del(k) { storage.delete(k); },
+      async list(prefix) { return [...storage.keys()].filter((k) => k.startsWith(prefix)); },
+    };
+
+    // Session A: create and commit a transaction, background write persists to backend
+    const storeA = createDurableStore(backend);
+    const entry = storeA.transactions.create("agent-1", "charge", { amount: 100 });
+    storeA.transactions.commit(entry.id, { chargeId: "ch_99" });
+    // Allow background write to complete
+    await new Promise<void>((r) => setImmediate(r));
+    await new Promise<void>((r) => setImmediate(r));
+
+    // Verify the entry was actually persisted to the backend
+    const txnKey = `txn:${entry.id}`;
+    expect(storage.has(txnKey)).toBe(true);
+
+    // Session B: new store over same backend — in-memory map is empty (no hydration)
+    const storeB = createDurableStore(backend);
+
+    // All three read methods return empty/undefined — this is the EXPECTED behavior
+    // after the doc fix. The backend has the entry; the in-memory map does not.
+    expect(storeB.transactions.get(entry.id)).toBeUndefined();
+    expect(storeB.transactions.getPending()).toHaveLength(0);
+    expect(storeB.transactions.query({})).toHaveLength(0);
+  });
+
+  it("entries committed in the current session ARE visible via get() and query()", async () => {
+    const dir = subdir("txn-session-local-current");
+    const store = createDurableStore(createFileBackend(dir));
+
+    const entry = store.transactions.create("agent-1", "action", { x: 1 });
+    store.transactions.commit(entry.id, { result: "ok" });
+
+    // Same-session reads work correctly
+    const fetched = store.transactions.get(entry.id);
+    expect(fetched).toBeDefined();
+    expect(fetched?.status).toBe("committed");
+
+    const all = store.transactions.query({});
+    expect(all.some((e) => e.id === entry.id)).toBe(true);
+  });
+});
+
 // ─── 7. Corruption safety — present-but-unreadable entry (Finding F2) ────────
 
 describe("DurableIdempotencyStore — corrupt entry handling", () => {

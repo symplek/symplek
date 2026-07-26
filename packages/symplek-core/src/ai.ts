@@ -26,34 +26,40 @@ import type { Provider, ResponseFormat } from "./providers/interface";
 /**
  * Build the response format for a schema-bearing request.
  *
+ * Returns both the format and a `degraded` flag that is `true` when the
+ * provider cannot enforce the schema at generation time (no
+ * strictStructuredOutput support, or the schema has a non-object root).
+ * The flag is threaded into the trace so callers can observe the degradation
+ * without inspecting the raw request — a schema request that silently fell
+ * back to json_object is not the same as one that was strictly enforced.
+ *
  * The strict-mode plumbing (CR-502) is only worth building if the primary
  * `ai()` path actually uses it: a capability reachable solely by hand-rolling
  * a provider request is a capability users do not have. So when the provider
  * advertises strict structured output and the schema converts cleanly, ask for
  * constrained decoding and carry the original Zod schema along so the adapter
  * validates against the full constraint set rather than the JSON Schema subset.
- *
- * Anything that does not qualify — a non-object root, or a provider without
- * strict support — falls back to the previous `json_object` behaviour, which
- * is exactly the honest-degradation path the capability defines.
  */
 function buildResponseFormat(
   schema: z.ZodType,
   provider: Provider,
-): ResponseFormat {
+): { format: ResponseFormat; degraded: boolean } {
   if (!provider.capabilities.strictStructuredOutput) {
-    return { type: "json_object" };
+    return { format: { type: "json_object" }, degraded: true };
   }
   const jsonSchema = zodSchemaToJsonSchema(schema);
   if (!jsonSchema) {
-    return { type: "json_object" };
+    return { format: { type: "json_object" }, degraded: true };
   }
   return {
-    type: "json_schema",
-    name: "response",
-    schema: jsonSchema as unknown as Record<string, unknown>,
-    strict: true,
-    zodSchema: schema,
+    format: {
+      type: "json_schema",
+      name: "response",
+      schema: jsonSchema as unknown as Record<string, unknown>,
+      strict: true,
+      zodSchema: schema,
+    },
+    degraded: false,
   };
 }
 
@@ -192,10 +198,18 @@ async function aiImplementation<T extends z.ZodType = any>(
       provider: _provider,
       ...providerOpts
     } = options ?? {};
+    let structuredOutputDegraded: boolean | undefined;
     const requestOptions: Omit<AIRequest, "model" | "messages"> = {
       ...providerOpts,
       ...(options?.schema && provider.capabilities.structuredOutput
-        ? { responseFormat: buildResponseFormat(options.schema, provider) }
+        ? (() => {
+            const { format, degraded } = buildResponseFormat(
+              options.schema,
+              provider,
+            );
+            if (degraded) structuredOutputDegraded = true;
+            return { responseFormat: format };
+          })()
         : {}),
     };
 
@@ -224,6 +238,7 @@ async function aiImplementation<T extends z.ZodType = any>(
         total: response.usage?.totalTokens || 0,
       },
       timestamp: startTime,
+      ...(structuredOutputDegraded ? { structuredOutputDegraded: true } : {}),
     });
 
     // 6b. Debug logging — written to stderr so it doesn't pollute stdout pipelines

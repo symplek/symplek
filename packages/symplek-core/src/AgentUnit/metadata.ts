@@ -9,6 +9,7 @@
  */
 
 import type { AgentContext } from "../types";
+import type { EnsembleCoherence } from "../coherence/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // COMPUTATION TYPE
@@ -33,6 +34,18 @@ export interface AgentUnitMetadata {
   isParallel?: boolean;
   /** Creation timestamp */
   createdAt: number;
+  /**
+   * Coherence propagated from an upstream coordination operator (consensus,
+   * converge, debate) through a downstream map() transform. Coordination
+   * operators attach coherence to their result VALUE; map() captures it here
+   * before applying the transform function so wrapInTrackedResult() can place
+   * it on the resulting TrackedResult even when the mapped value (e.g. a plain
+   * string) carries no coherence field of its own.
+   *
+   * Set only when map() observes upstream coherence. flatMap() does NOT
+   * propagate this field because the downstream computation is independent.
+   */
+  coherence?: EnsembleCoherence;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

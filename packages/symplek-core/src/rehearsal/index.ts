@@ -160,8 +160,10 @@ export type { GoldenTrace, GoldenTraceContract } from "./golden";
 
 export {
   _clearMigrationsForTest,
+  DEFAULT_SECRET_PATTERNS,
   extractLLMCallsFromTrace,
   registerTraceMigration,
   replayAgentWithTrace,
   toGoldenTrace,
+  SYMPLEK_REPLAY_INTERCEPTOR_KEY,
 } from "./golden";

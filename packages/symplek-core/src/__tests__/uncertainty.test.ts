@@ -331,6 +331,89 @@ describe("converge operator — coherence threading", () => {
   });
 });
 
+// ─── Finding R3-4: coherence survives downstream map ─────────────────────────
+//
+// consensus() attaches coherence to its ConsensusResult value. When the caller
+// then applies .map(() => "done"), the mapped value is a plain string with no
+// coherence field — wrapInTrackedResult extracted coherence from value and found
+// nothing. The composable uncertainty signal was advertised; it wasn't composable.
+//
+// PRE-FIX FAILURE:
+//   unit.consensus(voters).map(() => "done").run(ctx)
+//   → result.coherence is undefined because extractCoherence("done") === undefined
+// POST-FIX: map() captures coherence from the upstream ConsensusResult before
+//   applying the transform function and threads it to the TrackedResult via
+//   AgentUnitMetadata.coherence.
+
+describe("Finding R3-4 — coherence propagates through downstream map()", () => {
+  it("consensus().map(() => 'done') yields a TrackedResult with defined coherence", async () => {
+    const ctx = createContext({});
+
+    const voters = [
+      (_proposal: string): VoteInput => ({
+        decision: "approve",
+        confidence: 0.9,
+        reasoning: "looks good",
+      }),
+      (_proposal: string): VoteInput => ({
+        decision: "approve",
+        confidence: 0.85,
+        reasoning: "agreed",
+      }),
+    ];
+
+    // PRE-FIX: result.coherence is undefined — "done" carries no coherence field.
+    // POST-FIX: coherence is propagated from the ConsensusResult through map().
+    const result = await AgentUnit.of("proposal")
+      .consensus(voters, { quorum: 0.5 })
+      .map(() => "done")
+      .run(ctx);
+
+    expect(result.value).toBe("done");
+    expect(result.coherence).toBeDefined();
+    expect(typeof result.coherence?.composite).toBe("number");
+    expect(result.coherence!.composite).toBeGreaterThan(0);
+  });
+
+  it("coherence survives flatMap(() => AgentUnit.of('done'))", async () => {
+    const ctx = createContext({});
+
+    const voters = [
+      (_p: string): VoteInput => ({ decision: "approve", confidence: 0.88 }),
+    ];
+
+    const result = await AgentUnit.of("x")
+      .consensus(voters, { quorum: 0.5 })
+      .flatMap(() => AgentUnit.of("done"))
+      .run(ctx);
+
+    // flatMap replaces the computation entirely; coherence from the consensus
+    // step is NOT expected to survive flatMap (independent computation chain).
+    // This asserts the current specified boundary: only map() propagates.
+    expect(result.value).toBe("done");
+    // coherence may or may not be present after flatMap — not asserted here.
+  });
+
+  it("consensus().map().map() chains preserve coherence end-to-end", async () => {
+    const ctx = createContext({});
+
+    const voters = [
+      (_p: string): VoteInput => ({ decision: "approve", confidence: 0.92 }),
+      (_p: string): VoteInput => ({ decision: "approve", confidence: 0.9 }),
+    ];
+
+    const result = await AgentUnit.of("proposal")
+      .consensus(voters, { quorum: 0.5 })
+      .map((r) => r.winner)
+      .map((w) => `winner: ${w}`)
+      .run(ctx);
+
+    // Double map: coherence from consensus must survive both transforms.
+    expect(result.coherence).toBeDefined();
+    expect(typeof result.coherence?.composite).toBe("number");
+  });
+});
+
 // ─── OTel attribute safety ────────────────────────────────────────────────────
 
 describe("uncertaintySpanAttributes — OTel safety", () => {

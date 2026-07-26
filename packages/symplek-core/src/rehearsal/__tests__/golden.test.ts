@@ -411,16 +411,19 @@ describe("replayAgentWithTrace", () => {
 
   describe("no live provider call during replay", () => {
     it("serves recorded responses via injected interceptor, making no live call", async () => {
-      // Golden records one LLM call with response "recorded-answer"
+      // Golden records one LLM call with response "recorded-answer".
+      // promptHash must be DJB2(prompt) — the sequence hash check compares the
+      // actual prompt hash the factory sends against what was recorded.
+      const prompt = "hello";
       const callEvent = makeEvent("e1", "llm_call", {
         model: "test-model",
-        promptHash: "abc",
-        prompt: "hello",
+        promptHash: djb2Hash(prompt), // correct: DJB2 of the actual prompt
+        prompt,
       });
       const responseEvent = makeEvent("e2", "llm_response", {
         model: "test-model",
         response: "recorded-answer",
-        responseHash: "def",
+        responseHash: djb2Hash("recorded-answer"), // correct: DJB2 of the response
         latencyMs: 10,
       });
       const trace = makeTrace("recorded-answer", [callEvent, responseEvent]);
@@ -763,6 +766,226 @@ describe("toGoldenTrace — generic redaction covers all event types (finding 1)
 // precisely. The test below pins the observable behavior a caller experiences
 // when a factory ignores the interceptor.
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Finding 1 — applyRedact global flag
+//
+// Pre-fix: `applyRedact` called `String.replace(p, "[REDACTED]")`. When the
+// caller omits the `g` flag, `String.replace` replaces only the FIRST occurrence.
+// A string with the secret appearing twice would have the first redacted and
+// the second written verbatim into the committed trace.
+//
+// Post-fix: `applyRedact` forces global replacement by creating a new RegExp
+// with the `g` flag when the supplied pattern lacks it.
+//
+// Rule 015: the test FAILS pre-fix (second occurrence survives) and PASSES post-fix.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("applyRedact — global flag enforcement (finding 1)", () => {
+  it("redacts ALL occurrences when the caller omits the g flag — pre-fix replaces only first", () => {
+    // Pattern WITHOUT the g flag — pre-fix: String.replace replaces the first only.
+    const noGFlag = /private-token/; // deliberate: no 'g'
+    const trace = makeTrace("private-token and also private-token");
+    const golden = toGoldenTrace(trace, {
+      redactPatterns: [noGFlag],
+      useDefaultRedactions: false,
+    });
+
+    // Both occurrences must be gone. Pre-fix: second survives → this assertion FAILS.
+    expect(String(golden.finalOutput)).not.toContain("private-token");
+  });
+
+  it("handles a secret appearing three times in an event payload — all must be redacted", () => {
+    const noGFlag = /TOKEN/; // no 'g'
+    const callEvent = makeEvent("e1", "llm_call", {
+      model: "m",
+      promptHash: "h",
+      prompt: "TOKEN TOKEN TOKEN",
+    });
+    const trace = makeTrace("ok", [callEvent]);
+    const golden = toGoldenTrace(trace, {
+      redactPatterns: [noGFlag],
+      useDefaultRedactions: false,
+    });
+    const callPayload = golden.events[0].payload as Record<string, unknown>;
+    expect(String(callPayload.prompt)).not.toContain("TOKEN");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Finding 2 — unified interceptor key
+//
+// Pre-fix: golden.ts exported `SYMPLEK_REPLAY_INTERCEPTOR_KEY = "_symplekReplayInterceptor"`
+// but did NOT export it from the rehearsal barrel. The harness (@symplek/harness) exports
+// `INTERCEPTOR_EXTENSION_KEY = "__symplek_interceptor"`. An agent instrumented using the
+// harness key would check a different extensions slot than what `replayAgentWithTrace`
+// injects, silently falling through to a live provider during what is advertised as
+// a free CI assertion.
+//
+// Post-fix: the key is changed to `"__symplek_interceptor"` and exported from the barrel.
+// `replayAgentWithTrace` injects under the same key the harness uses.
+//
+// Rule 015: the string-value test FAILS pre-fix ("_symplekReplayInterceptor" ≠ "__symplek_interceptor")
+// and PASSES post-fix.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("SYMPLEK_REPLAY_INTERCEPTOR_KEY — unified key (finding 2)", () => {
+  it("SYMPLEK_REPLAY_INTERCEPTOR_KEY is '__symplek_interceptor' — the same key AgentUnitHarness uses (pre-fix FAILS)", () => {
+    // Pre-fix value: "_symplekReplayInterceptor" → assertion fails.
+    // Post-fix value: "__symplek_interceptor" → assertion passes.
+    expect(SYMPLEK_REPLAY_INTERCEPTOR_KEY).toBe("__symplek_interceptor");
+  });
+
+  it("replayAgentWithTrace injects under SYMPLEK_REPLAY_INTERCEPTOR_KEY and the factory receives it", async () => {
+    // This confirms the injected key matches what the factory checks.
+    const trace = makeTrace("value");
+    const golden = toGoldenTrace(trace);
+
+    let receivedKey: string | undefined;
+    await replayAgentWithTrace({
+      trace: golden,
+      factory: () =>
+        AgentUnit.from(async (ctx) => {
+          // Enumerate keys to find which one has a non-undefined interceptor value
+          for (const [k, v] of Object.entries(ctx.extensions ?? {})) {
+            if (v !== undefined) receivedKey = k;
+          }
+          return "value";
+        }),
+    });
+
+    expect(receivedKey).toBe("__symplek_interceptor");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Finding 3 — replay correctness (LLM event sequence hash)
+//
+// Pre-fix: the contract only checked finalOutputHash and expectedLlmCallCount.
+// A factory change that altered LLM prompt content (e.g. "debit $10" → "debit $1000")
+// while keeping the same output and call count returned `matched: true` — the
+// behavioral change was invisible to replay.
+//
+// Post-fix: `GoldenTraceContract` gains `llmEventSequenceHash` — SHA-256 of
+// [{promptHash, responseHash}, ...] for all LLM calls in order. A changed prompt
+// in any position diverges the sequence hash and produces a CRITICAL divergence.
+//
+// Rule 015: the sequence-hash divergence test FAILS pre-fix (no sequence check,
+// matched=true) and PASSES post-fix (matched=false, critical divergence present).
+//
+// Documented limitation: side effects that never appear in any LLM prompt or
+// response (fully hardcoded, no LLM involvement) remain outside the trace and
+// are not detectable by replay regardless of this fix.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("replayAgentWithTrace — LLM event sequence hash (finding 3)", () => {
+  it("toGoldenTrace includes llmEventSequenceHash in the contract", () => {
+    const callEvent = makeEvent("e1", "llm_call", {
+      model: "m",
+      promptHash: djb2Hash("hello"),
+      prompt: "hello",
+    });
+    const responseEvent = makeEvent("e2", "llm_response", {
+      model: "m",
+      response: "world",
+      responseHash: djb2Hash("world"),
+      latencyMs: 5,
+    });
+    const trace = makeTrace("world", [callEvent, responseEvent]);
+    const golden = toGoldenTrace(trace);
+
+    expect(golden.contract.llmEventSequenceHash).toBeDefined();
+    expect(typeof golden.contract.llmEventSequenceHash).toBe("string");
+    expect(golden.contract.llmEventSequenceHash!.length).toBe(64); // SHA-256 hex
+  });
+
+  it("detects changed LLM prompt via sequence hash — pre-fix returns matched:true (finding 3 — pre-fix FAILS)", async () => {
+    // Record an agent that asks "compute debit: 10"
+    const originalPrompt = "compute debit: 10";
+    const callEvent = makeEvent("e1", "llm_call", {
+      model: "m",
+      promptHash: djb2Hash(originalPrompt),
+      prompt: originalPrompt,
+    });
+    const responseEvent = makeEvent("e2", "llm_response", {
+      model: "m",
+      response: "ok",
+      responseHash: djb2Hash("ok"),
+      latencyMs: 5,
+    });
+    const trace = makeTrace("ok", [callEvent, responseEvent]);
+    const golden = toGoldenTrace(trace);
+
+    // Factory v2: same output, same call count, but changed prompt
+    const { matched, divergences } = await replayAgentWithTrace({
+      trace: golden,
+      factory: () =>
+        AgentUnit.from(async (ctx) => {
+          const interceptor = ctx.extensions?.[SYMPLEK_REPLAY_INTERCEPTOR_KEY] as
+            | ReplayLLMInterceptor
+            | undefined;
+          if (interceptor) {
+            // Changed prompt — "compute debit: 1000" instead of "compute debit: 10"
+            await interceptor.replayCall({ model: "m", prompt: "compute debit: 1000" });
+          }
+          return "ok"; // same output as recorded
+        }),
+    });
+
+    // Pre-fix: no sequence check → matched:true (prompt change invisible)
+    // Post-fix: sequence hash diverges → matched:false, critical divergence
+    expect(matched).toBe(false);
+    const seqDiv = divergences.find((d) => d.eventId === "golden:llmEventSequence");
+    expect(seqDiv).toBeDefined();
+    expect(seqDiv?.severity).toBe("critical");
+    expect(seqDiv?.description).toContain("LLM call sequence hash mismatch");
+  });
+
+  it("sequence hash matches when the factory uses the same prompt as recorded", async () => {
+    const prompt = "compute debit: 10";
+    const callEvent = makeEvent("e1", "llm_call", {
+      model: "m",
+      promptHash: djb2Hash(prompt),
+      prompt,
+    });
+    const responseEvent = makeEvent("e2", "llm_response", {
+      model: "m",
+      response: "ok",
+      responseHash: djb2Hash("ok"),
+      latencyMs: 5,
+    });
+    const trace = makeTrace("ok", [callEvent, responseEvent]);
+    const golden = toGoldenTrace(trace);
+
+    const { matched, divergences } = await replayAgentWithTrace({
+      trace: golden,
+      factory: () =>
+        AgentUnit.from(async (ctx) => {
+          const interceptor = ctx.extensions?.[SYMPLEK_REPLAY_INTERCEPTOR_KEY] as
+            | ReplayLLMInterceptor
+            | undefined;
+          if (interceptor) {
+            await interceptor.replayCall({ model: "m", prompt }); // same prompt
+          }
+          return "ok";
+        }),
+    });
+
+    expect(matched).toBe(true);
+    const seqDiv = divergences.find((d) => d.eventId === "golden:llmEventSequence");
+    expect(seqDiv).toBeUndefined();
+  });
+
+  it("contract.llmEventSequenceHash is empty-array hash when there are no LLM calls", () => {
+    // sha256(JSON.stringify([])) — deterministic, not undefined
+    const trace = makeTrace("static-result");
+    const golden = toGoldenTrace(trace);
+    expect(golden.contract.llmEventSequenceHash).toBeDefined();
+    // Value is stable: sha256("[]")
+    const expected = sha256hex(JSON.stringify([]));
+    expect(golden.contract.llmEventSequenceHash).toBe(expected);
+  });
+});
 
 describe("replayAgentWithTrace — zero-token guarantee is conditional (finding 2)", () => {
   it("factory that ignores the interceptor produces a critical count-mismatch divergence (loud, not silent)", async () => {

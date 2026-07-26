@@ -95,7 +95,11 @@ export function wrapInTrackedResult<T>(
   const confidence = calculateConfidence(metadata.operatorChain);
   const source: ResultSource = "agent";
   const objectiveConfidence = extractObjectiveConfidence(value);
-  const coherence = extractCoherence(value);
+  // Fall back to coherence captured by map() when the (transformed) value
+  // carries none of its own. This is the R3-4 propagation path: a consensus
+  // result piped through .map(() => "done") loses the structured value but
+  // the map() operator stored the upstream coherence in metadata.coherence.
+  const coherence = extractCoherence(value) ?? metadata.coherence;
 
   return createTrackedResult(value, {
     source,
