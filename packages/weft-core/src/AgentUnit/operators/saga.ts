@@ -82,12 +82,11 @@ AgentUnit.prototype.saga = function <T>(
             }
           }
 
-          // If any undo step failed, surface via CompensationError so the
-          // caller knows external state may be partially restored.
+          // If any undo step failed, surface ALL failures via CompensationError so
+          // the caller knows which resources remain uncompensated. Passing the full
+          // array means CompensationError.undoErrors lists every failed rollback step.
           if (undoErrors.length > 0) {
-            // Report the first undo failure (subsequent ones are lost, but the
-            // partially-restored state is the critical signal).
-            throw new CompensationError(originalError, undoErrors[0]!);
+            throw new CompensationError(originalError, undoErrors);
           }
 
           throw originalError;

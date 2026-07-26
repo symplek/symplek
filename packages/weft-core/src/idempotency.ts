@@ -261,9 +261,20 @@ function getStoreId(store: IdempotencyStore): string {
 }
 
 /**
- * Build the in-flight map key for a given store + idempotency key.
+ * Build the in-flight map key for a given store + idempotency key + AgentUnit identity.
+ *
+ * Including the unit's identity prevents two unrelated operations that share the same
+ * store and logical key from receiving each other's in-flight result. The persistent
+ * cache path already validates the stored value's shape; the in-flight path must carry
+ * the same discrimination so operation B cannot silently receive a type-incompatible
+ * result from operation A's in-flight promise.
+ *
  * @internal
  */
-export function buildFlightKey(store: IdempotencyStore, key: string): string {
-  return `${getStoreId(store)}::${key}`;
+export function buildFlightKey(
+  store: IdempotencyStore,
+  key: string,
+  unitId: string,
+): string {
+  return `${getStoreId(store)}::${key}::${unitId}`;
 }

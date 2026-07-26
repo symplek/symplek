@@ -172,4 +172,60 @@ describe("AgentUnit.saga()", () => {
     expect(undo2).not.toHaveBeenCalled();
     expect(undo3).not.toHaveBeenCalled();
   });
+
+  it("Story 7 — multiple undo failures: ALL undo errors surfaced in CompensationError.undoErrors", async () => {
+    // Reviewer finding: when multiple undo steps fail, CompensationError previously
+    // only exposed the FIRST failure (undoErrors[0]). Subsequent undo failures were
+    // silently dropped, so the caller had no way to know that resources B, C, ...
+    // also remain uncompensated.
+    //
+    // Fix: saga passes the full undoErrors array to CompensationError. The test
+    // verifies that CompensationError.undoErrors contains BOTH failures.
+    const { CompensationError } = await import("../errors");
+
+    const step3Error = new Error("step 3 failed — triggers rollback");
+    const undo1Error = new Error("undo step 1 failed");
+    const undo2Error = new Error("undo step 2 failed");
+
+    const steps: SagaStep<unknown>[] = [
+      {
+        execute: vi.fn().mockResolvedValue("r1"),
+        undo: vi.fn().mockRejectedValue(undo1Error),
+        name: "s1",
+      },
+      {
+        execute: vi.fn().mockResolvedValue("r2"),
+        undo: vi.fn().mockRejectedValue(undo2Error),
+        name: "s2",
+      },
+      {
+        execute: vi.fn().mockRejectedValue(step3Error),
+        undo: vi.fn(),
+        name: "s3",
+      },
+    ];
+
+    const err = await AgentUnit.of(null)
+      .saga(steps)
+      .run(ctx, { trustMode: "legacy" })
+      .catch((e) => e);
+
+    // Must be a CompensationError, not the raw step-3 error
+    expect(err).toBeInstanceOf(CompensationError);
+
+    // originalError is the primary step failure
+    expect(err.originalError).toBe(step3Error);
+
+    // undoErrors must contain BOTH undo failures (LIFO order: s2 first, s1 second)
+    expect(err.undoErrors).toHaveLength(2);
+    expect(err.undoErrors[0]).toBe(undo2Error);
+    expect(err.undoErrors[1]).toBe(undo1Error);
+
+    // compensationError (backwards-compat alias) is the first undo error
+    expect(err.compensationError).toBe(undo2Error);
+
+    // The error message must mention ALL failures, not just the first
+    expect(err.message).toContain("undo step 1 failed");
+    expect(err.message).toContain("undo step 2 failed");
+  });
 });

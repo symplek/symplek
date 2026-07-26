@@ -141,22 +141,37 @@ const SUPPORTED_PROVIDERS = ["openai", "anthropic", "google"] as const;
 type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number];
 
 /**
+ * Monotonically increasing counter that advances on every `configure()` call.
+ * Each bootstrap receives the generation at the time it was launched; it only
+ * commits the provider registration if its generation is still current when the
+ * async work completes. This prevents a slower older bootstrap from overwriting
+ * a faster newer one when `configure()` is called twice in quick succession.
+ */
+let _bootstrapGeneration = 0;
+
+/**
  * Bootstrap the provider adapter and register it as the registry default.
  * Called inside `_configure()` via `_initPromise` to keep `configure()` void.
  *
  * Each branch does a true dynamic import() of the adapter module — the SDK is
  * loaded lazily and cached per-module (Contract 2). The factory is async; we
- * await it before registering.
+ * await it before registering. The `generation` parameter is compared against
+ * `_bootstrapGeneration` after the async work: if a newer `configure()` call
+ * has since incremented the counter, this bootstrap is stale and must not
+ * overwrite the newer registration.
  */
 async function _bootstrapProvider(
   provider: string,
   apiKey: string,
+  generation: number,
 ): Promise<void> {
   switch (provider as SupportedProvider) {
     case "openai": {
       const { createOpenAIProvider } = await import("./providers/openai");
       const p = await createOpenAIProvider(apiKey);
-      providerRegistry.register(p, true);
+      if (generation === _bootstrapGeneration) {
+        providerRegistry.register(p, true);
+      }
       break;
     }
     case "anthropic": {
@@ -164,13 +179,17 @@ async function _bootstrapProvider(
         "./providers/anthropic"
       );
       const p = await createAnthropicProvider(apiKey);
-      providerRegistry.register(p, true);
+      if (generation === _bootstrapGeneration) {
+        providerRegistry.register(p, true);
+      }
       break;
     }
     case "google": {
       const { createGoogleProvider } = await import("./providers/google");
       const p = await createGoogleProvider(apiKey);
-      providerRegistry.register(p, true);
+      if (generation === _bootstrapGeneration) {
+        providerRegistry.register(p, true);
+      }
       break;
     }
     default: {
@@ -194,6 +213,7 @@ async function _bootstrapProvider(
  * @internal
  */
 export function _resetForTesting(): void {
+  _bootstrapGeneration = 0;
   resetAll();
 }
 
@@ -243,12 +263,18 @@ function _configure(options: WeftConfigOptions): void {
   // See OQ-1 resolution in wave-0-design.md. Read the merged config after
   // mergeGlobalConfig() so accumulated fields (e.g. apiKey from a prior call)
   // are visible.
+  //
+  // Generation guard: increment before launching so a slower earlier bootstrap
+  // that finishes after this one will discard its result rather than overwriting
+  // the newer provider registration.
   const merged = getGlobalConfig();
   const resolvedKey =
     merged.apiKey ??
     (merged.provider ? _apiKeyFromEnv(merged.provider) : undefined);
   if (merged.provider && resolvedKey) {
-    setInitPromise(_bootstrapProvider(merged.provider, resolvedKey));
+    _bootstrapGeneration++;
+    const generation = _bootstrapGeneration;
+    setInitPromise(_bootstrapProvider(merged.provider, resolvedKey, generation));
   }
 }
 

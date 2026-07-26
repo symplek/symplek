@@ -16,6 +16,7 @@ import {
   createDefaultEvaluator,
   createDefaultExtractor,
   createDefaultQuestioner,
+  createPartialContextUpdater,
 } from "../defaultAgents";
 import type { Answer, ClarityScore, InterviewState } from "../types";
 
@@ -292,23 +293,24 @@ describe("Default Agents Tests", () => {
     });
 
     it("extractor maps answers to schema fields", async () => {
-      // N64 fix: the default extractor uses full answer text as the field value.
-      // Answers like "My email is john@test.com" produce "My email is john@test.com"
-      // as the extracted value, which fails z.string().email() validation.
-      // Before N64 the invalid data was silently cast to T; now it throws.
+      // The extractor must parse field values from realistic natural-language answers.
+      // "My name is John"          → name:  "John"       (not the full sentence)
+      // "My email is john@test.com" → email: "john@test.com" (not the full sentence)
       //
-      // The extractor is designed to work with pre-extracted values in currentContext,
-      // falling back to raw answer text only when the context doesn't already have the
-      // field.  Provide clean pre-extracted data so the test validates the extraction
-      // path without triggering validation failure.
+      // This test was previously weakened by removing the answers and supplying a
+      // pre-populated context, which meant the answer-to-field mapping path was never
+      // exercised. It is restored here in accordance with rule 015: fix the product,
+      // not the test.
       const extractor = createDefaultExtractor(SimpleSchema);
       const state = createTestState({
-        currentContext: { name: "John", email: "john@test.com" },
+        answers: [
+          createTestAnswer("q-1", "My name is John"),
+          createTestAnswer("q-2", "My email is john@test.com"),
+        ],
       });
 
       const result = await extractor(state).run(ctx, { trustMode: "legacy" });
 
-      // Simple keyword matching should find mentions of fields
       expect(result).toBeDefined();
       expect(result.name).toBe("John");
       expect(result.email).toBe("john@test.com");
@@ -342,6 +344,74 @@ describe("Default Agents Tests", () => {
       // Should return validated data
       expect(result.name).toBe("Valid");
       expect(result.email).toBe("valid@example.com");
+    });
+
+    it("extractor throws VALIDATION_ERROR on incomplete required fields", async () => {
+      // The extractor contract: throw for invalid/incomplete data so callers
+      // know extraction failed rather than silently returning wrong-typed data.
+      const extractor = createDefaultExtractor(SimpleSchema);
+      const state = createTestState({
+        // Only name, no email — schema requires both
+        currentContext: { name: "John" },
+      });
+
+      await expect(
+        extractor(state).run(ctx, { trustMode: "legacy" }),
+      ).rejects.toThrow();
+    });
+  });
+
+  // ===========================================================================
+  // PARTIAL CONTEXT UPDATER (mid-loop accumulation)
+  // ===========================================================================
+
+  describe("Partial Context Updater", () => {
+    it("createPartialContextUpdater accumulates fields without full schema validation", () => {
+      // Mid-loop: only name answered so far, email still missing.
+      // The partial updater must NOT throw even though email is required in SimpleSchema.
+      const updater = createPartialContextUpdater(SimpleSchema);
+      const state = createTestState({
+        answers: [createTestAnswer("q-1", "My name is John")],
+      });
+
+      const partial = updater(state);
+
+      // name extracted from the answer; email absent (not yet answered)
+      expect(partial.name).toBe("John");
+      expect(partial.email).toBeUndefined();
+    });
+
+    it("createPartialContextUpdater extracts email value from natural-language answer", () => {
+      const updater = createPartialContextUpdater(SimpleSchema);
+      const state = createTestState({
+        answers: [
+          createTestAnswer("q-1", "My name is Jane"),
+          createTestAnswer("q-2", "My email is jane@example.com"),
+        ],
+      });
+
+      const partial = updater(state);
+
+      expect(partial.name).toBe("Jane");
+      expect(partial.email).toBe("jane@example.com");
+    });
+
+    it("createPartialContextUpdater merges with existing currentContext", () => {
+      const updater = createPartialContextUpdater(SimpleSchema);
+      // Simulate state after first round: name already accumulated
+      const state = createTestState({
+        currentContext: { name: "Alice" },
+        answers: [
+          createTestAnswer("q-1", "My name is Alice"),
+          createTestAnswer("q-2", "email: alice@test.org"),
+        ],
+      });
+
+      const partial = updater(state);
+
+      // Both fields should be present
+      expect(partial.name).toBe("Alice");
+      expect(partial.email).toBe("alice@test.org");
     });
   });
 

@@ -173,22 +173,20 @@ export function createConductComputation<TContext>(
       // STEP 5: UPDATE STATE AND CALLBACKS
       // -----------------------------------------------------------------------
 
-      // N63 fix: run the extractor after each answer and write the result back
-      // to state.currentContext so the NEXT round's evaluator can see the
-      // accumulated context. Previously extractor only ran once after the loop,
-      // so state.currentContext was always {} during evaluation — the evaluator's
-      // hasValue branches were dead and clarity was capped at 50 forever.
-      try {
-        const contextUpdate = await extractor(state).run(ctx, {
-          trustMode: "legacy",
-        });
-        if (contextUpdate !== null && contextUpdate !== undefined && typeof contextUpdate === "object") {
-          state.currentContext = contextUpdate as Record<string, unknown>;
-        }
-      } catch {
-        // Mid-loop extraction failure is non-fatal: the evaluator will score
-        // based on the previous context. The final extraction after the loop
-        // will fail loudly if it cannot produce valid context.
+      // N63 fix: update state.currentContext after each answer so the NEXT
+      // round's evaluator can see the accumulated partial context and credit
+      // answered fields. We use partialContextUpdater (not the full extractor)
+      // because the full extractor requires ALL required schema fields to be
+      // present — calling it mid-loop on partial data throws VALIDATION_ERROR
+      // which was previously swallowed, leaving state.currentContext permanently
+      // empty and preventing clarity from rising incrementally.
+      //
+      // partialContextUpdater does the same field-level extraction but uses
+      // schema.partial() validation so missing required fields are acceptable.
+      // The strict full-schema validation happens once, after the loop ends.
+      const partialUpdate = interview.partialContextUpdater(state);
+      if (Object.keys(partialUpdate).length > 0) {
+        state.currentContext = { ...state.currentContext, ...partialUpdate };
       }
 
       // Call progress callback

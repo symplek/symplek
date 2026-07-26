@@ -320,6 +320,56 @@ function generateQuestionText(
 }
 
 // =============================================================================
+// FIELD VALUE EXTRACTION HELPER
+// =============================================================================
+
+/**
+ * Extract the most likely field value from raw answer text.
+ *
+ * @remarks
+ * Strategy (in priority order):
+ * 1. For email-type fields (by name convention): pull the first email address
+ *    found in the text via regex. Answers like "My email is john@test.com"
+ *    produce "john@test.com", not the full sentence.
+ * 2. For all fields: look for "<fieldName> is <value>" or "<fieldName>: <value>"
+ *    patterns and extract the value portion. "My name is John" → "John".
+ * 3. Generic "… is <value>" at end of answer: "The answer is 42" → "42".
+ * 4. Fall back to the full trimmed answer text.
+ *
+ * This is intentionally conservative — production callers should override the
+ * extractor with LLM-powered extraction for complex schemas.
+ *
+ * @internal
+ */
+function extractFieldValue(fieldName: string, answerText: string): string {
+  const trimmed = answerText.trim();
+
+  // Strategy 1: email-looking field → grab first email-pattern substring
+  if (fieldName.toLowerCase().includes("email")) {
+    const emailMatch = trimmed.match(
+      /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/,
+    );
+    if (emailMatch) return emailMatch[0];
+  }
+
+  // Strategy 2: "<fieldName> is <value>" / "<fieldName>: <value>"
+  const fieldPattern = new RegExp(
+    `${fieldName}(?:\\s+is|:)\\s+(.+)`,
+    "i",
+  );
+  const fieldMatch = trimmed.match(fieldPattern);
+  if (fieldMatch) return fieldMatch[1].trim();
+
+  // Strategy 3: generic "… is <value>" at end of answer
+  const genericIs = /\bis\s+(.+)$/i;
+  const genericMatch = trimmed.match(genericIs);
+  if (genericMatch) return genericMatch[1].trim();
+
+  // Strategy 4: full text
+  return trimmed;
+}
+
+// =============================================================================
 // DEFAULT EXTRACTOR
 // =============================================================================
 
@@ -329,11 +379,18 @@ function generateQuestionText(
  * @remarks
  * Algorithm:
  * 1. For each schema field, search answers for relevant content
- * 2. Extract/infer values with keyword matching
- * 3. Validate against schema with `safeParse()`
+ * 2. Extract the field value using type-aware heuristics (email regex,
+ *    "field is value" patterns, generic "is value" patterns, full text)
+ * 3. Validate the complete set against the schema with `safeParse()`
  *
- * Note: This is a basic implementation using keyword matching.
- * Production use cases may want to override with LLM-powered extraction.
+ * Contract: this extractor produces a fully schema-valid result or throws
+ * `VALIDATION_ERROR`. It is intended for FINAL extraction after the interview
+ * loop. For incremental mid-loop context accumulation (partial data), use
+ * `createPartialContextUpdater` instead.
+ *
+ * Note: This is a best-effort heuristic implementation. Production use cases
+ * with complex schemas or free-form conversational answers should override
+ * with LLM-powered extraction.
  *
  * @param schema - Zod schema defining the target context
  * @returns Extractor agent function
@@ -354,19 +411,20 @@ export function createDefaultExtractor<T>(
     return AgentUnit.from(async () => {
       const extracted: Record<string, unknown> = { ...state.currentContext };
 
-      // Map answers to fields (simple keyword matching for default)
-      // In production, this would use an LLM for intelligent extraction
+      // Map answers to fields using type-aware value extraction.
+      // In production, this would use an LLM for intelligent extraction.
       for (const field of fields) {
         if (extracted[field.name] === undefined) {
-          // Find answers that might relate to this field
+          // Find the most recent answer that mentions this field by name.
           const relevantAnswer = state.answers.find((a) =>
             a.text.toLowerCase().includes(field.name.toLowerCase()),
           );
 
           if (relevantAnswer) {
-            // Simple extraction: use the answer text
-            // Real implementation would use LLM parsing
-            extracted[field.name] = relevantAnswer.text;
+            extracted[field.name] = extractFieldValue(
+              field.name,
+              relevantAnswer.text,
+            );
           }
         }
       }
@@ -393,5 +451,81 @@ export function createDefaultExtractor<T>(
         context: { issues: result.error.issues, extractedKeys: Object.keys(extracted) },
       });
     });
+  };
+}
+
+// =============================================================================
+// PARTIAL CONTEXT UPDATER (mid-loop incremental accumulation)
+// =============================================================================
+
+/**
+ * Creates a lightweight partial context updater for use between interview rounds.
+ *
+ * @remarks
+ * Unlike `createDefaultExtractor`, this function does NOT require the full schema
+ * to be satisfied. It extracts whatever field values it can find in the current
+ * answers, validates each field individually by running the whole extracted set
+ * through a schema.partial(), and returns the result as a plain Record.
+ *
+ * This is the correct tool for mid-loop context accumulation: after each answer
+ * is collected, the evaluator needs to see the accumulated context so it can
+ * credit answered fields and raise the clarity score incrementally. Running the
+ * full strict extractor mid-loop throws for missing required fields (expected at
+ * that stage), and swallowing that error means the context never updates.
+ *
+ * Contract: returns a `Record<string, unknown>` — not a fully-typed T — because
+ * required fields may be absent. Callers must treat this as partial state only;
+ * the final result is produced by the strict extractor after the loop ends.
+ *
+ * @param schema - Zod schema defining the target context
+ * @returns A synchronous function that returns a partial context record
+ */
+export function createPartialContextUpdater<T>(
+  schema: z.ZodType<T>,
+): (state: InterviewState) => Record<string, unknown> {
+  const fields = analyzeSchema(schema);
+
+  return (state: InterviewState): Record<string, unknown> => {
+    const extracted: Record<string, unknown> = { ...state.currentContext };
+
+    for (const field of fields) {
+      if (extracted[field.name] === undefined) {
+        const relevantAnswer = state.answers.find((a) =>
+          a.text.toLowerCase().includes(field.name.toLowerCase()),
+        );
+        if (relevantAnswer) {
+          extracted[field.name] = extractFieldValue(field.name, relevantAnswer.text);
+        }
+      }
+    }
+
+    // Use schema.partial() if the schema exposes it (ZodObject does), otherwise
+    // fall back to the raw extracted object. This filters out fields whose values
+    // fail their individual type constraints (e.g. a malformed email literal).
+    // Cast through unknown: ZodType<T> and AnyZodObject don't overlap in the type
+    // system even though ZodObject<S,D,O> extends ZodType<O>. The runtime guard
+    // (typeof .partial === "function") is the actual safety check.
+    const schemaAsObject = schema as unknown as z.AnyZodObject;
+    const partialSchema =
+      typeof schemaAsObject.partial === "function"
+        ? schemaAsObject.partial()
+        : null;
+
+    if (partialSchema) {
+      const result = partialSchema.safeParse(extracted);
+      if (result.success) {
+        // Remove undefined entries from the parsed result so they don't shadow
+        // previously accumulated values in state.currentContext.
+        return Object.fromEntries(
+          Object.entries(result.data as Record<string, unknown>).filter(
+            ([, v]) => v !== undefined,
+          ),
+        );
+      }
+    }
+
+    // Fallback: return whatever was extracted without type validation.
+    // The final extractor will enforce correctness.
+    return extracted;
   };
 }

@@ -66,9 +66,27 @@ export function createConsensusComputation<T>(
      */
     const executeVoterFully = async (
       v: Voter<T>,
-      signal?: AbortSignal,
+      timeoutSignal?: AbortSignal,
     ): Promise<VoteInput> => {
-      const runCtx = signal ? { ...ctx, signal } : ctx;
+      // Compose the per-voter timeout signal with any existing context signal so
+      // that upstream cancellation propagates through the vote timeout window.
+      // Replacing ctx.signal entirely (the previous behaviour) meant that if the
+      // caller aborted ctx.signal while voteTimeout was still running, the voter
+      // continued unaware of the upstream cancellation for the full timeout duration.
+      let runCtx = ctx;
+      if (timeoutSignal) {
+        if (ctx.signal) {
+          // Both signals exist: abort the composed controller when either fires.
+          const composedController = new AbortController();
+          const abort = () => composedController.abort();
+          ctx.signal.addEventListener("abort", abort, { once: true });
+          timeoutSignal.addEventListener("abort", abort, { once: true });
+          runCtx = { ...ctx, signal: composedController.signal };
+        } else {
+          runCtx = { ...ctx, signal: timeoutSignal };
+        }
+      }
+
       const voterCallResult = v(proposal);
 
       let voteInput: VoteInput;
@@ -91,15 +109,43 @@ export function createConsensusComputation<T>(
               }
             : result;
       } else if (voterCallResult instanceof Promise) {
-        const result = await voterCallResult;
-        voteInput =
-          "agentId" in result
-            ? {
-                decision: result.decision,
-                confidence: result.confidence,
-                reasoning: result.reasoning,
-              }
-            : result;
+        // Promise voters cannot receive an AbortSignal directly; race the awaiting
+        // against the timeout/upstream signal so we stop waiting when cancelled.
+        // The underlying operation may continue running but the vote is abandoned,
+        // preventing a timed-out promise from blocking or mutating consensus state.
+        const signal = runCtx.signal;
+        if (signal) {
+          const abortPromise = new Promise<never>((_, reject) => {
+            if (signal.aborted) {
+              reject(new DOMException("Vote aborted", "AbortError"));
+            } else {
+              signal.addEventListener(
+                "abort",
+                () => reject(new DOMException("Vote aborted", "AbortError")),
+                { once: true },
+              );
+            }
+          });
+          const result = await Promise.race([voterCallResult, abortPromise]);
+          voteInput =
+            "agentId" in result
+              ? {
+                  decision: result.decision,
+                  confidence: result.confidence,
+                  reasoning: result.reasoning,
+                }
+              : result;
+        } else {
+          const result = await voterCallResult;
+          voteInput =
+            "agentId" in result
+              ? {
+                  decision: result.decision,
+                  confidence: result.confidence,
+                  reasoning: result.reasoning,
+                }
+              : result;
+        }
       } else {
         voteInput =
           "agentId" in voterCallResult

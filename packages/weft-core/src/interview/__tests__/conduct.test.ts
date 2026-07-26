@@ -585,4 +585,117 @@ describe("Conduct Execution Tests", () => {
       expect(result.context.name).toBe("Test");
     });
   });
+
+  // ===========================================================================
+  // PARTIAL CONTEXT ACCUMULATION (N63/N64 convergence regression)
+  // ===========================================================================
+
+  describe("Partial Context Accumulation", () => {
+    it("clarity climbs incrementally as fields are answered (N63/N64 regression)", async () => {
+      // This test exercises the core N63/N64 defect: mid-loop extraction must
+      // accumulate partial context between rounds so the evaluator can credit
+      // answered fields and clarity can rise. The previous implementation ran
+      // the full strict extractor mid-loop, which threw VALIDATION_ERROR on
+      // partial data; the error was swallowed, state.currentContext stayed {}
+      // every round, and clarity was capped at ≤50 forever.
+      //
+      // Schema: required name (string) + required email (format-constrained).
+      const NameEmailSchema = z.object({
+        name: z.string(),
+        email: z.string().email(),
+      });
+
+      const clarityHistory: number[] = [];
+
+      // The evaluator inspects currentContext to score field completeness.
+      // It awards 50 points for name present and 50 for email present.
+      const evaluator = (state: InterviewState) => {
+        const namePresent =
+          typeof state.currentContext?.name === "string" &&
+          state.currentContext.name.length > 0;
+        const emailPresent =
+          typeof state.currentContext?.email === "string" &&
+          state.currentContext.email.length > 0;
+        const overall =
+          (namePresent ? 50 : 0) + (emailPresent ? 50 : 0);
+        clarityHistory.push(overall);
+        return AgentUnit.of<ClarityScore>({
+          overall,
+          byField: { name: namePresent ? 100 : 0, email: emailPresent ? 100 : 0 },
+          missingCritical: [],
+        });
+      };
+
+      let questionIndex = 0;
+      const questioner = () =>
+        AgentUnit.of<Question | null>(
+          questionIndex++ < 2
+            ? {
+                id: `q-${questionIndex}`,
+                text: questionIndex === 1
+                  ? "What is your name?"
+                  : "What is your email?",
+                targetField: questionIndex === 1 ? "name" : "email",
+                priority: "high" as const,
+              }
+            : null,
+        );
+
+      const { handlers } = createTestHandlers([
+        "My name is Alice",
+        "My email is alice@example.com",
+      ]);
+
+      const result = await AgentUnit.of("Tell me about yourself")
+        .interview({
+          contextSchema: NameEmailSchema,
+          options: { clarityThreshold: 95, maxQuestions: 5 },
+          evaluator,
+          questioner,
+        })
+        .conduct(handlers)
+        .run(ctx, { trustMode: "legacy" });
+
+      // Final context must be schema-valid with both fields
+      expect(result.context.name).toBe("Alice");
+      expect(result.context.email).toBe("alice@example.com");
+
+      // Clarity must have risen ABOVE 50 at some point during the interview,
+      // proving the partial context accumulation worked. If N63/N64 were still
+      // broken, clarity would be stuck at 0 every round (context always empty)
+      // and could never reach the threshold.
+      const maxClarity = Math.max(...clarityHistory);
+      expect(maxClarity).toBeGreaterThan(50);
+      // The interview converged on the fully-answered state
+      expect(result.converged).toBe(true);
+    });
+
+    it("default agents produce valid context from natural-language answers end to end", async () => {
+      // Smoke test: the full default agent pipeline (no mocks) must converge
+      // when the user answers questions with natural-language sentences.
+      const NameEmailSchema = z.object({
+        name: z.string(),
+        email: z.string().email(),
+      });
+
+      const { handlers } = createTestHandlers([
+        "My name is Bob",
+        "My email is bob@example.org",
+      ]);
+
+      const result = await AgentUnit.of("gather contact info")
+        .interview({
+          contextSchema: NameEmailSchema,
+          options: {
+            clarityThreshold: 70,
+            maxQuestions: 4,
+          },
+        })
+        .conduct(handlers)
+        .run(ctx, { trustMode: "legacy" });
+
+      expect(result.context.name).toBe("Bob");
+      expect(result.context.email).toBe("bob@example.org");
+    });
+  });
 });

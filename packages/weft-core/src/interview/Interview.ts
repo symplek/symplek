@@ -12,6 +12,7 @@ import {
   createDefaultEvaluator,
   createDefaultExtractor,
   createDefaultQuestioner,
+  createPartialContextUpdater,
 } from "./defaultAgents";
 import type {
   EvaluatorAgent,
@@ -65,8 +66,20 @@ export class Interview<TContext> {
   /**
    * Context extractor agent.
    * Extracts TContext from interview state.
+   * Called once after the interview loop for final, schema-validated extraction.
    */
   readonly extractor: ExtractorAgent<TContext>;
+
+  /**
+   * Lightweight partial context updater.
+   * Called after each answer during the interview loop to accumulate extracted
+   * field values without requiring the full schema to be satisfied. This lets the
+   * evaluator credit answered fields in subsequent rounds so clarity can climb.
+   *
+   * Returns a `Record<string, unknown>` — not a fully typed TContext — because
+   * required fields may still be missing at that point in the interview.
+   */
+  readonly partialContextUpdater: (state: import("./types").InterviewState) => Record<string, unknown>;
 
   /**
    * Private constructor - use Interview.create() factory method.
@@ -90,6 +103,7 @@ export class Interview<TContext> {
       config.questioner ?? createDefaultQuestioner(this.contextSchema);
     this.extractor =
       config.extractor ?? createDefaultExtractor(this.contextSchema);
+    this.partialContextUpdater = createPartialContextUpdater(this.contextSchema);
 
     // Validate at creation time
     this.validateConfig();

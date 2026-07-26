@@ -250,20 +250,37 @@ export class WeftError extends Error {
 export class CompensationError extends WeftError {
   /** The error thrown by the primary computation that triggered rollback. */
   readonly originalError: Error;
-  /** The error thrown by the compensation / undo action itself. */
+  /**
+   * The first undo error — kept for backwards compatibility with `.compensate()` callers
+   * that only have one compensation action. For multi-step sagas with multiple undo
+   * failures, inspect {@link undoErrors} instead.
+   */
   readonly compensationError: Error;
+  /**
+   * All undo errors collected during rollback, in LIFO execution order.
+   * Each entry represents one resource that failed to roll back and may remain
+   * in an uncompensated state.
+   */
+  readonly undoErrors: Error[];
 
-  constructor(originalError: Error, compensationError: Error) {
+  constructor(originalError: Error, undoErrors: Error | Error[]) {
+    const errArr = Array.isArray(undoErrors) ? undoErrors : [undoErrors];
+    const first = errArr[0]!;
+    const undoSummary =
+      errArr.length === 1
+        ? `rollback error: "${first.message}"`
+        : `${errArr.length} rollback errors: [${errArr.map((e) => `"${e.message}"`).join(", ")}]`;
     super({
       code: "COMPENSATION_FAILED",
-      why: `Compensation failed: original error: "${originalError.message}"; rollback error: "${compensationError.message}". External state may be partially restored.`,
+      why: `Compensation failed: original error: "${originalError.message}"; ${undoSummary}. External state may be partially restored.`,
       action:
-        "Inspect both originalError and compensationError on this instance. Manually verify external state consistency.",
+        "Inspect originalError and undoErrors on this instance. Manually verify external state consistency for each failed undo.",
       cause: originalError,
     });
     this.name = "CompensationError";
     this.originalError = originalError;
-    this.compensationError = compensationError;
+    this.compensationError = first;
+    this.undoErrors = errArr;
   }
 }
 

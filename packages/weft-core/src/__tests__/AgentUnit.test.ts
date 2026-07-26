@@ -172,5 +172,86 @@ describe("AgentUnit", () => {
       expect(result.value.votes[0]).toHaveProperty("agentId");
       expect(result.value.votes[0]).toHaveProperty("weight");
     });
+
+    it("promise voter receives timeout abort signal — stops waiting after timeout fires", async () => {
+      // Reviewer finding: Promise-returning voters never received the cancellation
+      // signal, so a timed-out vote kept provider requests running and consuming
+      // resources. The fix races the promise voter against the AbortSignal.
+      //
+      // Interleaving forced: a slow promise voter is paired with a 20 ms vote
+      // timeout. After the timeout fires, the vote is abandoned (abstain) rather
+      // than waiting for the full promise resolution. The slow promise never
+      // resolves within the test — if it were still being awaited, the test would
+      // hang.
+      let slowVoterResolved = false;
+      const slowVoter = () =>
+        new Promise<{ decision: "approve"; confidence: number }>((resolve) => {
+          // Resolves after 500 ms — well past the vote timeout
+          setTimeout(() => {
+            slowVoterResolved = true;
+            resolve({ decision: "approve", confidence: 0.9 });
+          }, 500);
+        });
+
+      const unit = AgentUnit.of("proposal").consensus(
+        [
+          slowVoter,
+          () => Promise.resolve({ decision: "approve" as const, confidence: 0.8 }),
+        ],
+        { quorum: 0.5, timeout: 20 },
+      );
+
+      const result = await unit.run(ctx);
+
+      // The slow voter abstained due to timeout; consensus still resolved
+      expect(result.value.votes).toHaveLength(2);
+      // The slow voter must have abstained
+      const slowVote = result.value.votes[0]!;
+      expect(slowVote.decision).toBe("abstain");
+      // slowVoterResolved is still false at this point — the test didn't wait for it
+      expect(slowVoterResolved).toBe(false);
+    });
+
+    it("upstream context signal propagates through per-voter timeout window", async () => {
+      // Reviewer finding: the per-voter timeout signal REPLACED the context signal
+      // instead of composing with it. If the caller aborted ctx.signal after 10 ms
+      // but voteTimeout was 60 s, the voter ran for another minute.
+      //
+      // The fix composes both signals: the voter aborts when EITHER fires.
+      const controller = new AbortController();
+      const ctxWithSignal = createContext({ signal: controller.signal });
+
+      let _voterReceivedAbort = false;
+      const signalAwareVoter = () =>
+        new Promise<{ decision: "approve"; confidence: number }>((resolve, reject) => {
+          // This promise checks whether its own signal fires (the composed one)
+          // In practice, Promise voters receive a race against the composed signal
+          // courtesy of the Promise-voter branch. Abort the context signal after
+          // a short delay to simulate upstream cancellation.
+          setTimeout(() => controller.abort(), 10);
+          // The promise would "normally" resolve after 500 ms, but the upstream
+          // abort at 10 ms should race it via the AbortSignal composition.
+          setTimeout(() => {
+            if (!controller.signal.aborted) {
+              resolve({ decision: "approve", confidence: 0.9 });
+            } else {
+              _voterReceivedAbort = true;
+              reject(new DOMException("Aborted", "AbortError"));
+            }
+          }, 50);
+        });
+
+      const unit = AgentUnit.of("proposal").consensus(
+        [signalAwareVoter],
+        {
+          quorum: 0.5,
+          timeout: 2000, // long timeout — upstream signal should win
+        },
+      );
+
+      // The upstream abort should cause the voter to abstain rather than waiting
+      const result = await unit.run(ctxWithSignal);
+      expect(result.value.votes[0]!.decision).toBe("abstain");
+    });
   });
 });

@@ -535,43 +535,34 @@ export class AgentUnit<T> {
     // Resolved here so a `reject` throw propagates cleanly, ahead of the
     // try/catch that would otherwise re-route it through handleError().
     //
-    // B3 FIX: single-flight per key to ensure at-most-once execution.
-    // A concurrent caller that arrives while the key is in-flight awaits the
-    // first run's settled promise rather than launching a second execution.
+    // B3 FIX (revised): in-flight registration happens synchronously BEFORE any
+    // await. Previous ordering checked the persistent store first (async), then
+    // checked the in-flight map. That allowed a concurrent caller whose store-get
+    // was still pending to miss the flight entry entirely and re-execute after the
+    // winner's store-write failed. New ordering:
+    //   1. Check in-flight map (synchronous) — no await, so registration is
+    //      visible to every JS-concurrent caller before we yield.
+    //   2. If in-flight: await the winning promise (same result, no re-execution).
+    //   3. If not in-flight: register then execute; persistent-store check moves
+    //      inside the promise so it is also covered by the in-flight guard.
     const idempotency = options?.idempotency;
     let idemStore: IdempotencyStore | null = null;
     let runCtx = ctx;
     if (idempotency) {
       idemStore = idempotency.store ?? defaultIdempotencyStore;
+      runCtx = { ...ctx, idempotencyKey: idempotency.key };
 
-      // ── Step 1: check persistent store ──
-      const cached = await idemStore.get(idempotency.key);
-      if (cached !== null) {
-        if (idempotency.strategy === "reject") {
-          throw new IdempotencyError(idempotency.key);
-        }
-        // strategy === "return-cached"
-        // ⚠️ FATAL #3 HARDENING (2026-07-07): Verify cached value is a
-        // genuine TrackedResult before returning it. A malicious or shared
-        // idempotency store could inject arbitrary objects.
-        if (!isTrackedResult<T>(cached)) {
-          throw new WeftError({
-            code: "SETUP_ERROR",
-            why:
-              "Cached idempotency result is not a genuine TrackedResult — " +
-              "the idempotency store may be compromised.",
-            action: `Clear the cache for key "${idempotency.key}" and re-run.`,
-          });
-        }
-        return trustMode === "legacy" ? cached.value : cached;
-      }
-
-      // ── Step 2: check in-flight map (single-flight on concurrent same-key calls) ──
-      const flightKey = buildFlightKey(idemStore, idempotency.key);
+      // ── Step 1: check in-flight map synchronously ──────────────────────────
+      // Must happen before any await so no concurrent caller can slip past
+      // registration. The flight key includes this unit's ID so two unrelated
+      // operations that accidentally share the same store+key do not receive
+      // each other's typed results (mirrors the persistent-store shape check).
+      const flightKey = buildFlightKey(idemStore, idempotency.key, this._metadata.id);
       const inFlight = _idempotencyInFlight.get(flightKey);
       if (inFlight !== undefined) {
-        // A concurrent run is already executing for this key. Await its result
-        // instead of executing the computation a second time.
+        // A concurrent run is already executing for this key. Await its settled
+        // promise — this covers both success and store-write failure, ensuring
+        // the caller never silently re-executes after the winner fails to persist.
         const result = await inFlight;
         if (idempotency.strategy === "reject") {
           throw new IdempotencyError(idempotency.key);
@@ -579,32 +570,49 @@ export class AgentUnit<T> {
         return trustMode === "legacy" ? (result as TrackedResult<T>).value : (result as TrackedResult<T>);
       }
 
-      // ── Step 3: register in-flight promise before computing ──
-      // Fresh key with no concurrent run — execute and register.
-      runCtx = { ...ctx, idempotencyKey: idempotency.key };
-
-      // Build the execution promise and register it synchronously before any
-      // awaits, so a concurrent caller that arrives after this point shares it.
+      // ── Step 2: register the in-flight promise (synchronous) ───────────────
+      // The IIFE starts executing synchronously up to its first internal await,
+      // so _idempotencyInFlight.set() is reached before any async work begins.
+      // Any concurrent caller that runs after this point sees the entry and awaits
+      // it instead of creating a duplicate execution.
       const executePromise = (async (): Promise<TrackedResult<T>> => {
+        // ── Step 2a: check persistent store (inside the promise) ─────────────
+        // Moved here so this check is covered by the in-flight guard: a concurrent
+        // caller that hits the in-flight entry will share the cache-hit path too.
+        const cached = await idemStore!.get(idempotency.key);
+        if (cached !== null) {
+          if (idempotency.strategy === "reject") {
+            throw new IdempotencyError(idempotency.key);
+          }
+          // ⚠️ FATAL #3 HARDENING: Verify cached value is a genuine TrackedResult
+          // before returning it. A malicious or shared store could inject arbitrary
+          // objects.
+          if (!isTrackedResult<T>(cached)) {
+            throw new WeftError({
+              code: "SETUP_ERROR",
+              why:
+                "Cached idempotency result is not a genuine TrackedResult — " +
+                "the idempotency store may be compromised.",
+              action: `Clear the cache for key "${idempotency.key}" and re-run.`,
+            });
+          }
+          return cached;
+        }
+
+        // ── Step 2b: execute computation ──────────────────────────────────────
         const value = await this.computation(runCtx);
         const tracked = wrapInTrackedResult(this._metadata, value);
-        // ── Step 4: write to persistent store (may fail) ──
-        // If the store write fails, we still return the successfully computed
-        // result to the caller — but we surface the store failure explicitly
-        // via IdempotencyStoreWriteError so callers know the key was not
-        // durably persisted (future calls will re-execute).
+
+        // ── Step 2c: write to persistent store ────────────────────────────────
+        // If the store write fails, surface it as IdempotencyStoreWriteError so
+        // callers know the computation succeeded but the key was not persisted.
+        // Any concurrent caller awaiting this promise receives the same error and
+        // does NOT re-execute (unlike the previous ordering where they could miss
+        // the in-flight entry after it was deleted on store-write failure).
         try {
           await idemStore!.set(idempotency.key, tracked, idempotency.ttl);
         } catch (storeErr) {
-          // Store write failed: the computation ran and succeeded.
-          // Remove from in-flight before throwing so concurrent waiters get
-          // the same error (they won't retry the computation).
-          _idempotencyInFlight.delete(flightKey);
-          throw new IdempotencyStoreWriteError(
-            idempotency.key,
-            storeErr,
-            tracked,
-          );
+          throw new IdempotencyStoreWriteError(idempotency.key, storeErr, tracked);
         }
         return tracked;
       })();
