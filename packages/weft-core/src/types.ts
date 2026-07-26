@@ -183,7 +183,19 @@ export interface ConsensusOptions {
   weights?: Record<string, number>;
   /** Agent IDs with veto power */
   vetoers?: string[];
-  /** Timeout per vote in ms */
+  /**
+   * Per-vote timeout in milliseconds.
+   *
+   * @remarks
+   * **AgentUnit voters** receive full cancellation: the abort signal is
+   * propagated into the `AgentContext`, so LLM requests and nested
+   * `AgentUnit.run()` calls are cancelled when the timeout fires.
+   *
+   * **Promise voters** only have the *awaiting* abandoned — the underlying
+   * operation continues running and cannot receive a cancellation signal.
+   * If the voter's work must be cancellable, return an `AgentUnit` instead
+   * of a bare `Promise`.
+   */
   timeout?: number;
   /** Require reasoning in votes */
   requireReasoning?: boolean;

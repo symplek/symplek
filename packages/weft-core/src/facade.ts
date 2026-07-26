@@ -217,6 +217,14 @@ export function _resetForTesting(): void {
   resetAll();
 }
 
+/**
+ * Return the current bootstrap generation counter. FOR TESTING ONLY.
+ * @internal
+ */
+export function _getBootstrapGenerationForTesting(): number {
+  return _bootstrapGeneration;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // NAMESPACE METHOD IMPLEMENTATIONS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -271,10 +279,17 @@ function _configure(options: WeftConfigOptions): void {
   const resolvedKey =
     merged.apiKey ??
     (merged.provider ? _apiKeyFromEnv(merged.provider) : undefined);
-  if (merged.provider && resolvedKey) {
+  if (merged.provider) {
+    // Always increment the generation when a provider is specified, regardless
+    // of whether we can resolve a key. This invalidates any pending bootstrap
+    // that was started under a prior configuration — if we skip the increment
+    // when no key is available, a stale in-flight bootstrap can still register
+    // after the newer configuration call supersedes it.
     _bootstrapGeneration++;
     const generation = _bootstrapGeneration;
-    setInitPromise(_bootstrapProvider(merged.provider, resolvedKey, generation));
+    if (resolvedKey) {
+      setInitPromise(_bootstrapProvider(merged.provider, resolvedKey, generation));
+    }
   }
 }
 

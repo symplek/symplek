@@ -294,43 +294,74 @@ describe("idempotency", () => {
       expect(errB).toBeInstanceOf(IdempotencyStoreWriteError);
     });
 
-    it("R2 — operation-mismatch: different AgentUnit instances do not share in-flight results", async () => {
-      // Scenario: operation A (returns string) and operation B (returns number)
-      // both use the same store and logical key concurrently.
-      // With the previous flight key (store+key only), B could receive A's
-      // TrackedResult<string> typed as TrackedResult<number>.
-      // The fix includes the AgentUnit's ID in the flight key, so A and B
-      // maintain independent in-flight entries.
-      let aExecutions = 0;
-      let bExecutions = 0;
+    it("R-strategy — return-cached waiter does not inherit reject leader's IdempotencyError", async () => {
+      // Scenario: store already contains key K.
+      // A "reject" leader starts an in-flight delayed lookup, then a concurrent
+      // "return-cached" waiter joins its flight. The leader's executePromise finds
+      // K in the store and throws IdempotencyError. Previously, the waiter received
+      // that error unchanged. After the fix, the waiter applies its own strategy:
+      // "return-cached" → fetches from the store and returns the cached value.
+      const store = new InMemoryIdempotencyStore();
 
-      const unitA = AgentUnit.from(async () => {
-        aExecutions++;
-        await sleep(10);
-        return "string-result";
+      // Pre-populate the store.
+      const first = await AgentUnit.of("cached-value").run(ctx, {
+        idempotency: { key: "K", strategy: "return-cached", store },
+      });
+      expect(isTracked(first) && first.value).toBe("cached-value");
+
+      // Simulate: "reject" call starts; "return-cached" call joins its flight.
+      // We use Promise.all so both calls are dispatched before either awaits.
+      const rejectResult = AgentUnit.of("ignored").run(ctx, {
+        idempotency: { key: "K", strategy: "reject", store },
+      });
+      const returnCachedResult = AgentUnit.of("ignored").run(ctx, {
+        idempotency: { key: "K", strategy: "return-cached", store },
       });
 
-      const unitB = AgentUnit.from(async () => {
-        bExecutions++;
+      // "reject" must throw.
+      await expect(rejectResult).rejects.toBeInstanceOf(IdempotencyError);
+
+      // "return-cached" must return the cached value, NOT throw IdempotencyError.
+      const cached = await returnCachedResult;
+      expect(isTracked(cached) && cached.value).toBe("cached-value");
+    });
+
+    it("R2 — two separately constructed instances of the same operation execute the computation once", async () => {
+      // The flight key is scoped to store+key (not unit instance), so at-most-once
+      // is enforced at exactly the same boundary as persistence. Two independently
+      // constructed units that share a store and key represent a single logical
+      // operation — only one execution should occur.
+      //
+      // Assertion change from previous round: the prior R2 test checked that two
+      // differently-typed units (string vs number) maintained *separate* in-flight
+      // entries because their unit IDs differed. That behaviour was introduced by a
+      // prior incorrect direction (including unit ID in the flight key). The correct
+      // guarantee is: same store + same key → execute once. Two operation types
+      // sharing a key is a developer misuse outside the at-most-once contract.
+      let executions = 0;
+      const computation = async () => {
+        executions++;
         await sleep(10);
-        return 42;
-      });
+        return "shared-result";
+      };
+
+      // Two SEPARATELY constructed AgentUnit instances from the same computation.
+      const unitA = AgentUnit.from(computation);
+      const unitB = AgentUnit.from(computation);
 
       const store = new InMemoryIdempotencyStore();
 
-      // Run both with the same key, concurrently
       const [rA, rB] = await Promise.all([
         unitA.run(ctx, { idempotency: { key: "shared-key", strategy: "return-cached", store } }),
         unitB.run(ctx, { idempotency: { key: "shared-key", strategy: "return-cached", store } }),
       ]);
 
-      // Each operation ran independently — no result sharing across different units
-      expect(aExecutions).toBe(1);
-      expect(bExecutions).toBe(1);
+      // Computation ran exactly once despite two separate instances.
+      expect(executions).toBe(1);
 
-      // Each result is the correct type for its operation
-      expect(isTracked(rA) && rA.value).toBe("string-result");
-      expect(isTracked(rB) && rB.value).toBe(42);
+      // Both callers receive the same result.
+      expect(isTracked(rA) && rA.value).toBe("shared-result");
+      expect(isTracked(rB) && rB.value).toBe("shared-result");
     });
   });
 });

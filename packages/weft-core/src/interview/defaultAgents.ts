@@ -413,19 +413,23 @@ export function createDefaultExtractor<T>(
 
       // Map answers to fields using type-aware value extraction.
       // In production, this would use an LLM for intelligent extraction.
+      //
+      // Fix 6 (R2 verdict): always scan from the most recent answer so a
+      // correction later in the conversation overrides an earlier mention.
+      // The undefined guard is intentionally absent — if currentContext already
+      // has a value, a more recent answer in the transcript can still override it.
+      // Using [...answers].reverse().find() rather than findLast to stay within
+      // the ES2022 lib target.
       for (const field of fields) {
-        if (extracted[field.name] === undefined) {
-          // Find the most recent answer that mentions this field by name.
-          const relevantAnswer = state.answers.find((a) =>
-            a.text.toLowerCase().includes(field.name.toLowerCase()),
-          );
+        const relevantAnswer = [...state.answers].reverse().find((a) =>
+          a.text.toLowerCase().includes(field.name.toLowerCase()),
+        );
 
-          if (relevantAnswer) {
-            extracted[field.name] = extractFieldValue(
-              field.name,
-              relevantAnswer.text,
-            );
-          }
+        if (relevantAnswer) {
+          extracted[field.name] = extractFieldValue(
+            field.name,
+            relevantAnswer.text,
+          );
         }
       }
 
@@ -488,20 +492,24 @@ export function createPartialContextUpdater<T>(
   return (state: InterviewState): Record<string, unknown> => {
     const extracted: Record<string, unknown> = { ...state.currentContext };
 
+    // Fix 5+6 (R2 verdict): remove the undefined-field guard and scan from the
+    // most recent answer so a corrected answer can replace an earlier one. The
+    // guard previously prevented any update to a field already present in
+    // currentContext, causing a malformed first answer to permanently block a
+    // later correct answer. Using [...answers].reverse().find() rather than
+    // findLast to stay within the ES2022 lib target.
     for (const field of fields) {
-      if (extracted[field.name] === undefined) {
-        const relevantAnswer = state.answers.find((a) =>
-          a.text.toLowerCase().includes(field.name.toLowerCase()),
-        );
-        if (relevantAnswer) {
-          extracted[field.name] = extractFieldValue(field.name, relevantAnswer.text);
-        }
+      const relevantAnswer = [...state.answers].reverse().find((a) =>
+        a.text.toLowerCase().includes(field.name.toLowerCase()),
+      );
+      if (relevantAnswer) {
+        extracted[field.name] = extractFieldValue(field.name, relevantAnswer.text);
       }
     }
 
     // Use schema.partial() if the schema exposes it (ZodObject does), otherwise
-    // fall back to the raw extracted object. This filters out fields whose values
-    // fail their individual type constraints (e.g. a malformed email literal).
+    // fall back to the previously accumulated valid state. This filters out fields
+    // whose values fail their individual type constraints (e.g. a malformed email).
     // Cast through unknown: ZodType<T> and AnyZodObject don't overlap in the type
     // system even though ZodObject<S,D,O> extends ZodType<O>. The runtime guard
     // (typeof .partial === "function") is the actual safety check.
@@ -522,10 +530,26 @@ export function createPartialContextUpdater<T>(
           ),
         );
       }
+
+      // Fix 5 (R2 verdict): partial validation failed for one or more fields.
+      // Return ONLY the subset that passes per-field type checks — never return
+      // raw extracted values, which would allow a malformed answer to poison
+      // currentContext and block a later correct answer from being accepted.
+      const validFields: Record<string, unknown> = {};
+      for (const [key, fieldSchema] of Object.entries(schemaAsObject.shape as Record<string, z.ZodTypeAny>)) {
+        if (extracted[key] !== undefined) {
+          const fieldResult = (fieldSchema as z.ZodTypeAny).safeParse(extracted[key]);
+          if (fieldResult.success) {
+            validFields[key] = fieldResult.data;
+          }
+        }
+      }
+      return validFields;
     }
 
-    // Fallback: return whatever was extracted without type validation.
-    // The final extractor will enforce correctness.
-    return extracted;
+    // partialSchema is null (schema is not a ZodObject): cannot safely validate
+    // individual fields. Return only the previously accumulated valid context
+    // rather than the raw extracted which may include type-invalid values.
+    return { ...state.currentContext };
   };
 }

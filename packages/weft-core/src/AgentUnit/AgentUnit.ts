@@ -554,20 +554,60 @@ export class AgentUnit<T> {
 
       // ── Step 1: check in-flight map synchronously ──────────────────────────
       // Must happen before any await so no concurrent caller can slip past
-      // registration. The flight key includes this unit's ID so two unrelated
-      // operations that accidentally share the same store+key do not receive
-      // each other's typed results (mirrors the persistent-store shape check).
-      const flightKey = buildFlightKey(idemStore, idempotency.key, this._metadata.id);
+      // registration. The flight key is scoped to store identity + logical key —
+      // exactly the scope at which persistence is keyed — so two independently
+      // constructed units sharing the same store and key share the same flight slot
+      // and execute the computation exactly once.
+      const flightKey = buildFlightKey(idemStore, idempotency.key);
       const inFlight = _idempotencyInFlight.get(flightKey);
       if (inFlight !== undefined) {
         // A concurrent run is already executing for this key. Await its settled
         // promise — this covers both success and store-write failure, ensuring
         // the caller never silently re-executes after the winner fails to persist.
-        const result = await inFlight;
+        //
+        // Each caller applies its OWN strategy after the shared promise settles.
+        // The leader's strategy must not govern waiters: a "return-cached" waiter
+        // must not inherit a "reject" leader's IdempotencyError, and vice versa.
+        let inflightResult: TrackedResult<T>;
+        try {
+          inflightResult = (await inFlight) as TrackedResult<T>;
+        } catch (err) {
+          // The leader rejected with IdempotencyError: it found the key in the
+          // store and its own strategy was "reject". Apply THIS caller's strategy.
+          if (err instanceof IdempotencyError) {
+            if (idempotency.strategy === "reject") {
+              throw new IdempotencyError(idempotency.key);
+            }
+            // "return-cached": key is confirmed in the store — fetch and return.
+            const storeResult = await idemStore!.get(idempotency.key);
+            if (storeResult !== null) {
+              if (!isTrackedResult<T>(storeResult)) {
+                throw new WeftError({
+                  code: "SETUP_ERROR",
+                  why:
+                    "Cached idempotency result is not a genuine TrackedResult — " +
+                    "the idempotency store may be compromised.",
+                  action: `Clear the cache for key "${idempotency.key}" and re-run.`,
+                });
+              }
+              if (trustMode === "legacy") {
+                emitDeprecationWarning(AgentUnit);
+                return storeResult.value;
+              }
+              return storeResult as TrackedResult<T>;
+            }
+          }
+          throw err;
+        }
+        // In-flight settled successfully; apply THIS caller's own strategy.
         if (idempotency.strategy === "reject") {
           throw new IdempotencyError(idempotency.key);
         }
-        return trustMode === "legacy" ? (result as TrackedResult<T>).value : (result as TrackedResult<T>);
+        if (trustMode === "legacy") {
+          emitDeprecationWarning(AgentUnit);
+          return inflightResult.value;
+        }
+        return inflightResult;
       }
 
       // ── Step 2: register the in-flight promise (synchronous) ───────────────
@@ -720,7 +760,17 @@ export interface AgentUnit<T> {
   zip<U>(other: AgentUnit<U>): AgentUnit<[T, U]>;
 
   // ─── coordination ────────────────────────────────────────────────────────
-  /** Run single-round consensus voting over the current value. */
+  /**
+   * Run single-round consensus voting over the current value.
+   *
+   * @remarks
+   * **Promise voter cancellation**: voters that return a bare `Promise` cannot
+   * receive an abort signal. When `ConsensusOptions.timeout` fires or the
+   * upstream context is cancelled, the wait is abandoned but the underlying
+   * operation keeps running. If the voter's work must be cancellable, return
+   * an `AgentUnit` instead — the `AgentContext.signal` is then propagated and
+   * LLM calls are cancelled when the timeout fires.
+   */
   consensus(
     voters: Array<
       (proposal: T) => AgentUnit<VoteInput> | Promise<VoteInput> | VoteInput

@@ -597,6 +597,26 @@ describe("configure() generation guard — stale bootstrap does not overwrite ne
 
     registerSpy.mockRestore();
   });
+
+  it("configure() with provider but no resolvable key still increments the bootstrap generation", async () => {
+    // Fix 3 (R2 adversarial verdict):
+    //   configure({ provider:"openai", apiKey:"A" }) → generation=N, bootstrap starts
+    //   configure({ provider:"anthropic" })          → no env key → no new bootstrap
+    //   Before fix: generation stayed at N; stale OpenAI bootstrap arriving after
+    //   step 2 passed the guard (generation still N) and registered, overriding the
+    //   user's explicit anthropic declaration.
+    //   After fix:  generation advances to N+1 unconditionally when a provider is named,
+    //   so the stale bootstrap fails the guard (N != N+1).
+    const { _getBootstrapGenerationForTesting } = await import("../facade");
+
+    vi.stubEnv("ANTHROPIC_API_KEY", "");
+    const genBefore = _getBootstrapGenerationForTesting();
+
+    Weft.configure({ provider: "anthropic" }); // no resolvable key
+
+    expect(_getBootstrapGenerationForTesting()).toBe(genBefore + 1);
+    vi.unstubAllEnvs();
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

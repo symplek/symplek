@@ -413,6 +413,77 @@ describe("Default Agents Tests", () => {
       expect(partial.name).toBe("Alice");
       expect(partial.email).toBe("alice@test.org");
     });
+
+    it("malformed answer does not poison context and a later corrected answer is accepted", () => {
+      // Fix 5+6 (R2 adversarial verdict):
+      // Round 1: malformed email must NOT enter the context.
+      // Round 2: corrected email must be accepted, not blocked by a poisoned field.
+      const updater = createPartialContextUpdater(SimpleSchema);
+
+      // Round 1: malformed email in the only answer.
+      const stateRound1 = createTestState({
+        currentContext: {},
+        answers: [createTestAnswer("q-1", "My email is not-an-email")],
+      });
+      const partialRound1 = updater(stateRound1);
+
+      // Invalid email must NOT appear in the partial context.
+      expect(partialRound1.email).toBeUndefined();
+
+      // Round 2: corrected email arrives. Simulate state after round 1 accumulated
+      // nothing for email (correct behaviour from round 1).
+      const stateRound2 = createTestState({
+        currentContext: partialRound1, // no email poisoning
+        answers: [
+          createTestAnswer("q-1", "My email is not-an-email"),
+          createTestAnswer("q-2", "Correction, my email is correct@example.com"),
+        ],
+      });
+      const partialRound2 = updater(stateRound2);
+
+      // Corrected valid email must be accepted.
+      expect(partialRound2.email).toBe("correct@example.com");
+    });
+
+    it("corrected answer replaces an earlier valid answer (most-recent scan)", () => {
+      // Fix 6 (R2 adversarial verdict): extractor and partial updater must scan
+      // from the most recent answer so a correction wins over the first mention.
+      const updater = createPartialContextUpdater(SimpleSchema);
+
+      const state = createTestState({
+        currentContext: { email: "old@example.com" },
+        answers: [
+          createTestAnswer("q-1", "My email is old@example.com"),
+          createTestAnswer("q-2", "Correction, my email is new@example.com"),
+        ],
+      });
+      const partial = updater(state);
+
+      // Most recent (corrected) answer must win.
+      expect(partial.email).toBe("new@example.com");
+    });
+
+    it("createDefaultExtractor scans from most-recent answer so a correction wins", async () => {
+      // Fix 6 (R2 adversarial verdict): extractor must return the most recent answer,
+      // not the first one, when the transcript contains a correction.
+      // Answers are kept to one field each so extractFieldValue resolves cleanly.
+      const extractor = createDefaultExtractor(SimpleSchema);
+
+      const state = createTestState({
+        answers: [
+          createTestAnswer("q-1", "My name is OldName"),
+          createTestAnswer("q-2", "My email is old@example.com"),
+          createTestAnswer("q-3", "Correction: my email is new@example.com"),
+        ],
+      });
+
+      const result = await extractor(state).run(ctx, { trustMode: "legacy" });
+
+      // Name came from the only name answer.
+      expect(result.name).toBe("OldName");
+      // Email must be the CORRECTED (most recent) value, not old@example.com.
+      expect(result.email).toBe("new@example.com");
+    });
   });
 
   // ===========================================================================

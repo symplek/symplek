@@ -261,20 +261,21 @@ function getStoreId(store: IdempotencyStore): string {
 }
 
 /**
- * Build the in-flight map key for a given store + idempotency key + AgentUnit identity.
+ * Build the in-flight map key for a given store + idempotency key.
  *
- * Including the unit's identity prevents two unrelated operations that share the same
- * store and logical key from receiving each other's in-flight result. The persistent
- * cache path already validates the stored value's shape; the in-flight path must carry
- * the same discrimination so operation B cannot silently receive a type-incompatible
- * result from operation A's in-flight promise.
+ * The key is scoped to the store identity and the logical operation key — the same
+ * scope at which the persistent store operates. This guarantees that at-most-once
+ * is enforced at exactly the same boundary as persistence: two separately constructed
+ * units that share the same store and key will share the same in-flight slot and
+ * execute the computation exactly once. Any concern about two genuinely different
+ * operations accidentally sharing the same key is a developer misuse that the
+ * persistent-store shape check (isTrackedResult) handles at the cache layer.
  *
  * @internal
  */
 export function buildFlightKey(
   store: IdempotencyStore,
   key: string,
-  unitId: string,
 ): string {
-  return `${getStoreId(store)}::${key}::${unitId}`;
+  return `${getStoreId(store)}::${key}`;
 }
