@@ -12,7 +12,8 @@
  *   - {@link SerializedTrackedResult} — JSON-serializable snapshot of a TrackedResult
  *   - {@link serializeTrackedResult} — serialize for durable storage
  *   - {@link deserializeTrackedResult} — reconstruct a genuine TrackedResult
- *   - {@link resume} — replay a prior run, skipping committed steps
+ *   - {@link resume} — replay a prior run; skips on whole-run cache hit. Per-step
+ *                     skipping requires explicit per-step idempotency options.
  *   - {@link ResumeOptions} — options for resume()
  *
  * @since 2.2.0 — CR-403

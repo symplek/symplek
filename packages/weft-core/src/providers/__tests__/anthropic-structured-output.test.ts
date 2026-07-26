@@ -200,3 +200,48 @@ describe("Anthropic adapter — post-hoc validation (simulated path)", () => {
     expect((caught as WeftError).code).toBe("VALIDATION_ERROR");
   });
 });
+
+// ─── enum constraints (Finding 2 HIGH) ────────────────────────────────────────
+//
+// PRE-FIX: validateJsonSchema walks type/required/properties only. The `enum`
+// keyword is silently ignored — validateJsonSchema("denied", {type:"string",
+// enum:["approved"]}) returns [] (no errors). The tests below FAIL before the
+// fix because they expect errors for enum-violating values.
+
+describe("validateJsonSchema — enum constraints (Finding 2 HIGH)", () => {
+  it("reports a value that violates a top-level enum [PRE-FIX FAILS: returns []]", () => {
+    const errs = validateJsonSchema("denied", { type: "string", enum: ["approved"] });
+    expect(errs.length).toBeGreaterThan(0);
+    expect(errs.join(" ")).toMatch(/approved|denied|enum/i);
+  });
+
+  it("passes a value that satisfies a top-level enum", () => {
+    const errs = validateJsonSchema("approved", { type: "string", enum: ["approved"] });
+    expect(errs).toHaveLength(0);
+  });
+
+  it("reports an enum violation on a nested object property [PRE-FIX FAILS: returns []]", () => {
+    const schema = {
+      type: "object",
+      properties: {
+        status: { type: "string", enum: ["active", "inactive"] },
+      },
+      required: ["status"],
+    };
+    const errs = validateJsonSchema({ status: "deleted" }, schema);
+    expect(errs.length).toBeGreaterThan(0);
+    expect(errs.join(" ")).toMatch(/active|inactive|deleted|enum|status/i);
+  });
+
+  it("passes a valid nested enum value", () => {
+    const schema = {
+      type: "object",
+      properties: {
+        status: { type: "string", enum: ["active", "inactive"] },
+      },
+      required: ["status"],
+    };
+    const errs = validateJsonSchema({ status: "active" }, schema);
+    expect(errs).toHaveLength(0);
+  });
+});

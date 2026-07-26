@@ -30,6 +30,29 @@ import { ReplayLLMInterceptor } from "../interceptor";
 import type { ExecutionTrace, TraceEvent } from "../types";
 import { TRACE_SCHEMA_VERSION, TraceVersionError } from "../types";
 
+// ─── Additional test helpers ──────────────────────────────────────────────────
+
+/**
+ * Like makeEvent but with an explicit agentId — required for concurrent-pairing
+ * tests where events from two different agents must be distinguishable.
+ */
+function makeAgentEvent(
+  id: string,
+  agentId: string,
+  type: TraceEvent["type"],
+  payload: Record<string, unknown>,
+): TraceEvent {
+  const base: Omit<TraceEvent, "hash"> = {
+    id,
+    type,
+    agentId,
+    timestamp: 1000,
+    vectorClock: { [agentId]: 1 },
+    payload: payload as TraceEvent["payload"],
+  };
+  return { ...base, hash: computeEventHash(base) };
+}
+
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 
 function sha256hex(input: string): string {
@@ -648,5 +671,207 @@ describe("toGoldenTrace — default redaction (safe by omission)", () => {
     const prose = "The task is to summarise the quarterly report for review.";
     const golden = toGoldenTrace(makeTrace(prose));
     expect(golden.finalOutput).toBe(prose);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Generic redaction: ALL event payload string fields, not just llm_call/response
+//
+// Pre-fix: redactEventPayload type-switched on event.type and returned every
+// non-LLM event unchanged, so a secret in an operator, error, checkpoint, or
+// consensus-vote payload survived into the committed trace file.
+//
+// Post-fix: a generic string-deep-walk redacts all string fields across every
+// event type, making the safety floor event-type-agnostic.
+//
+// Rule 015: each test asserts a property that the pre-fix code violates, so
+// each test FAILS before the fix and PASSES after.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("toGoldenTrace — generic redaction covers all event types (finding 1)", () => {
+  it("redacts a secret planted in an operator event payload — pre-fix FAILS", () => {
+    const trace = makeTrace("ok", [
+      // operator event is not llm_call or llm_response — pre-fix leaves it unchanged
+      makeEvent("e1", "operator", {
+        operator: "tool-fetch",
+        durationMs: 0,
+        inputHash: "TOPSECRET-operatorpayload",
+      }),
+    ]);
+    const golden = toGoldenTrace(trace, { redactPatterns: [/TOPSECRET-\w+/g] });
+    const serialized = JSON.stringify(golden);
+    expect(serialized).not.toContain("TOPSECRET-operatorpayload");
+    expect(serialized).toContain("[REDACTED]");
+  });
+
+  it("redacts a secret planted in an error event message — pre-fix FAILS", () => {
+    const trace = makeTrace("ok", [
+      makeEvent("e1", "error", {
+        code: "E001",
+        message: "Auth failed with key TOPSECRET-errorfield",
+      }),
+    ]);
+    const golden = toGoldenTrace(trace, { redactPatterns: [/TOPSECRET-\w+/g] });
+    const serialized = JSON.stringify(golden);
+    expect(serialized).not.toContain("TOPSECRET-errorfield");
+    expect(serialized).toContain("[REDACTED]");
+  });
+
+  it("secret is absent and event hash matches the redacted payload — pre-fix FAILS", () => {
+    // Pre-fix: operator event returned unchanged → secret survives AND hash is
+    // computed from the un-redacted payload → first assertion fails.
+    // Post-fix: secret is stripped, hash recomputed from redacted payload → both pass.
+    const operatorEvent = makeEvent("e1", "operator", {
+      operator: "tool-fetch",
+      durationMs: 0,
+      inputHash: "TOPSECRET-hashtest",
+    });
+    const trace = makeTrace("ok", [operatorEvent]);
+    const golden = toGoldenTrace(trace, { redactPatterns: [/TOPSECRET-\w+/g] });
+
+    const redactedEvent = golden.events[0];
+    // Secret must be gone (fails pre-fix — event returned unchanged)
+    expect(JSON.stringify(redactedEvent.payload)).not.toContain("TOPSECRET-hashtest");
+    // Hash must match the final (redacted) payload
+    const expectedHash = computeEventHash({
+      id: redactedEvent.id,
+      type: redactedEvent.type,
+      agentId: redactedEvent.agentId,
+      timestamp: redactedEvent.timestamp,
+      vectorClock: redactedEvent.vectorClock,
+      payload: redactedEvent.payload,
+    });
+    expect(redactedEvent.hash).toBe(expectedHash);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Zero-token guarantee (finding 2) — decision: narrow the claim
+//
+// The provider layer (ProviderRegistry) is a thin Map with no middleware hook.
+// Adding interception there is invasive machinery; this campaign has twice shown
+// that defensive machinery for hard cases makes them worse (verdict wording).
+//
+// Decision: narrow the claim. The zero-token guarantee applies ONLY to agents
+// that check WEFT_REPLAY_INTERCEPTOR_KEY. Agents that skip the check may make
+// live provider calls. replayAgentWithTrace cannot prevent this without
+// provider-level interception. What it CAN do — and does — is emit a CRITICAL
+// `golden:llmCallCount` divergence when the call count does not match, making
+// the violation loud rather than silent.
+//
+// The module doc and JSDoc for replayAgentWithTrace are updated to state this
+// precisely. The test below pins the observable behavior a caller experiences
+// when a factory ignores the interceptor.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("replayAgentWithTrace — zero-token guarantee is conditional (finding 2)", () => {
+  it("factory that ignores the interceptor produces a critical count-mismatch divergence (loud, not silent)", async () => {
+    // Golden recorded one LLM call.
+    const callEvent = makeEvent("e1", "llm_call", { model: "m", promptHash: "h" });
+    const responseEvent = makeEvent("e2", "llm_response", {
+      response: "recorded",
+      responseHash: "rh",
+      latencyMs: 10,
+    });
+    const trace = makeTrace("recorded", [callEvent, responseEvent]);
+    const golden = toGoldenTrace(trace);
+
+    // Factory produces the expected output by direct value — never touches the
+    // interceptor, so callsConsumed=0 vs expectedLlmCallCount=1.
+    const { matched, divergences } = await replayAgentWithTrace({
+      trace: golden,
+      factory: () => AgentUnit.of("recorded"),
+    });
+
+    // 0 consumed ≠ 1 expected → critical divergence (loud, not silent)
+    expect(matched).toBe(false);
+    const countDiv = divergences.find((d) => d.eventId === "golden:llmCallCount");
+    expect(countDiv).toBeDefined();
+    expect(countDiv?.severity).toBe("critical");
+    expect(countDiv?.expected).toBe(1);
+    expect(countDiv?.actual).toBe(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Concurrent call pairing — events from parallel agents paired by agentId
+//
+// Pre-fix: extractLLMCallsFromTrace used a single `pending` slot. An interleaved
+// sequence (callA → callB → responseA → responseB from two different agents)
+// overwrote callA's slot with callB, paired responseA with callB's config, and
+// discarded responseB entirely. This is the exact event pattern produced by
+// zipAll, consensus, and debate — unchanged parallel code reported spurious
+// divergence.
+//
+// Post-fix: a Map<agentId, Partial<RecordedLLMCall>> is used instead of a
+// single slot, correctly pairing each response to its own agent's pending call.
+//
+// Rule 015: the interleaved-sequence test FAILS pre-fix (returns 1 call, wrong
+// pairing) and PASSES post-fix (returns 2 correctly paired calls).
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("extractLLMCallsFromTrace — concurrent call pairing by agentId (finding 3)", () => {
+  it("correctly pairs interleaved calls from two parallel agents — pre-fix FAILS", () => {
+    // Interleaving: callA (agent-1) → callB (agent-2) → responseA (agent-1) → responseB (agent-2)
+    // Pre-fix: callB overwrites callA in single pending slot; only 1 (wrong) pair extracted.
+    // Post-fix: Map by agentId; 2 correctly paired calls extracted.
+    const events: TraceEvent[] = [
+      makeAgentEvent("e1", "agent-1", "llm_call", {
+        model: "m1",
+        promptHash: "h1",
+        prompt: "prompt-A",
+      }),
+      makeAgentEvent("e2", "agent-2", "llm_call", {
+        model: "m2",
+        promptHash: "h2",
+        prompt: "prompt-B",
+      }),
+      makeAgentEvent("e3", "agent-1", "llm_response", {
+        response: "resp-A",
+        responseHash: "rh1",
+        latencyMs: 10,
+      }),
+      makeAgentEvent("e4", "agent-2", "llm_response", {
+        response: "resp-B",
+        responseHash: "rh2",
+        latencyMs: 10,
+      }),
+    ];
+    const calls = extractLLMCallsFromTrace(makeTrace("out", events));
+
+    // Must return 2 calls (pre-fix returns 1, which is wrong)
+    expect(calls).toHaveLength(2);
+
+    // agent-1's call must be paired with agent-1's response
+    const callA = calls.find((c) => c.config.model === "m1");
+    expect(callA).toBeDefined();
+    expect(callA?.response.response).toBe("resp-A");
+
+    // agent-2's call must be paired with agent-2's response (pre-fix discards this entirely)
+    const callB = calls.find((c) => c.config.model === "m2");
+    expect(callB).toBeDefined();
+    expect(callB?.response.response).toBe("resp-B");
+  });
+
+  it("sequential calls from the same agent still pair correctly after fix", () => {
+    // Regression guard: the agentId-keyed approach must not break sequential same-agent calls.
+    const events: TraceEvent[] = [
+      makeAgentEvent("e1", "agent-1", "llm_call", { model: "m", promptHash: "h1", prompt: "p1" }),
+      makeAgentEvent("e2", "agent-1", "llm_response", {
+        response: "r1",
+        responseHash: "rh1",
+        latencyMs: 5,
+      }),
+      makeAgentEvent("e3", "agent-1", "llm_call", { model: "m", promptHash: "h2", prompt: "p2" }),
+      makeAgentEvent("e4", "agent-1", "llm_response", {
+        response: "r2",
+        responseHash: "rh2",
+        latencyMs: 5,
+      }),
+    ];
+    const calls = extractLLMCallsFromTrace(makeTrace("out", events));
+    expect(calls).toHaveLength(2);
+    expect(calls[0].response.response).toBe("r1");
+    expect(calls[1].response.response).toBe("r2");
   });
 });

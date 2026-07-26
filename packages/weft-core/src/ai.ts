@@ -19,6 +19,42 @@ import { providerRegistry } from "./providers/registry";
 import type { InferOutput } from "./schema";
 import { stream } from "./streaming";
 import { type Trace, type TraceRedactor, traceManager } from "./trace";
+import { zodSchemaToJsonSchema } from "./agent/executor";
+import type { Provider, ResponseFormat } from "./providers/interface";
+
+/**
+ * Build the response format for a schema-bearing request.
+ *
+ * The strict-mode plumbing (CR-502) is only worth building if the primary
+ * `ai()` path actually uses it: a capability reachable solely by hand-rolling
+ * a provider request is a capability users do not have. So when the provider
+ * advertises strict structured output and the schema converts cleanly, ask for
+ * constrained decoding and carry the original Zod schema along so the adapter
+ * validates against the full constraint set rather than the JSON Schema subset.
+ *
+ * Anything that does not qualify — a non-object root, or a provider without
+ * strict support — falls back to the previous `json_object` behaviour, which
+ * is exactly the honest-degradation path the capability defines.
+ */
+function buildResponseFormat(
+  schema: z.ZodType,
+  provider: Provider,
+): ResponseFormat {
+  if (!provider.capabilities.strictStructuredOutput) {
+    return { type: "json_object" };
+  }
+  const jsonSchema = zodSchemaToJsonSchema(schema);
+  if (!jsonSchema) {
+    return { type: "json_object" };
+  }
+  return {
+    type: "json_schema",
+    name: "response",
+    schema: jsonSchema as unknown as Record<string, unknown>,
+    strict: true,
+    zodSchema: schema,
+  };
+}
 
 /**
  * Extended options for the ai() function.
@@ -159,7 +195,7 @@ async function aiImplementation<T extends z.ZodType = any>(
     const requestOptions: Omit<AIRequest, "model" | "messages"> = {
       ...providerOpts,
       ...(options?.schema && provider.capabilities.structuredOutput
-        ? { responseFormat: { type: "json_object" as const } }
+        ? { responseFormat: buildResponseFormat(options.schema, provider) }
         : {}),
     };
 

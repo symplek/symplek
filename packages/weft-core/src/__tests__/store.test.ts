@@ -182,6 +182,30 @@ describe("createFileBackend", () => {
     expect(await backend.get("ttl-key")).toBeNull();
     vi.useRealTimers();
   });
+
+  it("propagates non-ENOENT read errors — does not treat an unreadable entry as absent", async () => {
+    // Place a *directory* at the path the backend would read for "payment-key".
+    // readFile() on a directory returns EISDIR (not ENOENT) on all platforms.
+    // Before the fix the backend swallowed this and returned null, silently
+    // authorising re-execution of any committed side effect guarded by this
+    // key. After the fix it must throw so the caller can decide whether
+    // re-execution is safe after manual inspection.
+    const dir = subdir("file-backend-eisdir");
+    const backend = createFileBackend(dir);
+
+    // "payment-key" has no special characters; encodeKey("payment-key") === "payment-key".
+    await mkdir(join(dir, "payment-key"), { recursive: true });
+
+    // Must throw — NOT return null and silently authorise a re-run
+    await expect(backend.get("payment-key")).rejects.toThrow();
+  });
+
+  it("absent keys (ENOENT) still return null — absence and unreadability remain distinct", async () => {
+    const dir = subdir("file-backend-absent-vs-unreadable");
+    const backend = createFileBackend(dir);
+    // No file written — genuine absence must still return null
+    expect(await backend.get("never-written-key")).toBeNull();
+  });
 });
 
 // ─── 3. Durable IdempotencyStore: at-most-once across restart ───────────────
@@ -335,6 +359,38 @@ describe("resume()", () => {
     const result = await resume(runId, unit, createContext(), { store });
     expect(executed).toBe(false);
     expect(result.value).toBe("already-done");
+  });
+
+  it("ordinary composed unit re-executes on resume — pre-committed step keys have no effect without explicit per-step wiring", async () => {
+    // This test pins the documented contract: resume() does NOT automatically
+    // skip sub-steps. A committed key like ${runId}:step1 in the store is
+    // irrelevant to a unit that does not explicitly query it with its own
+    // idempotency option. The unit re-executes even though step-key data is
+    // present in the store.
+    const dir = subdir("resume-no-step-keys");
+    const runId = "run-no-step-keys";
+    const store = createDurableStore(createFileBackend(dir));
+
+    // Pre-commit a step result — as if this step ran in a prior process
+    await store.idempotency.set(
+      `${runId}:step1`,
+      createTrackedResult("cached-step1", { source: "agent", confidence: 0.9 }),
+    );
+
+    let execCount = 0;
+    // Ordinary unit: no explicit per-step idempotency wiring inside
+    const unit = AgentUnit.from(async () => {
+      execCount++;
+      return "fresh-result";
+    });
+
+    // Outer runId is absent (simulates a crash before the outer run committed)
+    const result = await resume(runId, unit, createContext(), { store });
+
+    // The pre-committed step key is irrelevant — the unit has no code to look
+    // it up. resume() does not inject per-step skipping automatically.
+    expect(execCount).toBe(1); // unit ran, not skipped
+    expect(result.value).toBe("fresh-result");
   });
 });
 
