@@ -326,54 +326,40 @@ describe("idempotency", () => {
       expect(isTracked(cached) && cached.value).toBe("cached-value");
     });
 
-    it("R3 — store.get() that re-enters unit.run() during get() does not execute computation twice", async () => {
-      // Failure scenario (without deferred-promise fix):
-      //   1. Outer run() starts IIFE → IIFE calls store.get(key) synchronously.
-      //   2. store.get() fires a nested unit.run() for the same key (without awaiting).
-      //   3. Nested run() checks _idempotencyInFlight → EMPTY (outer hasn't set it yet)
-      //      → installs its own flight entry.
-      //   4. IIFE returns from store.get() → outer sets _idempotencyInFlight, overwriting
-      //      the nested entry.
-      //   5. Both outer and nested run the computation → execCount = 2.
+    it("R3 — re-entrant store is an unsupported pattern; IdempotencyStore contract documents the restriction", async () => {
+      // The deferred-promise machinery that attempted to support re-entrant
+      // stores has been removed. It created a circular await that deadlocked
+      // permanently: the re-entrant run() awaited executePromise, which could
+      // not settle until idemStore.get() returned, which it never would.
       //
-      // With fix: flight entry registered BEFORE store.get() is called. Nested run()
-      // finds the entry immediately and awaits the shared promise → execCount = 1.
-      let execCount = 0;
-      // Declare with definite-assignment assertion so the store closure can
-      // reference it before the assignment below.
-      let unit!: AgentUnit<string>;
-
-      let getCallCount = 0;
-      const reentrantStore: IdempotencyStore = {
-        get: async (key: string) => {
-          getCallCount++;
-          if (getCallCount === 1) {
-            // First call: fire a nested run WITHOUT awaiting to match the failure scenario.
-            // The nested call either shares the outer flight (fix) or creates a duplicate (bug).
-            unit
-              .run(ctx, {
-                idempotency: { key, strategy: "return-cached", store: reentrantStore },
-              })
-              .catch(() => {
-                // Circular await resolves fine with the fix; ignore any error here.
-              });
-          }
-          return null; // simulate cache miss
-        },
-        set: async () => {},
-      };
-
-      unit = AgentUnit.from(async () => {
-        execCount++;
-        return `exec-${execCount}`;
+      // The IdempotencyStore contract (see idempotency.ts) now explicitly
+      // forbids re-entrant implementations. A store whose get() calls back
+      // into run() for the same key violates the contract and may execute the
+      // computation more than once — the framework does not defend against it.
+      //
+      // This test documents the simplified structure: the flight entry is
+      // registered after the IIFE starts (not before), so a concurrent
+      // non-re-entrant caller that arrives after the entry is registered
+      // still joins the in-flight promise correctly.
+      //
+      // Verify the core concurrent-caller guarantee still holds.
+      const store = new InMemoryIdempotencyStore();
+      let executions = 0;
+      const unit = AgentUnit.from(async () => {
+        executions++;
+        await new Promise<void>((r) => setTimeout(r, 10));
+        return `exec-${executions}`;
       });
 
-      await unit.run(ctx, {
-        idempotency: { key: "reentrant-k", strategy: "return-cached", store: reentrantStore },
-      });
+      // Two concurrent calls: only one should execute.
+      const [r1, r2] = await Promise.all([
+        unit.run(ctx, { idempotency: { key: "r3-key", strategy: "return-cached", store } }),
+        unit.run(ctx, { idempotency: { key: "r3-key", strategy: "return-cached", store } }),
+      ]);
 
-      // Computation must have executed exactly once.
-      expect(execCount).toBe(1);
+      expect(executions).toBe(1);
+      expect(isTracked(r1) && r1.value).toBe("exec-1");
+      expect(isTracked(r2) && r2.value).toBe("exec-1");
     });
 
     it("R2 — two separately constructed instances of the same operation execute the computation once", async () => {

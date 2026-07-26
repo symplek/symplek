@@ -485,6 +485,33 @@ describe("Default Agents Tests", () => {
       expect(result.email).toBe("new@example.com");
     });
 
+    it("P3 — terse answers are extracted via question-field association", async () => {
+      // Failure scenario (before fix): text matching requires the answer text
+      // to contain the field name.  "Alice" does not contain "name", so the
+      // extractor found nothing and threw VALIDATION_ERROR.
+      //
+      // After fix: when askedQuestions is populated, extraction uses the
+      // question's targetField as the primary lookup signal.  A bare value like
+      // "Alice" (in response to a question targeting "name") populates the field
+      // correctly without any text-match heuristic.
+      const extractor = createDefaultExtractor(SimpleSchema);
+      const state: ReturnType<typeof createTestState> = createTestState({
+        answers: [
+          { questionId: "q-1", text: "Alice", timestamp: Date.now() },
+          { questionId: "q-2", text: "alice@example.com", timestamp: Date.now() },
+        ],
+        askedQuestions: [
+          { id: "q-1", text: "What is your name?", targetField: "name", priority: "high" as const },
+          { id: "q-2", text: "What is your email?", targetField: "email", priority: "high" as const },
+        ],
+      });
+
+      const result = await extractor(state).run(ctx, { trustMode: "legacy" });
+
+      expect(result.name).toBe("Alice");
+      expect(result.email).toBe("alice@example.com");
+    });
+
     it("P2 — valid accumulated value survives a later malformed correction at final extraction", async () => {
       // Failure scenario (without R3 fix):
       // currentContext.email = "good@example.com" (valid, accepted by partial updater).

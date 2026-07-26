@@ -529,6 +529,30 @@ describe("N67 — configure() cross-provider key safety", () => {
     expect(cfg.apiKey).toBe("sk-test-123");
     expect(cfg.model).toBe("gpt-4o-mini");
   });
+
+  it("N67 two-call sequence: apiKey-first then provider clears the staged key", async () => {
+    // Failure scenario (before fix):
+    //   configure({apiKey: openAIKey})  → _config = {apiKey: openAIKey}
+    //   configure({provider: "anthropic"}) → _config.provider was undefined,
+    //     so providerChanging was false → apiKey NOT cleared → Anthropic
+    //     would bootstrap with openAIKey.
+    //
+    // After fix: providerChanging fires whenever options.provider differs from
+    // _config.provider (including the undefined → "anthropic" transition).
+    const { getGlobalConfig } = await import("../globalConfig");
+
+    Weft.configure({ apiKey: "sk-openai-staged-key" });
+    // Confirm key is staged, no provider yet
+    expect(getGlobalConfig().apiKey).toBe("sk-openai-staged-key");
+    expect(getGlobalConfig().provider).toBeUndefined();
+
+    Weft.configure({ provider: "anthropic" });
+
+    const cfg = getGlobalConfig();
+    expect(cfg.provider).toBe("anthropic");
+    // The staged OpenAI key must NOT carry over to Anthropic.
+    expect(cfg.apiKey).toBeUndefined();
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

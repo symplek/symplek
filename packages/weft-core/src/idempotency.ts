@@ -48,7 +48,15 @@ export interface IdempotencyConfig {
 
 /**
  * Pluggable persistence contract for idempotency results.
+ *
  * Implementations must be safe to share across concurrent runs.
+ *
+ * **Non-re-entrancy requirement**: `get()` MUST NOT call `AgentUnit.run()`
+ * (or any wrapper around it) for the same store+key combination. The runtime
+ * registers the in-flight entry after `get()` starts executing; a `get()`
+ * that re-enters `run()` will find an empty flight map and execute the
+ * computation a second time. Implement stores as pure read-through to
+ * external state (database, cache, KV) only.
  */
 export interface IdempotencyStore {
   /** Return the cached result for `key`, or `null` if absent/expired. */

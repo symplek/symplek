@@ -697,5 +697,47 @@ describe("Conduct Execution Tests", () => {
       expect(result.context.name).toBe("Bob");
       expect(result.context.email).toBe("bob@example.org");
     });
+
+    it("terse answers converge end to end via question-field association", async () => {
+      // Failure scenario (before fix): answers like "Alice" and "alice@example.com"
+      // contain no field-name keywords. Text matching found nothing, partial context
+      // stayed empty, clarity could never climb, and final extraction threw
+      // VALIDATION_ERROR.
+      //
+      // After fix: computations.ts populates state.askedQuestions as each question
+      // is asked. The extractor and partialContextUpdater use question.targetField
+      // to find the right answer, so bare values map to the correct field.
+      const NameEmailSchema = z.object({
+        name: z.string(),
+        email: z.string().email(),
+      });
+
+      // Handler returns the bare field value when answering the targeted question.
+      const handlers = {
+        onQuestion: async (q: Question): Promise<Answer> => {
+          const bareValues: Record<string, string> = {
+            name: "Alice",
+            email: "alice@example.com",
+          };
+          return {
+            questionId: q.id,
+            text: bareValues[q.targetField ?? ""] ?? "unknown",
+            timestamp: Date.now(),
+          };
+        },
+      };
+
+      const result = await AgentUnit.of("gather contact info")
+        .interview({
+          contextSchema: NameEmailSchema,
+          options: { clarityThreshold: 70, maxQuestions: 5 },
+        })
+        .conduct(handlers)
+        .run(ctx, { trustMode: "legacy" });
+
+      expect(result.converged).toBe(true);
+      expect(result.context.name).toBe("Alice");
+      expect(result.context.email).toBe("alice@example.com");
+    });
   });
 });

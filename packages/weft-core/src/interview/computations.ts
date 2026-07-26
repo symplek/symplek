@@ -104,6 +104,7 @@ export function createConductComputation<TContext>(
     // Initialize state
     const state: InterviewState = {
       answers: [],
+      askedQuestions: [],
       currentContext: {},
       clarityHistory: [],
       round: 0,
@@ -160,6 +161,10 @@ export function createConductComputation<TContext>(
       if (questionResult === null) {
         break;
       }
+
+      // Track the question so extractors can use question-field association
+      // to map terse answers (e.g. "Alice") to the correct schema field.
+      state.askedQuestions!.push(questionResult);
 
       // -----------------------------------------------------------------------
       // STEP 4: GET HUMAN ANSWER (async callback)

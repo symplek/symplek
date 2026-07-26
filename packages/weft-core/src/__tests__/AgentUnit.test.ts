@@ -254,6 +254,56 @@ describe("AgentUnit", () => {
       expect(result.value.votes[0]!.decision).toBe("abstain");
     });
 
+    it("P2 — bare-Promise voter removes its abort listener after settling", async () => {
+      // Failure scenario (before fix): a bare-Promise voter that resolved before
+      // the upstream signal aborted left its { once: true } listener attached to
+      // the signal. Each vote added a listener; running many consensus rounds on
+      // a long-lived signal accumulated listeners indefinitely.
+      //
+      // After fix: a local AbortController bounds the listener lifetime. When the
+      // race settles for any reason, localController.abort() removes the listener
+      // from the upstream signal via the { signal: localController.signal } option.
+      //
+      // Verify: spy on addEventListener/removeEventListener and confirm every add
+      // has a matching remove once the consensus resolves.
+      const controller = new AbortController();
+      const ctxWithSignal = createContext({ signal: controller.signal });
+
+      let addCount = 0;
+      let removeCount = 0;
+      const origAdd = controller.signal.addEventListener.bind(controller.signal);
+      const origRemove = controller.signal.removeEventListener.bind(controller.signal);
+      vi.spyOn(controller.signal, "addEventListener").mockImplementation(
+        (type: string, listener: any, opts?: any) => {
+          if (type === "abort") addCount++;
+          origAdd(type, listener, opts);
+        },
+      );
+      vi.spyOn(controller.signal, "removeEventListener").mockImplementation(
+        (type: string, listener: any, opts?: any) => {
+          if (type === "abort") removeCount++;
+          origRemove(type, listener, opts);
+        },
+      );
+
+      // Run consensus with two quickly-resolving bare-Promise voters.
+      const unit = AgentUnit.of("proposal").consensus(
+        [
+          () => Promise.resolve({ decision: "approve" as const, confidence: 0.9 }),
+          () => Promise.resolve({ decision: "approve" as const, confidence: 0.8 }),
+        ],
+        { quorum: 0.5 }, // no voteTimeout → Promise-voter path with upstream signal
+      );
+
+      await unit.run(ctxWithSignal);
+
+      // Every added abort listener must have been removed.
+      expect(addCount).toBeGreaterThan(0);
+      expect(removeCount).toBe(addCount);
+
+      vi.restoreAllMocks();
+    });
+
     it("P1 — pre-aborted ctx.signal aborts voters immediately when voteTimeout is set", async () => {
       // Failure scenario (without AbortSignal.any):
       // ctx.signal is already aborted when consensus begins. Listener-based

@@ -11,6 +11,7 @@ import { z } from "zod";
 import { AgentUnit } from "../AgentUnit";
 import { WeftError } from "../errors";
 import type {
+  Answer,
   ClarityScore,
   EvaluatorAgent,
   ExtractorAgent,
@@ -370,6 +371,64 @@ function extractFieldValue(fieldName: string, answerText: string): string {
 }
 
 // =============================================================================
+// ANSWER LOOKUP HELPERS
+// =============================================================================
+
+/**
+ * Build a lookup from field name → set of question IDs that target that field.
+ * Enables extraction to find answers via question-field association rather than
+ * text matching, so terse answers ("Alice") populate the correct schema field.
+ *
+ * @internal
+ */
+function buildFieldQuestionMap(
+  askedQuestions: Question[] | undefined,
+): Map<string, Set<string>> {
+  const map = new Map<string, Set<string>>();
+  if (!askedQuestions) return map;
+  for (const q of askedQuestions) {
+    if (q.targetField) {
+      const existing = map.get(q.targetField) ?? new Set<string>();
+      existing.add(q.id);
+      map.set(q.targetField, existing);
+    }
+  }
+  return map;
+}
+
+/**
+ * Find the most recent answer for a schema field.
+ *
+ * Primary signal: question-field association — the answer's `questionId` maps
+ * to a question whose `targetField` is this field. This correctly handles terse
+ * answers ("Alice") that contain no field-name keywords.
+ *
+ * Fallback: text matching — the answer text contains the field name. This covers
+ * volunteered information not elicited by a targeted question.
+ *
+ * Scans in reverse so the most recent answer wins (correction semantics).
+ *
+ * @internal
+ */
+function findRelevantAnswer(
+  answers: Answer[],
+  fieldName: string,
+  fieldQuestionIds: Map<string, Set<string>>,
+): Answer | undefined {
+  const questionIds = fieldQuestionIds.get(fieldName);
+  if (questionIds && questionIds.size > 0) {
+    const byAssociation = [...answers].reverse().find((a) =>
+      questionIds.has(a.questionId),
+    );
+    if (byAssociation) return byAssociation;
+  }
+  // Fallback: text matching for volunteered info or when askedQuestions absent
+  return [...answers].reverse().find((a) =>
+    a.text.toLowerCase().includes(fieldName.toLowerCase()),
+  );
+}
+
+// =============================================================================
 // DEFAULT EXTRACTOR
 // =============================================================================
 
@@ -414,25 +473,28 @@ export function createDefaultExtractor<T>(
       // Map answers to fields using type-aware value extraction.
       // In production, this would use an LLM for intelligent extraction.
       //
-      // Fix 6 (R2 verdict): always scan from the most recent answer so a
-      // correction later in the conversation overrides an earlier mention.
-      // Using [...answers].reverse().find() rather than findLast to stay within
-      // the ES2022 lib target.
+      // Primary signal: question-field association — use the answer that was
+      // given in response to the question targeting this field.  This handles
+      // terse answers ("Alice") that contain no field-name keywords.
+      // Fallback: text matching for volunteered information.
       //
+      // Fix 6 (R2 verdict): scan from the most recent answer so a correction
+      // later in the conversation overrides an earlier mention.
       // R3 fix: only overwrite an accumulated valid value when the candidate
-      // from the most-recent answer itself passes per-field validation.
-      // Without this guard, a malformed correction (e.g. "My email is not-an-email")
-      // discards a previously-converged valid value from currentContext and
-      // causes final schema validation to throw even though a valid value exists.
+      // passes per-field validation (guards against malformed corrections).
       const schemaAsObject = schema as unknown as z.AnyZodObject;
       const fieldSchemas: Record<string, z.ZodTypeAny> | null =
         typeof schemaAsObject.shape === "object"
           ? (schemaAsObject.shape as Record<string, z.ZodTypeAny>)
           : null;
 
+      const fieldQuestionIds = buildFieldQuestionMap(state.askedQuestions);
+
       for (const field of fields) {
-        const relevantAnswer = [...state.answers].reverse().find((a) =>
-          a.text.toLowerCase().includes(field.name.toLowerCase()),
+        const relevantAnswer = findRelevantAnswer(
+          state.answers,
+          field.name,
+          fieldQuestionIds,
         );
 
         if (relevantAnswer) {
@@ -510,15 +572,15 @@ export function createPartialContextUpdater<T>(
   return (state: InterviewState): Record<string, unknown> => {
     const extracted: Record<string, unknown> = { ...state.currentContext };
 
-    // Fix 5+6 (R2 verdict): remove the undefined-field guard and scan from the
-    // most recent answer so a corrected answer can replace an earlier one. The
-    // guard previously prevented any update to a field already present in
-    // currentContext, causing a malformed first answer to permanently block a
-    // later correct answer. Using [...answers].reverse().find() rather than
-    // findLast to stay within the ES2022 lib target.
+    // Primary signal: question-field association (enables terse answers).
+    // Fallback: text matching for volunteered information.
+    // Fix 5+6 (R2 verdict): scan from most recent answer; correction wins.
+    const fieldQuestionIds = buildFieldQuestionMap(state.askedQuestions);
     for (const field of fields) {
-      const relevantAnswer = [...state.answers].reverse().find((a) =>
-        a.text.toLowerCase().includes(field.name.toLowerCase()),
+      const relevantAnswer = findRelevantAnswer(
+        state.answers,
+        field.name,
+        fieldQuestionIds,
       );
       if (relevantAnswer) {
         extracted[field.name] = extractFieldValue(field.name, relevantAnswer.text);

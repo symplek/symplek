@@ -115,6 +115,13 @@ export function createConsensusComputation<T>(
         // preventing a timed-out promise from blocking or mutating consensus state.
         const signal = runCtx.signal;
         if (signal) {
+          // Use a local AbortController so the abort listener on `signal` is
+          // automatically removed via { signal: localController.signal } when
+          // localController.abort() fires in the finally block.  Without this,
+          // a voter that resolves before the signal aborts would leave the
+          // listener attached for the signal's lifetime, causing listener
+          // accumulation on long-lived shared signals.
+          const localController = new AbortController();
           const abortPromise = new Promise<never>((_, reject) => {
             if (signal.aborted) {
               reject(new DOMException("Vote aborted", "AbortError"));
@@ -122,19 +129,26 @@ export function createConsensusComputation<T>(
               signal.addEventListener(
                 "abort",
                 () => reject(new DOMException("Vote aborted", "AbortError")),
-                { once: true },
+                { once: true, signal: localController.signal },
               );
             }
           });
-          const result = await Promise.race([voterCallResult, abortPromise]);
+          let raceResult: Vote | VoteInput;
+          try {
+            raceResult = await Promise.race([voterCallResult, abortPromise]);
+          } finally {
+            // Abort the local controller to remove the listener from `signal`,
+            // regardless of whether the race settled via voter or abort.
+            localController.abort();
+          }
           voteInput =
-            "agentId" in result
+            "agentId" in raceResult
               ? {
-                  decision: result.decision,
-                  confidence: result.confidence,
-                  reasoning: result.reasoning,
+                  decision: raceResult.decision,
+                  confidence: raceResult.confidence,
+                  reasoning: raceResult.reasoning,
                 }
-              : result;
+              : raceResult;
         } else {
           const result = await voterCallResult;
           voteInput =
