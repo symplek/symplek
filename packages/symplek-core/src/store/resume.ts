@@ -2,19 +2,26 @@
  * @module @symplek/core/store/resume
  * @description `resume()` — replay a prior run from its durable journal (CR-403).
  *
- *   Mechanism: `resume()` runs the unit with the durable idempotency store and
- *   `strategy: "return-cached"`. Steps whose idempotency keys were written to
- *   the store during the original run return their cached `TrackedResult`
- *   immediately. Steps whose keys were never written (because the original run
- *   crashed or was interrupted before those steps completed) re-execute.
+ *   WHAT `resume()` DOES:
+ *   Calls `unit.run()` with the durable idempotency store and `runId` as the
+ *   outer idempotency key. If `runId` is already in the store (the whole run
+ *   committed), the unit returns its cached result without executing any steps.
+ *   If `runId` is absent, the unit executes from scratch.
  *
- *   REQUIRES: the original run used idempotency keys prefixed with `runId`.
- *   Each sub-step should use a key like `${runId}:step1`, `${runId}:step2`, etc.
- *   so that `resume()` can supply the store and the per-step lookups succeed.
+ *   WHAT `resume()` DOES NOT DO — the critical constraint:
+ *   `resume()` does NOT automatically skip sub-steps inside the unit. An
+ *   ordinary composed unit (a `flatMap`, `zip`, or any operator that does not
+ *   pass explicit `idempotency` options to each internal step) re-executes
+ *   every step whenever the outer `runId` is absent.
  *
- *   The `runId` itself is used as the idempotency key for the outer run. If the
- *   entire run was committed, `resume()` returns the cached result without
- *   executing any steps.
+ *   Per-step skipping applies only when ALL of the following hold:
+ *     1. Each sub-step was run with an explicit
+ *        `idempotency: { key: \`${runId}:stepN\`, strategy: "return-cached", store }`
+ *        option during the original run.
+ *     2. The same durable `store` (or one backed by the same backend) is
+ *        supplied to `resume()` and to each sub-step's `run()` call.
+ *   Without both conditions the sub-step re-executes on every resume attempt
+ *   regardless of any keys that exist in the store.
  *
  *   GUARANTEE BOUNDARY (stated verbatim per repair-campaign rule):
  *   At-most-once delivery is narrowed but not eliminated. If `backend.set()`
@@ -49,7 +56,14 @@ export interface ResumeOptions {
 }
 
 /**
- * Replay a prior run from its durable journal, skipping completed steps.
+ * Replay a prior run from its durable journal.
+ *
+ * Skips the entire unit if `runId` is committed in the store. Per-step
+ * skipping is NOT automatic: it applies only to sub-steps that were each
+ * run with an explicit `idempotency: { key: \`${runId}:stepN\` }` option
+ * during the original run. An ordinary composed unit (`flatMap`, `zip`, etc.)
+ * re-executes all its steps when the outer `runId` is absent. See the
+ * module docstring for the full contract.
  *
  * @example
  * ```typescript
@@ -57,21 +71,26 @@ export interface ResumeOptions {
  *
  * const store = createDurableStore(createFileBackend("./.symplek-journal"));
  *
- * // Original run (may have been interrupted):
- * await unit.run(ctx, {
- *   idempotency: { key: `${runId}:step1`, strategy: "return-cached", store: store.idempotency },
+ * // Each sub-step MUST pass its own idempotency option for step-level skipping:
+ * const unit = AgentUnit.from(async (ctx) => {
+ *   const r1 = await step1.run(ctx, {
+ *     idempotency: { key: `${runId}:step1`, strategy: "return-cached", store: store.idempotency },
+ *   });
+ *   return r1.value;
  * });
  *
- * // Resume (steps with committed keys return cached; uncommitted steps re-run):
+ * // Resume: whole-unit cache hit returns immediately; otherwise runs with
+ * // per-step skipping for any step whose key is already committed.
  * const result = await resume(runId, unit, createContext(), { store });
  * ```
  *
- * @param runId   Stable identifier for the original run. Used as the idempotency
- *                key for the outer unit, and as the prefix to match per-step keys.
+ * @param runId   Stable identifier for the original run. Used as the outer
+ *                idempotency key. Per-step keys, if any, must be constructed
+ *                by agent code itself (e.g. `\`${runId}:stepN\``).
  * @param unit    The `AgentUnit` to execute (same unit as the original run).
  * @param context `AgentContext` for the resumed execution. The durable store is
- *                injected into `context.extensions.__symplek_resume_store` so that
- *                sub-steps executed inside `flatMap` chains can read the store.
+ *                injected into `context.extensions.__symplek_resume_store` so
+ *                agent code that checks for it can access the store directly.
  * @param options Resume options including the durable store.
  */
 export async function resume<T>(
@@ -101,9 +120,10 @@ export async function resume<T>(
     }
   }
 
-  // Run the unit with the durable idempotency store.
-  // Sub-steps that used `${runId}:stepN` keys during the original run will
-  // find their cached results; uncommitted steps will re-execute.
+  // Run the unit with the outer idempotency key. If runId is cached, the
+  // whole unit returns immediately. If not, the unit executes; sub-steps are
+  // skipped only if they were each run with an explicit per-step idempotency
+  // option — ordinary composed units (flatMap, zip) do NOT skip automatically.
   return (unit as unknown as {
     run(
       ctx: AgentContext,

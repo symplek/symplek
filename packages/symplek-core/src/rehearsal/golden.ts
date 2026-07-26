@@ -1,18 +1,28 @@
 /**
  * @module @symplek/core/rehearsal/golden
- * @description Golden trace format — record once, replay infinitely, zero tokens.
- *   A GoldenTrace is an ExecutionTrace designated as a committed test oracle.
+ * @description Golden trace format — record once, replay at zero token cost for agents
+ *   that participate.  A GoldenTrace is an ExecutionTrace designated as a committed test oracle.
  *   Contract fields (schemaVersion, finalOutputHash, expectedLlmCallCount) are
  *   stable across schema versions and safe to diff in CI.
  *
  *   Secret safety: when `redactPatterns` are supplied to `toGoldenTrace`, they
- *   are applied to ALL sensitive event payload fields (prompt, systemPrompt,
- *   response) AND to finalOutput, so no secret survives into the committed file.
+ *   are applied to ALL string fields across ALL event payload types AND to
+ *   finalOutput, so no secret survives into the committed file regardless of
+ *   event type (tool calls, operator payloads, error messages, etc.).
  *
- *   Replay correctness: `replayAgentWithTrace` actually executes the supplied
- *   factory, injects a `ReplayLLMInterceptor` via the context so no live model
- *   call is made, and compares the resulting output and call profile against the
- *   golden contract.  A changed factory will produce a divergence.
+ *   Replay cost guarantee (conditional): `replayAgentWithTrace` injects a
+ *   `ReplayLLMInterceptor` into `AgentContext.extensions[SYMPLEK_REPLAY_INTERCEPTOR_KEY]`.
+ *   Agents that check for this key and call `interceptor.replayCall()` make no
+ *   live model calls and consume zero tokens.  Agents that skip the check may
+ *   call a live provider; this module cannot prevent that without provider-level
+ *   interception (which is not currently implemented).  What it does guarantee:
+ *   if the call count diverges from the recorded count, a CRITICAL divergence is
+ *   emitted — the violation is loud, not silent.
+ *
+ *   Replay correctness: the factory is actually executed. A changed factory will
+ *   produce a different output hash or call count, which the contract check detects.
+ *   Concurrent LLM calls from parallel agents are paired by agentId, matching the
+ *   event pattern produced by zipAll, consensus, and debate operators.
  * @rules @.claude/rules/patterns/316-file-header-contracts.md
  */
 
@@ -95,54 +105,44 @@ function recomputeEventHash(event: TraceEvent): TraceEvent {
 }
 
 /**
- * Redact sensitive payload fields in an event and recompute its hash.
+ * Deep-walk any JSON-serializable value and apply redaction patterns to every
+ * string leaf.  Numbers, booleans, null, and undefined pass through unchanged.
  *
- * - `llm_call`: redacts `prompt` and `systemPrompt`.
- * - `llm_response`: redacts `response`.
- * - All other event types: returned unchanged.
+ * This is intentionally type-agnostic: secrets can appear in any string field
+ * of any event type (operator payloads, error messages, consensus reasoning,
+ * tool-call inputs, etc.) and an allowlist of two event types is the wrong
+ * structure for a safety floor.
+ */
+function redactStringsDeep(value: unknown, patterns: RegExp[]): unknown {
+  if (typeof value === "string") {
+    return applyRedact(value, patterns);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => redactStringsDeep(item, patterns));
+  }
+  if (value !== null && typeof value === "object") {
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      result[k] = redactStringsDeep(v, patterns);
+    }
+    return result;
+  }
+  return value;
+}
+
+/**
+ * Redact all string fields in an event payload and recompute its integrity hash.
  *
- * The hash is recomputed after redaction so `TraceReplayer.verifyEventIntegrity`
- * still passes on the committed golden trace.
+ * Applies redaction generically across all event types rather than enumerating
+ * known shapes.  The hash is always recomputed so `TraceReplayer.verifyEventIntegrity`
+ * passes on the committed golden trace.
  */
 function redactEventPayload(event: TraceEvent, patterns: RegExp[]): TraceEvent {
-  if (event.type === "llm_call") {
-    const p = event.payload as unknown as Record<string, unknown>;
-    const newPayload: Record<string, unknown> = {
-      ...p,
-      ...(typeof p.prompt === "string" && {
-        prompt: applyRedact(p.prompt, patterns),
-      }),
-      ...(typeof p.systemPrompt === "string" && {
-        systemPrompt: applyRedact(p.systemPrompt, patterns),
-      }),
-    };
-    return recomputeEventHash({
-      ...event,
-      // TraceEvent is not a discriminated union — `type` and `payload` are
-      // independent, so narrowing on `type` cannot narrow the payload. The
-      // spread preserves every original field and only replaces two strings
-      // with redacted strings, so the shape is unchanged.
-      payload: newPayload as unknown as TraceEvent["payload"],
-    });
-  }
-  if (event.type === "llm_response") {
-    const p = event.payload as unknown as Record<string, unknown>;
-    const newPayload: Record<string, unknown> = {
-      ...p,
-      ...(typeof p.response === "string" && {
-        response: applyRedact(p.response, patterns),
-      }),
-    };
-    return recomputeEventHash({
-      ...event,
-      // TraceEvent is not a discriminated union — `type` and `payload` are
-      // independent, so narrowing on `type` cannot narrow the payload. The
-      // spread preserves every original field and only replaces two strings
-      // with redacted strings, so the shape is unchanged.
-      payload: newPayload as unknown as TraceEvent["payload"],
-    });
-  }
-  return event;
+  const newPayload = redactStringsDeep(
+    event.payload,
+    patterns,
+  ) as TraceEvent["payload"];
+  return recomputeEventHash({ ...event, payload: newPayload });
 }
 
 // ─── REPLAY CONTEXT KEY ───────────────────────────────────────────────────────
@@ -329,17 +329,30 @@ export function toGoldenTrace<T>(
 /**
  * Extract RecordedLLMCall entries from a trace.
  * Used by replayAgentWithTrace to seed the ReplayLLMInterceptor.
+ *
+ * Pairing strategy: calls are matched to responses by `event.agentId`.  Within
+ * a single agent LLM calls are always sequential (each `recordCall` awaits its
+ * provider before the next call starts), so the agentId is a correct correlation
+ * key even when events from multiple parallel agents are interleaved — the exact
+ * pattern produced by `zipAll`, `consensus`, and `debate`.
+ *
+ * A single pending slot was wrong for parallel compositions: given the ordering
+ * callA → callB → responseA → responseB, callB overwrote callA's slot,
+ * responseA was paired with callB, and responseB was silently discarded.
  */
 export function extractLLMCallsFromTrace<T>(
   trace: ExecutionTrace<T>,
 ): RecordedLLMCall[] {
   const calls: RecordedLLMCall[] = [];
-  let pending: Partial<RecordedLLMCall> | null = null;
+  // Key: agentId — each agent's in-flight call waits for its response before
+  // the same agent can make another call, so a single pending slot per agentId
+  // is sufficient and correct.
+  const pending = new Map<string, Partial<RecordedLLMCall>>();
 
   for (const event of trace.events) {
     if (event.type === "llm_call") {
       const p = event.payload as unknown as Record<string, unknown>;
-      pending = {
+      pending.set(event.agentId, {
         config: {
           model: p.model as string,
           prompt: (p.prompt as string) ?? "",
@@ -348,25 +361,28 @@ export function extractLLMCallsFromTrace<T>(
           maxTokens: p.maxTokens as number | undefined,
         },
         configHash: p.promptHash as string,
-      };
-    } else if (event.type === "llm_response" && pending) {
-      const p = event.payload as unknown as Record<string, unknown>;
-      pending.response = {
-        response: (p.response as string) ?? "",
-        tokensUsed: p.tokensUsed as number | undefined,
-        finishReason: p.finishReason as string | undefined,
-        latencyMs: (p.latencyMs as number) ?? 0,
-      };
-      pending.responseHash = p.responseHash as string;
-      if (
-        pending.config &&
-        pending.response &&
-        pending.configHash &&
-        pending.responseHash
-      ) {
-        calls.push(pending as RecordedLLMCall);
+      });
+    } else if (event.type === "llm_response") {
+      const pendingCall = pending.get(event.agentId);
+      if (pendingCall) {
+        const p = event.payload as unknown as Record<string, unknown>;
+        pendingCall.response = {
+          response: (p.response as string) ?? "",
+          tokensUsed: p.tokensUsed as number | undefined,
+          finishReason: p.finishReason as string | undefined,
+          latencyMs: (p.latencyMs as number) ?? 0,
+        };
+        pendingCall.responseHash = p.responseHash as string;
+        if (
+          pendingCall.config &&
+          pendingCall.response &&
+          pendingCall.configHash &&
+          pendingCall.responseHash
+        ) {
+          calls.push(pendingCall as RecordedLLMCall);
+        }
+        pending.delete(event.agentId);
       }
-      pending = null;
     }
   }
   return calls;
@@ -375,15 +391,21 @@ export function extractLLMCallsFromTrace<T>(
 // ─── REPLAY AGENT WITH TRACE ──────────────────────────────────────────────────
 
 /**
- * Replay a golden trace as a CI assertion at zero token cost.
+ * Replay a golden trace as a CI assertion.
  *
  * Executes the supplied `factory` with a `ReplayLLMInterceptor` injected via
- * `AgentContext.extensions[SYMPLEK_REPLAY_INTERCEPTOR_KEY]`.  Agents that check
- * for this key will receive recorded provider responses instead of making live
- * model calls.  Agents that make no LLM calls at all (e.g. `AgentUnit.of(...)`)
- * satisfy the zero-token guarantee trivially.
+ * `AgentContext.extensions[SYMPLEK_REPLAY_INTERCEPTOR_KEY]`.
  *
- * Two properties are asserted:
+ * **Token cost — conditional guarantee**: agents that check for
+ * `SYMPLEK_REPLAY_INTERCEPTOR_KEY` and call `interceptor.replayCall()` make no
+ * live model calls and consume zero tokens.  Agents that skip the check may
+ * call a live provider; this function cannot prevent that without provider-level
+ * interception (not currently implemented).  However, if the call count diverges
+ * from the recorded count, a CRITICAL `golden:llmCallCount` divergence is
+ * emitted — the violation is loud, not silent.  Agents that make no LLM calls
+ * at all (e.g. `AgentUnit.of(...)`) cost zero tokens trivially.
+ *
+ * Two contract properties are asserted:
  * 1. **Output hash**: `sha256(JSON.stringify(factoryOutput)) === contract.finalOutputHash`
  * 2. **LLM call count**: calls consumed from the interceptor === `contract.expectedLlmCallCount`
  *

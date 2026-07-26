@@ -51,8 +51,10 @@ function decodeKey(encoded: string): string {
 /**
  * Create a file-backed `DurableStoreBackend` that stores entries under `dir`.
  *
- * The directory is created lazily on first write. All reads against a missing
- * directory return `null` rather than throwing.
+ * The directory is created lazily on first write. Reads against an absent key
+ * or absent directory (ENOENT) return `null`. Any other read error (EACCES,
+ * EIO, EISDIR, …) is rethrown — returning null would silently authorise
+ * re-execution of a committed side effect (e.g. a payment charge).
  *
  * @example
  * ```typescript
@@ -77,8 +79,15 @@ export function createFileBackend(dir: string): DurableStoreBackend {
       let raw: Buffer;
       try {
         raw = await readFile(path);
-      } catch {
-        return null;
+      } catch (err) {
+        // ENOENT = file does not exist → the key is genuinely absent.
+        // Any other error (EACCES, EIO, EISDIR, …) means the file exists or
+        // could not be accessed for a reason unrelated to absence. Returning
+        // null would silently authorise re-execution of a committed side
+        // effect. Rethrow so the caller can surface the failure and decide
+        // whether re-execution is safe after manual inspection.
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+        throw err;
       }
 
       // Check TTL header

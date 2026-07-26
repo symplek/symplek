@@ -5,10 +5,12 @@ import { SymplekError } from "../errors";
 // ── Post-hoc JSON Schema validator ──────────────────────────────────────────
 // Anthropic's tool_use forcing guarantees the tool is invoked, but NOT that its
 // input conforms to the schema. This validator catches violations before they
-// reach the caller. No new dependency — only handles type, required, properties.
+// reach the caller. Handles: type, required, properties, enum.
+// For complete validation (min, max, pattern, anyOf, …) pass a zodSchema in
+// ResponseFormat — the adapter uses Zod when available.
 
 /**
- * Validates a value against a JSON Schema (subset: type, required, properties).
+ * Validates a value against a JSON Schema (subset: type, required, properties, enum).
  * Returns error messages; empty array means valid.
  *
  * @internal Exported for unit testing; not part of the public provider API.
@@ -24,6 +26,17 @@ export function validateJsonSchema(
     const expectedType = schema.type as string;
     if (!_matchesSchemaType(value, expectedType)) {
       return [`${path}: expected ${expectedType}, got ${_schemaTypeOf(value)}`];
+    }
+  }
+
+  // enum check: if the type matched (or was not specified), verify the value is
+  // one of the enumerated values. This covers the common string-enum pattern that
+  // the old walker silently accepted.
+  if (schema.enum !== undefined && Array.isArray(schema.enum)) {
+    const enumValues = schema.enum as unknown[];
+    if (!enumValues.includes(value)) {
+      const allowed = enumValues.map((v) => JSON.stringify(v)).join(", ");
+      errors.push(`${path}: value ${JSON.stringify(value)} is not one of [${allowed}]`);
     }
   }
 
@@ -53,6 +66,57 @@ export function validateJsonSchema(
   }
 
   return errors;
+}
+
+// Duck-typed interface for Zod schema validation — avoids importing Zod while
+// still supporting the full Zod constraint surface (enum, min, max, regex, …).
+type ZodLike = {
+  safeParse: (v: unknown) => { success: boolean; error?: { message: string } };
+};
+
+/**
+ * Validates structured output from an Anthropic tool_use forced call.
+ * - When zodSchema is provided: uses Zod for complete validation (enum, min, etc.).
+ * - Without zodSchema: falls back to the partial JSON Schema walker
+ *   (type, required, properties, enum).
+ * Throws SymplekError(VALIDATION_ERROR) on violation; returns void on success.
+ *
+ * @internal Exported for unit testing; not part of the public provider API.
+ */
+export function validateAnthropicStructuredOutput(
+  toolInput: unknown,
+  schemaObj: Record<string, unknown>,
+  zodSchema?: ZodLike,
+): void {
+  if (zodSchema) {
+    const result = zodSchema.safeParse(toolInput);
+    if (!result.success) {
+      throw new SymplekError({
+        code: "VALIDATION_ERROR",
+        why: `Anthropic structured output failed schema validation: ${result.error?.message ?? "schema violation"}`,
+        fix: {
+          description:
+            "The model returned output that does not match the requested schema. Review your prompt and schema.",
+          docsUrl: "https://docs.anthropic.com/en/api/messages",
+        },
+      });
+    }
+    return;
+  }
+  // Partial fallback: handles type, required, properties, enum.
+  // For min/max/pattern/anyOf pass ResponseFormat.zodSchema for complete coverage.
+  const errs = validateJsonSchema(toolInput, schemaObj);
+  if (errs.length > 0) {
+    throw new SymplekError({
+      code: "VALIDATION_ERROR",
+      why: `Anthropic structured output failed schema validation: ${errs.slice(0, 3).join("; ")}`,
+      fix: {
+        description:
+          "The model returned output that does not match the requested schema. Review your prompt and schema.",
+        docsUrl: "https://docs.anthropic.com/en/api/messages",
+      },
+    });
+  }
 }
 
 function _matchesSchemaType(value: unknown, type: string): boolean {
@@ -116,6 +180,75 @@ async function loadAnthropicSdk(): Promise<
 }
 
 /**
+ * Converts provider-neutral AIMessage[] into Anthropic MessageParam[].
+ *
+ * Critical correctness requirement: assistant turns that returned tool calls
+ * MUST emit `tool_use` content blocks (one per call) so that the subsequent
+ * `tool_result` blocks have matching `tool_use_id` values. Anthropic rejects
+ * conversations where a `tool_result` references a `tool_use_id` that was
+ * never sent as a `tool_use` block.
+ *
+ * @internal Exported for unit testing; not part of the public provider API.
+ */
+export function transformAnthropicMessages(messages: AIMessage[]): {
+  system?: string;
+  messages: Anthropic.MessageParam[];
+} {
+  const system = messages.find((m) => m.role === "system")?.content;
+  const filteredMessages = messages
+    .filter((m) => m.role !== "system")
+    .map((m) => {
+      if (m.role === "user")
+        return { role: "user", content: m.content } as Anthropic.MessageParam;
+
+      if (m.role === "assistant") {
+        const toolCalls = m.toolCalls;
+        if (toolCalls && toolCalls.length > 0) {
+          // Anthropic requires tool_use content blocks in the assistant turn that
+          // immediately precede each tool_result block. The text prefix (if any)
+          // is emitted as a leading text block. Without these blocks, Anthropic
+          // rejects the conversation with a 400 error.
+          const contentBlocks: unknown[] = [];
+          if (m.content) {
+            contentBlocks.push({ type: "text", text: m.content });
+          }
+          for (const tc of toolCalls) {
+            contentBlocks.push({
+              type: "tool_use" as const,
+              id: tc.id,
+              name: tc.name,
+              input: tc.input as Record<string, unknown>,
+            });
+          }
+          return { role: "assistant", content: contentBlocks } as Anthropic.MessageParam;
+        }
+        return { role: "assistant", content: m.content } as Anthropic.MessageParam;
+      }
+
+      // CR-402 fix: Anthropic requires tool results as content blocks with
+      // type:"tool_result", not as plain user messages. The previous coercion
+      // (role:"user" with string content) silently dropped the tool_use_id
+      // link, causing Anthropic to reject multi-turn tool conversations.
+      if (m.role === "tool") {
+        return {
+          role: "user",
+          content: [
+            {
+              type: "tool_result" as const,
+              tool_use_id: m.toolCallId ?? "",
+              content: m.content,
+            },
+          ],
+        } as Anthropic.MessageParam;
+      }
+      // Fallback for any unknown role — plain user message
+      return { role: "user", content: m.content } as Anthropic.MessageParam;
+    });
+
+  return { system, messages: filteredMessages };
+}
+
+/**
  * Output cap used when the caller sets none. Anthropic requires the field.
  * On current Claude models thinking tokens count toward it, so a small cap can
  * be spent before any answer text is written.
@@ -154,49 +287,23 @@ export async function createAnthropicProvider(
     // Anthropic uses tool_use forcing for json_schema strict=true: the schema is
     // injected as a tool and tool_choice is forced to that tool. This guarantees
     // the tool is invoked but does NOT constrain generation — the model can still
-    // return schema-non-conforming input. The adapter validates the returned input
-    // post-hoc and throws VALIDATION_ERROR on failure, so callers receive a
-    // conforming result or a clear error (never silent garbage).
+    // return schema-non-conforming input. The adapter validates post-hoc:
+    //   - With ResponseFormat.zodSchema: Zod validates ALL constraints (enum,
+    //     min, max, pattern, …). This is the complete enforcement path.
+    //   - Without zodSchema: a partial JSON Schema walker checks type, required,
+    //     properties, and enum. Pass zodSchema for full constraint coverage.
+    // In both cases violations throw VALIDATION_ERROR (never silent acceptance).
     strictStructuredOutput: true,
     maxContextTokens: 200000,
   };
 
+  // transformAnthropicMessages is the inner call site; delegate to the exported
+  // standalone function so tests can call it directly without a live provider.
   function transformMessages(messages: AIMessage[]): {
     system?: string;
     messages: Anthropic.MessageParam[];
   } {
-    const system = messages.find((m) => m.role === "system")?.content;
-    const filteredMessages = messages
-      .filter((m) => m.role !== "system")
-      .map((m) => {
-        if (m.role === "user")
-          return { role: "user", content: m.content } as Anthropic.MessageParam;
-        if (m.role === "assistant")
-          return {
-            role: "assistant",
-            content: m.content,
-          } as Anthropic.MessageParam;
-        // CR-402 fix: Anthropic requires tool results as content blocks with
-        // type:"tool_result", not as plain user messages. The previous coercion
-        // (role:"user" with string content) silently dropped the tool_use_id
-        // link, causing Anthropic to reject multi-turn tool conversations.
-        if (m.role === "tool") {
-          return {
-            role: "user",
-            content: [
-              {
-                type: "tool_result" as const,
-                tool_use_id: m.toolCallId ?? "",
-                content: m.content,
-              },
-            ],
-          } as Anthropic.MessageParam;
-        }
-        // Fallback for any unknown role — plain user message
-        return { role: "user", content: m.content } as Anthropic.MessageParam;
-      });
-
-    return { system, messages: filteredMessages };
+    return transformAnthropicMessages(messages);
   }
 
   function transformFinishReason(
@@ -289,6 +396,7 @@ export async function createAnthropicProvider(
         if (isToolForced) {
           const schemaName = (request.responseFormat as { name: string }).name;
           const schemaObj = (request.responseFormat as { schema: Record<string, unknown> }).schema;
+          const zodSchema = (request.responseFormat as { zodSchema?: ZodLike }).zodSchema;
           // Use any[] cast to avoid Anthropic SDK's discriminated union mismatch
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const toolBlock = (response.content as any[]).find(
@@ -308,18 +416,7 @@ export async function createAnthropicProvider(
             });
           }
 
-          const errs = validateJsonSchema(toolBlock.input, schemaObj);
-          if (errs.length > 0) {
-            throw new SymplekError({
-              code: "VALIDATION_ERROR",
-              why: `Anthropic structured output failed schema validation: ${errs.slice(0, 3).join("; ")}`,
-              fix: {
-                description:
-                  "The model returned output that does not match the requested schema. Review your prompt and schema.",
-                docsUrl: "https://docs.anthropic.com/en/api/messages",
-              },
-            });
-          }
+          validateAnthropicStructuredOutput(toolBlock.input, schemaObj, zodSchema);
 
           const structuredText = JSON.stringify(toolBlock.input);
           return {
@@ -536,18 +633,8 @@ export async function createAnthropicProvider(
               // the assembled input before yielding — violations surface as errors.
               if (isToolForced && buf.name === (request.responseFormat as { name: string }).name) {
                 const schemaObj = (request.responseFormat as { schema: Record<string, unknown> }).schema;
-                const errs = validateJsonSchema(input, schemaObj);
-                if (errs.length > 0) {
-                  throw new SymplekError({
-                    code: "VALIDATION_ERROR",
-                    why: `Anthropic structured output failed schema validation: ${errs.slice(0, 3).join("; ")}`,
-                    fix: {
-                      description:
-                        "The model returned output that does not match the requested schema. Review your prompt and schema.",
-                      docsUrl: "https://docs.anthropic.com/en/api/messages",
-                    },
-                  });
-                }
+                const zodSchema = (request.responseFormat as { zodSchema?: ZodLike }).zodSchema;
+                validateAnthropicStructuredOutput(input, schemaObj, zodSchema);
               }
 
               yield {

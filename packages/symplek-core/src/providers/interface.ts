@@ -60,6 +60,14 @@ export type ResponseFormat =
       schema: Record<string, unknown>;
       /** Enforce constrained decoding (only supported by select providers). */
       strict?: boolean;
+      /**
+       * Optional: the original Zod schema from which `schema` was derived.
+       * When supplied, the Anthropic adapter uses Zod for post-hoc validation
+       * instead of the partial JSON Schema walker. This enables complete
+       * constraint enforcement (enum, min, max, pattern, anyOf, …). Without
+       * this field, validation covers type, required, properties, and enum only.
+       */
+      zodSchema?: import("zod").ZodTypeAny;
     };
 
 // ─── Typed Stream Parts ──────────────────────────────────────────────────────
