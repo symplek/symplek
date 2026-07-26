@@ -47,7 +47,7 @@ export type {
   SymplekErrorDetail,
   SymplekErrorOptions,
 } from "./errors";
-export { CompensationError, IdempotencyStoreWriteError, SymplekError } from "./errors";
+export { CompensationError, IdempotencyStoreCorruptedError, IdempotencyStoreWriteError, SymplekError } from "./errors";
 export type {
   InterviewConfig,
   InterviewOptions,

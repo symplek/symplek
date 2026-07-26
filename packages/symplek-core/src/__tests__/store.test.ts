@@ -25,6 +25,7 @@ import {
   createDurableStore,
   createFileBackend,
   resume,
+  type DurableStoreBackend,
 } from "../store/index";
 
 // ─── test directory setup ─────────────────────────────────────────────────────
@@ -334,6 +335,240 @@ describe("resume()", () => {
     const result = await resume(runId, unit, createContext(), { store });
     expect(executed).toBe(false);
     expect(result.value).toBe("already-done");
+  });
+});
+
+// ─── 6. Encoding — injective key mapping (Finding F1) ────────────────────────
+
+describe("createFileBackend — injective key encoding", () => {
+  it("keys that collide under the old _-based encoding store and retrieve independently", async () => {
+    // Old encoding: encodeURIComponent(key).replace(/%/g, "_")
+    //   "idem:run/step"   → encodeURIComponent → "idem%3Arun%2Fstep" → "idem_3Arun_2Fstep"
+    //   "idem:run_2Fstep" → encodeURIComponent → "idem%3Arun_2Fstep" → "idem_3Arun_2Fstep"  ← collision
+    // New encoding (~ as escape):
+    //   "idem:run/step"   → "idem~3Arun~2Fstep"
+    //   "idem:run_2Fstep" → "idem~3Arun_2Fstep"  ← distinct
+    const dir = subdir("encode-collision-idem");
+    const backend = createFileBackend(dir);
+    const enc = new TextEncoder();
+    const dec = new TextDecoder();
+
+    await backend.set("idem:run/step", enc.encode("slash-version"));
+    await backend.set("idem:run_2Fstep", enc.encode("underscore-version"));
+
+    const slashResult = await backend.get("idem:run/step");
+    const underscoreResult = await backend.get("idem:run_2Fstep");
+
+    expect(slashResult).not.toBeNull();
+    expect(underscoreResult).not.toBeNull();
+    expect(dec.decode(slashResult!)).toBe("slash-version");
+    expect(dec.decode(underscoreResult!)).toBe("underscore-version");
+  });
+
+  it("keys with colons, slashes, underscores, percent signs, and tildes all round-trip", async () => {
+    const dir = subdir("encode-roundtrip-specials");
+    const backend = createFileBackend(dir);
+    const enc = new TextEncoder();
+    const dec = new TextDecoder();
+
+    const keys = [
+      "run/step",
+      "run:step",
+      "run_step",
+      "run%2Fstep",
+      "run~step",
+      "run~2Fstep",
+      "idem:run/step",
+      "idem:run_2Fstep",
+    ];
+
+    for (const k of keys) {
+      await backend.set(k, enc.encode(k));
+    }
+
+    for (const k of keys) {
+      const raw = await backend.get(k);
+      expect(raw, `round-trip failed for key: ${k}`).not.toBeNull();
+      expect(dec.decode(raw!), `value mismatch for key: ${k}`).toBe(k);
+    }
+  });
+
+  it("list() enumerates all keys under a prefix with no phantom entries after collision fix", async () => {
+    const dir = subdir("encode-list-prefix");
+    const backend = createFileBackend(dir);
+    const enc = new TextEncoder();
+
+    await backend.set("idem:run/step1", enc.encode("a"));
+    await backend.set("idem:run_2Fstep1", enc.encode("b")); // collided with above under old encoding
+    await backend.set("idem:run~step1", enc.encode("c"));
+    await backend.set("other:run/step1", enc.encode("d"));
+
+    const idemKeys = await backend.list("idem:");
+    expect(idemKeys).toHaveLength(3);
+    expect(idemKeys).toContain("idem:run/step1");
+    expect(idemKeys).toContain("idem:run_2Fstep1");
+    expect(idemKeys).toContain("idem:run~step1");
+    expect(idemKeys).not.toContain("other:run/step1");
+  });
+});
+
+// ─── 7. Corruption safety — present-but-unreadable entry (Finding F2) ────────
+
+describe("DurableIdempotencyStore — corrupt entry handling", () => {
+  it("throws when a backend entry exists but cannot be JSON-parsed", async () => {
+    const dir = subdir("idem-corrupt-json");
+    const backend = createFileBackend(dir);
+    const store = createDurableStore(backend);
+
+    // Write corrupt bytes directly to the backend key (bypassing the store layer)
+    await backend.set("idem:payment-key", new TextEncoder().encode("{not valid json{{{"));
+
+    // Must throw — NOT silently return null and authorize a re-run
+    await expect(store.idempotency.get("payment-key")).rejects.toThrow();
+  });
+
+  it("throws when a backend entry is truncated mid-JSON", async () => {
+    const dir = subdir("idem-corrupt-truncated");
+    const backend = createFileBackend(dir);
+    const store = createDurableStore(backend);
+
+    // Truncated JSON: valid prefix, but JSON.parse will fail
+    await backend.set(
+      "idem:charge-key",
+      new TextEncoder().encode('{"source":"agent","value":"payment-result","confidence":'),
+    );
+
+    await expect(store.idempotency.get("charge-key")).rejects.toThrow();
+  });
+
+  it("absent key still returns null — absence and corruption remain distinct", async () => {
+    const dir = subdir("idem-absent-key");
+    const backend = createFileBackend(dir);
+    const store = createDurableStore(backend);
+
+    expect(await store.idempotency.get("never-written")).toBeNull();
+  });
+});
+
+// ─── 8. Write ordering and failure observability (Finding F3) ─────────────────
+
+describe("DurableTransactionLogManager — write ordering", () => {
+  it("committed write always arrives after pending write even when pending is delayed", async () => {
+    // Backend: first set() for any key is held until released; subsequent calls
+    // for the same key run immediately.  This simulates a slow initial write
+    // followed by an immediate commit write — the scenario where fire-and-forget
+    // lets a delayed pending write overwrite a committed write.
+    const storage = new Map<string, Uint8Array>();
+    const dec = new TextDecoder();
+    let firstWriteResolve: (() => void) | null = null;
+    let firstWriteDone = false;
+
+    const backend: DurableStoreBackend = {
+      async get(key) { return storage.get(key) ?? null; },
+      async set(key, value) {
+        if (!firstWriteDone) {
+          if (firstWriteResolve === null) {
+            await new Promise<void>(resolve => { firstWriteResolve = resolve; });
+          }
+          firstWriteDone = true;
+        }
+        storage.set(key, value);
+      },
+      async del(key) { storage.delete(key); },
+      async list(prefix) {
+        return [...storage.keys()].filter(k => k.startsWith(prefix));
+      },
+    };
+
+    const store = createDurableStore(backend);
+
+    // create() fires the pending write, which suspends at the hold point
+    const entry = store.transactions.create("agent-1", "charge", { amount: 100 });
+    await new Promise<void>(r => setImmediate(r)); // let pending write reach hold
+
+    // commit() while pending is still in-flight
+    store.transactions.commit(entry.id, { chargeId: "ch_123" });
+    // OLD CODE: committed write runs immediately (no hold), storage = committed
+    // NEW CODE: committed write is chained after pending, hasn't started yet
+    await new Promise<void>(r => setImmediate(r));
+
+    // Release the held pending write
+    firstWriteResolve!();
+    // OLD CODE: pending write resumes, storage = pending (overwrites committed) — BUG
+    // NEW CODE: pending write finishes, committed write runs, storage = committed
+    await new Promise<void>(r => setImmediate(r));
+
+    const txnKey = `txn:${entry.id}`;
+    const raw = storage.get(txnKey);
+    expect(raw, "no journal entry written").not.toBeNull();
+    const persisted = JSON.parse(dec.decode(raw!));
+    expect(persisted.status).toBe("committed");
+  });
+
+  it("a failed persist is logged to stderr rather than silently swallowed", async () => {
+    const stderrMessages: string[] = [];
+    const origWrite = process.stderr.write;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stderr as any).write = (msg: unknown) => { stderrMessages.push(String(msg)); return true; };
+
+    try {
+      const backend: DurableStoreBackend = {
+        async get() { return null; },
+        async set() { throw new Error("disk full"); },
+        async del() {},
+        async list() { return []; },
+      };
+
+      const store = createDurableStore(backend);
+      store.transactions.create("agent-1", "charge", {});
+
+      await new Promise<void>(r => setImmediate(r));
+
+      expect(stderrMessages.some(m => m.includes("disk full"))).toBe(true);
+    } finally {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (process.stderr as any).write = origWrite;
+    }
+  });
+
+  it("a failed pending persist does not block the subsequent committed write", async () => {
+    let callCount = 0;
+    const storage = new Map<string, Uint8Array>();
+    const dec = new TextDecoder();
+
+    const backend: DurableStoreBackend = {
+      async get(key) { return storage.get(key) ?? null; },
+      async set(key, value) {
+        if (++callCount === 1) throw new Error("transient error");
+        storage.set(key, value);
+      },
+      async del() {},
+      async list() { return []; },
+    };
+
+    const origWrite = process.stderr.write;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stderr as any).write = () => true; // suppress the logged error in test output
+
+    try {
+      const store = createDurableStore(backend);
+      const entry = store.transactions.create("agent-1", "charge", {});
+
+      await new Promise<void>(r => setImmediate(r)); // pending write fails
+
+      store.transactions.commit(entry.id, { result: "ok" });
+      await new Promise<void>(r => setImmediate(r)); // committed write runs
+
+      expect(callCount).toBe(2);
+      const txnKey = `txn:${entry.id}`;
+      const raw = storage.get(txnKey);
+      expect(raw, "committed write should have reached the backend").not.toBeNull();
+      const persisted = JSON.parse(dec.decode(raw!));
+      expect(persisted.status).toBe("committed");
+    } finally {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (process.stderr as any).write = origWrite;
+    }
   });
 });
 

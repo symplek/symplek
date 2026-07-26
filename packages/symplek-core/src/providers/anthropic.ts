@@ -1,6 +1,78 @@
 // Type-only import — erased at runtime; safe for lazy SDK loading.
 import type Anthropic from "@anthropic-ai/sdk";
 import { SymplekError } from "../errors";
+
+// ── Post-hoc JSON Schema validator ──────────────────────────────────────────
+// Anthropic's tool_use forcing guarantees the tool is invoked, but NOT that its
+// input conforms to the schema. This validator catches violations before they
+// reach the caller. No new dependency — only handles type, required, properties.
+
+/**
+ * Validates a value against a JSON Schema (subset: type, required, properties).
+ * Returns error messages; empty array means valid.
+ *
+ * @internal Exported for unit testing; not part of the public provider API.
+ */
+export function validateJsonSchema(
+  value: unknown,
+  schema: Record<string, unknown>,
+  path = "$",
+): string[] {
+  const errors: string[] = [];
+
+  if (schema.type !== undefined) {
+    const expectedType = schema.type as string;
+    if (!_matchesSchemaType(value, expectedType)) {
+      return [`${path}: expected ${expectedType}, got ${_schemaTypeOf(value)}`];
+    }
+  }
+
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return errors;
+  }
+
+  const obj = value as Record<string, unknown>;
+
+  const required = schema.required;
+  if (Array.isArray(required)) {
+    for (const key of required as string[]) {
+      if (!(key in obj)) {
+        errors.push(`${path}: required property "${key}" is missing`);
+      }
+    }
+  }
+
+  const properties = schema.properties;
+  if (properties != null && typeof properties === "object" && !Array.isArray(properties)) {
+    const props = properties as Record<string, Record<string, unknown>>;
+    for (const [key, propSchema] of Object.entries(props)) {
+      if (key in obj) {
+        errors.push(...validateJsonSchema(obj[key], propSchema, `${path}.${key}`));
+      }
+    }
+  }
+
+  return errors;
+}
+
+function _matchesSchemaType(value: unknown, type: string): boolean {
+  switch (type) {
+    case "string":  return typeof value === "string";
+    case "number":  return typeof value === "number";
+    case "integer": return typeof value === "number" && Number.isInteger(value);
+    case "boolean": return typeof value === "boolean";
+    case "array":   return Array.isArray(value);
+    case "null":    return value === null;
+    case "object":  return typeof value === "object" && value !== null && !Array.isArray(value);
+    default:        return true;
+  }
+}
+
+function _schemaTypeOf(value: unknown): string {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "array";
+  return typeof value;
+}
 import { redactErrorMessage, safeCause } from "./redact";
 import type {
   AIMessage,
@@ -79,9 +151,12 @@ export async function createAnthropicProvider(
     tools: true,
     vision: true,
     structuredOutput: true,
-    // Anthropic enforces json_schema strict mode via tool_use forcing:
-    // when strict=true, the provider receives a tool definition with the schema
-    // and tool_choice:forced, constraining output to valid JSON at generation time.
+    // Anthropic uses tool_use forcing for json_schema strict=true: the schema is
+    // injected as a tool and tool_choice is forced to that tool. This guarantees
+    // the tool is invoked but does NOT constrain generation — the model can still
+    // return schema-non-conforming input. The adapter validates the returned input
+    // post-hoc and throws VALIDATION_ERROR on failure, so callers receive a
+    // conforming result or a clear error (never silent garbage).
     strictStructuredOutput: true,
     maxContextTokens: 200000,
   };
@@ -208,16 +283,45 @@ export async function createAnthropicProvider(
         } as any)) as Anthropic.Message;
 
         // When tool_use forcing is active, the structured output is in the
-        // tool_use block's input, not a text block. Serialize it as text.
+        // tool_use block's input, not a text block. Validate against the schema
+        // before serialising — violations throw VALIDATION_ERROR rather than
+        // reaching the caller as silent garbage.
         if (isToolForced) {
           const schemaName = (request.responseFormat as { name: string }).name;
+          const schemaObj = (request.responseFormat as { schema: Record<string, unknown> }).schema;
           // Use any[] cast to avoid Anthropic SDK's discriminated union mismatch
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const toolBlock = (response.content as any[]).find(
             (b: { type: string; name?: string }) =>
               b.type === "tool_use" && b.name === schemaName,
           ) as { input: unknown } | undefined;
-          const structuredText = toolBlock ? JSON.stringify(toolBlock.input) : "";
+
+          if (!toolBlock) {
+            throw new SymplekError({
+              code: "VALIDATION_ERROR",
+              why: "Anthropic did not invoke the required schema tool; structured output unavailable.",
+              fix: {
+                description:
+                  "The model did not return the expected structured output. Retry or adjust your prompt.",
+                docsUrl: "https://docs.anthropic.com/en/api/messages",
+              },
+            });
+          }
+
+          const errs = validateJsonSchema(toolBlock.input, schemaObj);
+          if (errs.length > 0) {
+            throw new SymplekError({
+              code: "VALIDATION_ERROR",
+              why: `Anthropic structured output failed schema validation: ${errs.slice(0, 3).join("; ")}`,
+              fix: {
+                description:
+                  "The model returned output that does not match the requested schema. Review your prompt and schema.",
+                docsUrl: "https://docs.anthropic.com/en/api/messages",
+              },
+            });
+          }
+
+          const structuredText = JSON.stringify(toolBlock.input);
           return {
             text: structuredText,
             usage: {
@@ -427,6 +531,25 @@ export async function createAnthropicProvider(
             if (buf && buf.id) {
               let input: unknown;
               try { input = JSON.parse(buf.json || "{}"); } catch { input = buf.json; }
+
+              // When tool-forcing is active and this is the schema tool, validate
+              // the assembled input before yielding — violations surface as errors.
+              if (isToolForced && buf.name === (request.responseFormat as { name: string }).name) {
+                const schemaObj = (request.responseFormat as { schema: Record<string, unknown> }).schema;
+                const errs = validateJsonSchema(input, schemaObj);
+                if (errs.length > 0) {
+                  throw new SymplekError({
+                    code: "VALIDATION_ERROR",
+                    why: `Anthropic structured output failed schema validation: ${errs.slice(0, 3).join("; ")}`,
+                    fix: {
+                      description:
+                        "The model returned output that does not match the requested schema. Review your prompt and schema.",
+                      docsUrl: "https://docs.anthropic.com/en/api/messages",
+                    },
+                  });
+                }
+              }
+
               yield {
                 type: "tool-call",
                 toolCallId: buf.id,

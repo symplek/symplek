@@ -16,6 +16,11 @@ export * from "./compensate";
 export * from "./contracts";
 export * from "./coordination";
 export * from "./interview";
+// Side-effect import ensures the prototype augmentation in loop.ts runs even
+// in bundled environments where tree-shakers elide `export * from "./loop"`
+// when the module has no value exports (loop.ts exports only the interface
+// LoopOperatorOptions, which is erased at runtime).
+import "./loop";
 export * from "./loop";
 export * from "./model";
 export * from "./parallel";

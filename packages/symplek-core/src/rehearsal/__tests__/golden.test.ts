@@ -1,21 +1,32 @@
 /**
  * @fileoverview Tests for golden trace format (CR-501)
  * @module @symplek/core/rehearsal/__tests__/golden
- * @description Covers: toGoldenTrace contract, replayAgentWithTrace matched/diverged paths,
- *   schema migration, secret redaction, zero-LLM-call guarantee, and TraceVersionError.
+ * @description Covers: toGoldenTrace contract, redaction scope (all sensitive
+ *   event fields + finalOutput), replayAgentWithTrace with genuine factory
+ *   execution, divergence detection, no-live-call guarantee via injected
+ *   interceptor, schema migration, and TraceVersionError.
+ *
+ * Rule 015: every assertion must fail if the capability is broken.
+ *   Tests that previously passed vacuously (factory never called) have been
+ *   replaced with assertions that require genuine factory execution.
  */
 
 import { createHash } from "node:crypto";
 import { describe, expect, it, afterEach } from "vitest";
-import { AgentUnit } from "../../AgentUnit/AgentUnit";
+// Must import from the package barrel so all operators are prototype-augmented.
+// Importing from AgentUnit/AgentUnit directly leaves .retry undefined and causes
+// SETUP_ERROR when unit.run() is called by replayAgentWithTrace.
+import { AgentUnit } from "../../index";
 import {
   _clearMigrationsForTest,
   extractLLMCallsFromTrace,
-  GoldenTrace,
+  type GoldenTrace,
   registerTraceMigration,
   replayAgentWithTrace,
   toGoldenTrace,
+  SYMPLEK_REPLAY_INTERCEPTOR_KEY,
 } from "../golden";
+import { ReplayLLMInterceptor } from "../interceptor";
 import type { ExecutionTrace, TraceEvent } from "../types";
 import { TRACE_SCHEMA_VERSION, TraceVersionError } from "../types";
 
@@ -129,40 +140,142 @@ describe("toGoldenTrace", () => {
     const golden = toGoldenTrace(trace);
     expect(golden.finalOutput).toEqual({ answer: 42 });
     expect(golden.id).toBe(trace.id);
-    expect(golden.events).toBe(trace.events);
   });
 
-  describe("secret redaction", () => {
+  it("does not mutate the original trace", () => {
+    const trace = makeTrace("sk-original");
+    toGoldenTrace(trace, { redactPatterns: [/sk-[a-z0-9]+/gi] });
+    expect(trace.finalOutput).toBe("sk-original");
+  });
+
+  describe("secret redaction — full scope", () => {
     it("redacts secrets from finalOutput and recomputes hash from redacted value", () => {
       const trace = makeTrace("api-key=sk-secret123 result");
       const golden = toGoldenTrace(trace, {
         redactPatterns: [/sk-[a-z0-9]+/gi],
       });
 
-      // finalOutput should contain REDACTED
       expect(String(golden.finalOutput)).toContain("[REDACTED]");
       expect(String(golden.finalOutput)).not.toContain("sk-secret123");
 
-      // hash is computed from the REDACTED value
       const expectedHash = sha256hex(JSON.stringify(golden.finalOutput));
       expect(golden.contract.finalOutputHash).toBe(expectedHash);
     });
 
-    it("does not mutate the original trace", () => {
-      const trace = makeTrace("sk-original");
-      toGoldenTrace(trace, { redactPatterns: [/sk-[a-z0-9]+/gi] });
-      expect(trace.finalOutput).toBe("sk-original");
+    it("redacts secret from llm_call event prompt field", () => {
+      const callEvent = makeEvent("e1", "llm_call", {
+        model: "claude-3",
+        promptHash: "abc",
+        prompt: "Your API key is sk-secret99",
+        systemPrompt: undefined,
+      });
+      const responseEvent = makeEvent("e2", "llm_response", {
+        model: "claude-3",
+        response: "ok",
+        responseHash: "rh1",
+        latencyMs: 10,
+      });
+      const trace = makeTrace("out", [callEvent, responseEvent]);
+      const golden = toGoldenTrace(trace, {
+        redactPatterns: [/sk-[a-z0-90-9]+/gi],
+      });
+
+      const callPayload = golden.events[0].payload as Record<string, unknown>;
+      expect(callPayload.prompt).toContain("[REDACTED]");
+      expect(String(callPayload.prompt)).not.toContain("sk-secret99");
+    });
+
+    it("redacts secret from llm_call event systemPrompt field", () => {
+      const callEvent = makeEvent("e1", "llm_call", {
+        model: "claude-3",
+        promptHash: "abc",
+        prompt: "hello",
+        systemPrompt: "Use token sk-adminkey to authenticate",
+      });
+      const responseEvent = makeEvent("e2", "llm_response", {
+        model: "claude-3",
+        response: "ok",
+        responseHash: "rh1",
+        latencyMs: 10,
+      });
+      const trace = makeTrace("out", [callEvent, responseEvent]);
+      const golden = toGoldenTrace(trace, {
+        redactPatterns: [/sk-[a-z]+/gi],
+      });
+
+      const callPayload = golden.events[0].payload as Record<string, unknown>;
+      expect(callPayload.systemPrompt).toContain("[REDACTED]");
+      expect(String(callPayload.systemPrompt)).not.toContain("sk-adminkey");
+    });
+
+    it("redacts secret from llm_response event response field", () => {
+      const callEvent = makeEvent("e1", "llm_call", {
+        model: "claude-3",
+        promptHash: "abc",
+        prompt: "hello",
+      });
+      const responseEvent = makeEvent("e2", "llm_response", {
+        model: "claude-3",
+        response: "Here is the secret: sk-resp123",
+        responseHash: "rh1",
+        latencyMs: 10,
+      });
+      const trace = makeTrace("out", [callEvent, responseEvent]);
+      const golden = toGoldenTrace(trace, {
+        redactPatterns: [/sk-[a-z0-9]+/gi],
+      });
+
+      const responsePayload = golden.events[1].payload as Record<string, unknown>;
+      expect(responsePayload.response).toContain("[REDACTED]");
+      expect(String(responsePayload.response)).not.toContain("sk-resp123");
+    });
+
+    it("event hashes are recomputed after redaction so integrity checks pass", () => {
+      const callEvent = makeEvent("e1", "llm_call", {
+        model: "claude-3",
+        promptHash: "abc",
+        prompt: "Use token sk-secret to authenticate",
+      });
+      const trace = makeTrace("out", [callEvent]);
+      const golden = toGoldenTrace(trace, {
+        redactPatterns: [/sk-[a-z]+/gi],
+      });
+
+      // The stored hash must match the hash of the redacted payload
+      const redactedEvent = golden.events[0];
+      const expectedHash = computeEventHash({
+        id: redactedEvent.id,
+        type: redactedEvent.type,
+        agentId: redactedEvent.agentId,
+        timestamp: redactedEvent.timestamp,
+        vectorClock: redactedEvent.vectorClock,
+        payload: redactedEvent.payload,
+      });
+      expect(redactedEvent.hash).toBe(expectedHash);
     });
 
     it("handles non-string finalOutput with object redaction", () => {
       const trace = makeTrace({ token: "Bearer sk-secret", user: "alice" });
       const golden = toGoldenTrace(trace, {
-        redactPatterns: [/sk-[a-z0-9]+/gi],
+        redactPatterns: [/sk-[a-z]+/gi],
       });
-      // Redacted JSON should have parsed back to an object
       const out = golden.finalOutput as { token: string; user: string };
       expect(out.token).toContain("[REDACTED]");
       expect(out.user).toBe("alice");
+    });
+
+    it("leaves events unchanged when no redactPatterns provided", () => {
+      const callEvent = makeEvent("e1", "llm_call", {
+        model: "m",
+        promptHash: "h",
+        prompt: "hello",
+      });
+      const trace = makeTrace("out", [callEvent]);
+      const golden = toGoldenTrace(trace); // no patterns
+
+      const callPayload = golden.events[0].payload as Record<string, unknown>;
+      expect(callPayload.prompt).toBe("hello");
+      expect(golden.events[0].hash).toBe(callEvent.hash); // hash unchanged
     });
   });
 });
@@ -170,36 +283,30 @@ describe("toGoldenTrace", () => {
 // ─── replayAgentWithTrace ─────────────────────────────────────────────────────
 
 describe("replayAgentWithTrace", () => {
-  // factory is a type witness; the actual computation isn't called during replay
-  const factory = () => AgentUnit.of("unused");
-
-  it("returns matched: true and empty divergences when golden trace is unchanged", async () => {
+  it("returns matched: true when factory produces same output as golden", async () => {
     const trace = makeTrace("response-a", [makeEvent("e1")]);
     const golden = toGoldenTrace(trace);
 
+    // Factory must produce the same output that was recorded.
     const { matched, divergences } = await replayAgentWithTrace({
       trace: golden,
-      factory,
+      factory: () => AgentUnit.of("response-a"),
     });
 
     expect(matched).toBe(true);
     expect(divergences).toHaveLength(0);
   });
 
-  it("returns matched: false when finalOutput has been altered (different agent response)", async () => {
-    const trace = makeTrace("response-a", [makeEvent("e1")]);
+  it("returns matched: false when factory produces different output (agent changed)", async () => {
+    const trace = makeTrace("approved", [makeEvent("e1")]);
     const golden = toGoldenTrace(trace);
 
-    // Simulate: agent now produces "response-b" — finalOutput differs from recorded
-    const alteredTrace: GoldenTrace<string> = {
-      ...golden,
-      finalOutput: "response-b",
-      // contract still references "response-a" hash
-    };
-
+    // Factory now returns "denied" — agent changed since the trace was recorded.
+    // Pre-fix: this test FAILED (matched was true because factory was never called).
+    // Post-fix: factory runs → hash("denied") ≠ hash("approved") → matched: false.
     const { matched, divergences } = await replayAgentWithTrace({
-      trace: alteredTrace,
-      factory,
+      trace: golden,
+      factory: () => AgentUnit.of("denied"),
     });
 
     expect(matched).toBe(false);
@@ -212,50 +319,52 @@ describe("replayAgentWithTrace", () => {
   it("divergence description names expected and actual hash prefixes", async () => {
     const trace = makeTrace("original");
     const golden = toGoldenTrace(trace);
-    const altered: GoldenTrace<string> = { ...golden, finalOutput: "changed" };
 
-    const { divergences } = await replayAgentWithTrace({ trace: altered, factory });
+    // Factory now produces "changed" instead of "original"
+    const { divergences } = await replayAgentWithTrace({
+      trace: golden,
+      factory: () => AgentUnit.of("changed"),
+    });
 
     const div = divergences.find((d) => d.eventId === "golden:finalOutputHash");
-    expect(div?.description).toMatch(/\w{16}…/); // SHA-256 prefix present
+    expect(div?.description).toMatch(/\w{16}…/); // SHA-256 prefix present in description
   });
 
-  it("detects LLM call count mismatch", async () => {
-    const events = [
-      makeEvent("e1", "llm_call", { model: "m", promptHash: "h" }),
-    ];
-    const trace = makeTrace("out", events);
+  it("detects LLM call count mismatch: factory makes fewer calls than recorded", async () => {
+    // Golden records an agent that made one LLM call
+    const callEvent = makeEvent("e1", "llm_call", { model: "m", promptHash: "h" });
+    const responseEvent = makeEvent("e2", "llm_response", {
+      model: "m",
+      response: "r1",
+      responseHash: "rh1",
+      latencyMs: 10,
+    });
+    const trace = makeTrace("out", [callEvent, responseEvent]);
     const golden = toGoldenTrace(trace);
 
-    // Simulate trace that has different event count for testing (bypass event integrity)
-    // by creating a fresh golden with no llm_call events but same contract
-    const alteredGolden: GoldenTrace<string> = {
-      ...golden,
-      events: [],
-      contract: {
-        ...golden.contract,
-        // Keep expectedLlmCallCount at 1 but events array is now empty
-        finalOutputHash: sha256hex(JSON.stringify(golden.finalOutput)),
-      },
-      metadata: { ...golden.metadata, eventCount: 0 },
-    };
-
+    // Factory produces the correct output but makes 0 interceptor calls.
+    // callsConsumed(0) ≠ expectedLlmCallCount(1) → count divergence.
     const { matched, divergences } = await replayAgentWithTrace({
-      trace: alteredGolden,
-      factory,
+      trace: golden,
+      factory: () => AgentUnit.of("out"),
     });
 
     expect(matched).toBe(false);
     const countDiv = divergences.find((d) => d.eventId === "golden:llmCallCount");
     expect(countDiv).toBeDefined();
     expect(countDiv?.description).toContain("LLM call count mismatch");
+    expect(countDiv?.expected).toBe(1);
+    expect(countDiv?.actual).toBe(0);
   });
 
-  it("result is a genuine TrackedResult", async () => {
+  it("result carries the factory output when matched", async () => {
     const trace = makeTrace("ok");
     const golden = toGoldenTrace(trace);
 
-    const { result } = await replayAgentWithTrace({ trace: golden, factory });
+    const { result } = await replayAgentWithTrace({
+      trace: golden,
+      factory: () => AgentUnit.of("ok"),
+    });
 
     expect(result).toBeDefined();
     expect(result.value).toBe("ok");
@@ -266,12 +375,87 @@ describe("replayAgentWithTrace", () => {
   it("result.confidence is 0 when matched is false", async () => {
     const trace = makeTrace("a");
     const golden = toGoldenTrace(trace);
-    const altered: GoldenTrace<string> = { ...golden, finalOutput: "b" };
 
-    const { result, matched } = await replayAgentWithTrace({ trace: altered, factory });
+    // Factory now produces "b" instead of "a" — changed agent
+    const { result, matched } = await replayAgentWithTrace({
+      trace: golden,
+      factory: () => AgentUnit.of("b"),
+    });
 
     expect(matched).toBe(false);
     expect(result.confidence).toBe(0);
+  });
+
+  describe("no live provider call during replay", () => {
+    it("serves recorded responses via injected interceptor, making no live call", async () => {
+      // Golden records one LLM call with response "recorded-answer"
+      const callEvent = makeEvent("e1", "llm_call", {
+        model: "test-model",
+        promptHash: "abc",
+        prompt: "hello",
+      });
+      const responseEvent = makeEvent("e2", "llm_response", {
+        model: "test-model",
+        response: "recorded-answer",
+        responseHash: "def",
+        latencyMs: 10,
+      });
+      const trace = makeTrace("recorded-answer", [callEvent, responseEvent]);
+      const golden = toGoldenTrace(trace);
+
+      let liveCallMade = false;
+
+      // Factory that uses the injected replay interceptor.
+      // When the interceptor is present, it returns the recorded response.
+      // When absent, it would fall through to a live call — which must not happen.
+      const interceptingFactory = () =>
+        AgentUnit.from(async (ctx) => {
+          const interceptor = ctx.extensions?.[SYMPLEK_REPLAY_INTERCEPTOR_KEY] as
+            | ReplayLLMInterceptor
+            | undefined;
+          if (interceptor) {
+            const response = await interceptor.replayCall({
+              model: "test-model",
+              prompt: "hello",
+            });
+            return response.response;
+          }
+          liveCallMade = true;
+          return "live-answer";
+        });
+
+      const { matched } = await replayAgentWithTrace({
+        trace: golden,
+        factory: interceptingFactory,
+      });
+
+      // Interceptor was used — no live call
+      expect(liveCallMade).toBe(false);
+      // Factory output "recorded-answer" matches golden contract — all calls consumed
+      expect(matched).toBe(true);
+    });
+
+    it("old vacuous test replaced: factory IS called during replay", async () => {
+      // This documents the before/after behavior change.
+      // Before fix: factory was NEVER called → computationCalled always false (vacuous).
+      // After fix: factory IS called; computationCalled reflects actual execution.
+      let computationCalled = false;
+
+      const trace = makeTrace("value");
+      const golden = toGoldenTrace(trace);
+
+      await replayAgentWithTrace({
+        trace: golden,
+        factory: () =>
+          AgentUnit.from(async () => {
+            computationCalled = true;
+            return "value";
+          }),
+      });
+
+      // The computation was executed — this is the corrected guarantee
+      expect(computationCalled).toBe(true);
+    });
   });
 
   describe("schema version migration", () => {
@@ -288,7 +472,10 @@ describe("replayAgentWithTrace", () => {
       };
 
       await expect(
-        replayAgentWithTrace({ trace: staleGolden as GoldenTrace<string>, factory }),
+        replayAgentWithTrace({
+          trace: staleGolden as GoldenTrace<string>,
+          factory: () => AgentUnit.of("x"),
+        }),
       ).rejects.toThrow(TraceVersionError);
     });
 
@@ -302,7 +489,10 @@ describe("replayAgentWithTrace", () => {
 
       let thrown: Error | null = null;
       try {
-        await replayAgentWithTrace({ trace: staleGolden as GoldenTrace<string>, factory });
+        await replayAgentWithTrace({
+          trace: staleGolden as GoldenTrace<string>,
+          factory: () => AgentUnit.of("x"),
+        });
       } catch (e) {
         thrown = e as Error;
       }
@@ -316,7 +506,6 @@ describe("replayAgentWithTrace", () => {
       const golden = toGoldenTrace(trace);
       const oldVersion = "0.9.0" as typeof TRACE_SCHEMA_VERSION;
 
-      // Register migration from 0.9.0 to current
       registerTraceMigration("0.9.0", TRACE_SCHEMA_VERSION, (t) => ({
         ...t,
         version: TRACE_SCHEMA_VERSION,
@@ -334,30 +523,9 @@ describe("replayAgentWithTrace", () => {
       // Should NOT throw — migration upgrades it
       const { matched } = await replayAgentWithTrace({
         trace: staleGolden,
-        factory,
+        factory: () => AgentUnit.of("migrated-output"),
       });
-      // matched may be false if contract misaligns after migration, but no error thrown
-      expect(typeof matched).toBe("boolean");
-    });
-  });
-
-  describe("zero LLM calls during replay", () => {
-    it("does not call the factory unit's computation", async () => {
-      let computationCalled = false;
-      const throwIfCalled = AgentUnit.from(async () => {
-        computationCalled = true;
-        throw new Error("Provider called during replay — this must never happen");
-      });
-
-      const trace = makeTrace("recorded-output");
-      const golden = toGoldenTrace(trace);
-
-      const { matched } = await replayAgentWithTrace({
-        trace: golden,
-        factory: () => throwIfCalled,
-      });
-
-      expect(computationCalled).toBe(false);
+      // Factory produces "migrated-output" which matches the contract → true
       expect(matched).toBe(true);
     });
   });
@@ -403,5 +571,82 @@ describe("extractLLMCallsFromTrace", () => {
     expect(calls).toHaveLength(2);
     expect(calls[0].response.response).toBe("r1");
     expect(calls[1].response.response).toBe("r2");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Safe-by-omission redaction.
+//
+// A golden trace is committed to the caller's repository. The original
+// implementation redacted only when the caller remembered to pass
+// redactPatterns, so the happy path — toGoldenTrace(trace) — wrote raw prompts
+// and responses into a file destined for git. These pin the default.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("toGoldenTrace — default redaction (safe by omission)", () => {
+  const OPENAI_KEY = `sk-${"a1b2c3d4e5f6g7h8".repeat(2)}`;
+  const ANTHROPIC_KEY = `sk-ant-${"x9y8z7w6v5u4t3s2".repeat(2)}`;
+
+  it("strips credentials from prompts with NO options supplied at all", () => {
+    const trace = makeTrace("done", [
+      makeEvent("e-1", "llm_call", {
+        prompt: `Use ${OPENAI_KEY} to call the API`,
+        systemPrompt: `Auth: Bearer ${"t".repeat(32)}`,
+        model: "gpt-4o",
+      }),
+      makeEvent("e-2", "llm_response", {
+        response: `Your key ${ANTHROPIC_KEY} worked`,
+        model: "gpt-4o",
+      }),
+    ]);
+
+    const golden = toGoldenTrace(trace);
+    const serialized = JSON.stringify(golden);
+
+    expect(serialized).not.toContain(OPENAI_KEY);
+    expect(serialized).not.toContain(ANTHROPIC_KEY);
+    expect(serialized).not.toMatch(/Bearer\s+t{32}/);
+    expect(serialized).toContain("[REDACTED]");
+  });
+
+  it("strips credentials from finalOutput with no options supplied", () => {
+    const golden = toGoldenTrace(makeTrace(`token=${OPENAI_KEY}`));
+    expect(JSON.stringify(golden.finalOutput)).not.toContain(OPENAI_KEY);
+  });
+
+  it("caller patterns extend the defaults rather than replacing them", () => {
+    const trace = makeTrace("ok", [
+      makeEvent("e-1", "llm_call", {
+        prompt: `${OPENAI_KEY} and INTERNAL-7788`,
+        model: "gpt-4o",
+      }),
+    ]);
+
+    const serialized = JSON.stringify(
+      toGoldenTrace(trace, { redactPatterns: [/INTERNAL-\d+/g] }),
+    );
+
+    // Custom pattern applied...
+    expect(serialized).not.toContain("INTERNAL-7788");
+    // ...and the built-in floor still held.
+    expect(serialized).not.toContain(OPENAI_KEY);
+  });
+
+  it("useDefaultRedactions:false opts out for a trace known to be clean", () => {
+    const trace = makeTrace("ok", [
+      makeEvent("e-1", "llm_call", { prompt: OPENAI_KEY, model: "gpt-4o" }),
+    ]);
+
+    const serialized = JSON.stringify(
+      toGoldenTrace(trace, { useDefaultRedactions: false }),
+    );
+
+    expect(serialized).toContain(OPENAI_KEY);
+  });
+
+  it("leaves ordinary prose untouched", () => {
+    const prose = "The task is to summarise the quarterly report for review.";
+    const golden = toGoldenTrace(makeTrace(prose));
+    expect(golden.finalOutput).toBe(prose);
   });
 });
