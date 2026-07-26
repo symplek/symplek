@@ -67,11 +67,20 @@ export const DEFAULT_SECRET_PATTERNS: readonly RegExp[] = [
   /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+/g, // JWTs
 ];
 
-/** Apply regex redaction patterns to a string. */
+/**
+ * Apply regex redaction patterns to a string, replacing ALL occurrences.
+ *
+ * Forces global replacement regardless of whether the caller's pattern carries the
+ * `g` flag. A pattern like `/private-token/` (no `g`) would otherwise only redact
+ * the first occurrence, leaving the rest verbatim in a committed file. We create a
+ * new RegExp rather than mutating `p.lastIndex` so caller-supplied stateful patterns
+ * are not disturbed.
+ */
 function applyRedact(value: string, patterns: RegExp[]): string {
   let result = value;
   for (const p of patterns) {
-    result = result.replace(p, "[REDACTED]");
+    const gp = p.global ? p : new RegExp(p.source, p.flags + "g");
+    result = result.replace(gp, "[REDACTED]");
   }
   return result;
 }
@@ -149,8 +158,12 @@ function redactEventPayload(event: TraceEvent, patterns: RegExp[]): TraceEvent {
 
 /**
  * The `AgentContext.extensions` key under which `replayAgentWithTrace` injects
- * a `ReplayLLMInterceptor`.  Agents designed to support zero-token replay should
- * check for this key before making live provider calls:
+ * a `ReplayLLMInterceptor`. This is the same string (`"__weft_interceptor"`) that
+ * `AgentUnitHarness` exports as `INTERCEPTOR_EXTENSION_KEY`. Using one shared key
+ * means an agent instrumented for harness unit-testing is also interceptable during
+ * golden replay — checking for either constant is equivalent.
+ *
+ * Always import this constant; never hardcode `"__weft_interceptor"`.
  *
  * ```typescript
  * const interceptor = ctx.extensions?.[WEFT_REPLAY_INTERCEPTOR_KEY] as
@@ -161,7 +174,7 @@ function redactEventPayload(event: TraceEvent, patterns: RegExp[]): TraceEvent {
  * return await realProviderCall(model, prompt);
  * ```
  */
-export const WEFT_REPLAY_INTERCEPTOR_KEY = "_weftReplayInterceptor";
+export const WEFT_REPLAY_INTERCEPTOR_KEY = "__weft_interceptor";
 
 // ─── MIGRATION REGISTRY ───────────────────────────────────────────────────────
 
@@ -214,6 +227,30 @@ export interface GoldenTraceContract {
    * Diverges if the agent makes a different number of model calls.
    */
   readonly expectedLlmCallCount: number;
+  /**
+   * SHA-256 hex of JSON.stringify([{promptHash, responseHash}, ...]) in LLM call order.
+   *
+   * `promptHash` = DJB2(prompt text), `responseHash` = DJB2(response text) — same
+   * algorithm used by `RecordingLLMInterceptor`. During replay the actual prompt
+   * passed to each `interceptor.replayCall()` call is hashed and compared against this
+   * sequence; a prompt or response change in any position produces a CRITICAL
+   * `golden:llmEventSequence` divergence.
+   *
+   * **What this detects**: any change to the text of a prompt sent to the LLM, or to
+   * the recorded response returned for that prompt. This catches behavioral differences
+   * where a changed tool argument (e.g. `debit(1000)` vs `debit(10)`) surfaces in a
+   * subsequent LLM prompt (e.g. "confirm charge of $1000").
+   *
+   * **What this does NOT detect**: side effects that are hardcoded in agent code and
+   * never appear in any LLM prompt or response. A `debit(1000)` call that happens
+   * entirely outside the LLM path, with the same final output and same prompts, is
+   * outside the trace and remains undetectable by replay.
+   *
+   * Absent in golden traces recorded before this field was introduced. When absent,
+   * the sequence check is skipped for backward compatibility. Re-record the golden
+   * trace to enable the check.
+   */
+  readonly llmEventSequenceHash?: string;
 }
 
 /**
@@ -311,6 +348,18 @@ export function toGoldenTrace<T>(
     (e) => e.type === "llm_call",
   ).length;
 
+  // Compute the LLM call sequence hash from the redacted events.
+  // promptHash = DJB2(prompt_text) as stored in each llm_call event's promptHash field.
+  // responseHash = DJB2(response_text) as stored in each llm_response event's responseHash field.
+  // Using redacted events ensures the hash reflects the committed (scrubbed) trace content.
+  const redactedTrace = { ...trace, events } as typeof trace;
+  const extractedCalls = extractLLMCallsFromTrace(redactedTrace);
+  const llmEventSequenceHash = sha256hex(
+    JSON.stringify(
+      extractedCalls.map((c) => ({ promptHash: c.configHash, responseHash: c.responseHash })),
+    ),
+  );
+
   return {
     ...trace,
     events,
@@ -320,6 +369,7 @@ export function toGoldenTrace<T>(
       schemaVersion: trace.version,
       finalOutputHash,
       expectedLlmCallCount,
+      llmEventSequenceHash,
     },
   };
 }
@@ -539,11 +589,35 @@ export async function replayAgentWithTrace<T>(options: {
     });
   }
 
-  // ── 8. Determine match status ─────────────────────────────────────────────
+  // ── 8. Compare LLM event sequence hash ───────────────────────────────────────
+  // Only present in golden traces recorded after llmEventSequenceHash was introduced.
+  // When absent (older trace), skip — backward-compatible.
+  // Check only on factory success: a factory error already emits a critical divergence.
+  if (factorySucceeded && golden.contract.llmEventSequenceHash !== undefined) {
+    const consumedDetails = replayInterceptor.getConsumedCallDetails();
+    const actualSequenceHash = sha256hex(JSON.stringify(consumedDetails));
+    if (actualSequenceHash !== golden.contract.llmEventSequenceHash) {
+      divergences.push({
+        eventId: "golden:llmEventSequence",
+        expected: golden.contract.llmEventSequenceHash,
+        actual: actualSequenceHash,
+        severity: "critical",
+        description:
+          `LLM call sequence hash mismatch: the sequence of prompt hashes and response ` +
+          `hashes differs from the recorded sequence. The agent passed different prompts ` +
+          `to the LLM than were recorded. This catches behavioral changes (e.g. a changed ` +
+          `tool argument surfacing in a prompt). Re-record the golden trace if the change ` +
+          `is intentional. Note: hardcoded side effects never appearing in any LLM prompt ` +
+          `or response remain outside the trace and are not detectable by replay.`,
+      });
+    }
+  }
+
+  // ── 9. Determine match status ─────────────────────────────────────────────
   const hasCritical = divergences.some((d) => d.severity === "critical");
   const matched = !hasCritical;
 
-  // ── 9. Wrap result in a genuine TrackedResult ─────────────────────────────
+  // ── 10. Wrap result in a genuine TrackedResult ────────────────────────────
   // Fall back to golden.finalOutput when the factory threw so callers always
   // receive a valid result object (with confidence: 0 indicating failure).
   const outputForResult = factorySucceeded

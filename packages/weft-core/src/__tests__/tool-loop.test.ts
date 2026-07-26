@@ -836,6 +836,54 @@ describe("Anthropic provider — transformMessages role:tool fix", () => {
   });
 });
 
+// ─── R3-2. tool() factory preserves name in return type ──────────────────────
+//
+// Finding: tool() returned Tool<P,R> whose name is optional, so consumers could
+// not pass tool({name:"search",...}) directly to executeLoop without a type cast.
+//
+// Fix: tool<P,R,T extends Tool<P,R>>(config: T): T preserves the literal type T,
+// so when name is present in the argument object, the return type also has it
+// as required — satisfying Array<Tool & { name: string }>.
+//
+// PRE-FIX FAILURE: pnpm typecheck fails because tool() returns Tool<P,R> and the
+// [t] argument to executeLoop does not satisfy Array<Tool & { name: string }>.
+// The test's executeLoop call below requires no type assertion (no 'as ...' cast).
+
+describe("Finding R3-2 — tool() preserves name in return type (no cast required)", () => {
+  it("tool with name can be passed to executeLoop without type assertion", async () => {
+    // Import through the public consumer path the documented example uses.
+    const { tool: toolFn } = await import("../agent/index");
+
+    const t = toolFn({
+      name: "web_search",
+      description: "Search the web for information",
+      parameters: z.object({ query: z.string() }),
+      execute: async ({ query }: { query: string }) => `results for: ${query}`,
+    });
+
+    const searchProvider = makeMockProvider([
+      {
+        toolCalls: [{ id: "c1", name: "web_search", input: { query: "hello" } }],
+        finishReason: "tool_calls",
+      },
+      { text: "Found results.", finishReason: "stop" },
+    ]);
+
+    // PRE-FIX: TypeScript error — [t] is Array<Tool<P,R>> whose name is optional,
+    //   not Array<Tool & { name: string }> as executeLoop requires.
+    // POST-FIX: t has type T = { name: string; ... } satisfying the constraint.
+    const result = await executeLoop(
+      searchProvider,
+      [{ role: "user", content: "search for hello" }],
+      [t],
+      { model: "test-model" },
+    );
+
+    expect(result.text).toBe("Found results.");
+    expect(result.toolCallCount).toBe(1);
+  });
+});
+
 // ─── 10. subpath import smoke ─────────────────────────────────────────────────
 
 describe("weft-core/agent subpath contract", () => {

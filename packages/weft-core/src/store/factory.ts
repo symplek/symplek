@@ -4,7 +4,17 @@
  *
  *   `createDurableStore(backend)` returns `DurableStoreOptions` whose `idempotency`
  *   field is fully durable (async round-trip through the backend) and whose
- *   `transactions` field is a write-through cache (in-memory reads, async writes).
+ *   `transactions` field is a session-local log (in-memory reads, async writes to
+ *   the backend for observability, but NOT hydrated on construction).
+ *
+ *   GUARANTEE BOUNDARY (transactions):
+ *   `DurableTransactionLogManager` does NOT hydrate its in-memory map from the
+ *   backend when constructed. `get()`, `query()`, and `getPending()` reflect only
+ *   entries created in the CURRENT process session. A restarted process sees an
+ *   empty map regardless of what is persisted in the backend.
+ *   To query committed transactions across restarts, read the backend directly
+ *   using the `txn:` key prefix. The backend write is best-effort (fire-and-forget
+ *   per-entry write queue); persist failures are logged to stderr.
  *
  * @since 2.2.0 — CR-403
  * @runtime node
@@ -35,6 +45,31 @@ import type { TrackedResult } from "../types";
 const IDEM_PREFIX = "idem:";
 
 /**
+ * Structural guard for deserialized idempotency entries.
+ *
+ * JSON.parse succeeds on any syntactically valid JSON — `{}`, `[]`, `42` — so a
+ * syntactically valid but structurally foreign entry would be forwarded to
+ * `deserializeTrackedResult` and silently reconstructed with undefined metadata,
+ * becoming a trusted cache hit that skips a computation that never actually ran.
+ *
+ * This guard checks the minimum required shape before trusting the entry. It is
+ * intentionally conservative: it only checks field presence and primitive types,
+ * not domain invariants (e.g. 0 ≤ confidence ≤ 1), to avoid breaking valid
+ * entries that have unusual-but-legal values.
+ */
+function isValidSerializedShape(obj: unknown): boolean {
+  if (typeof obj !== "object" || obj === null) return false;
+  const r = obj as Record<string, unknown>;
+  return (
+    "value" in r &&
+    typeof r.source === "string" &&
+    typeof r.confidence === "number" &&
+    Array.isArray(r.sourceChain) &&
+    typeof r.minChainConfidence === "number"
+  );
+}
+
+/**
  * Fully durable `IdempotencyStore` adapter over a `DurableStoreBackend`.
  *
  * All reads and writes go through the backend. On a process restart, results
@@ -61,6 +96,21 @@ class DurableIdempotencyStore implements IdempotencyStore {
       serialized = JSON.parse(this.dec.decode(raw));
     } catch (cause) {
       throw new IdempotencyStoreCorruptedError(key, cause);
+    }
+    // Structural guard: syntactically valid JSON that lacks required TrackedResult
+    // fields (e.g. `{}` or a stale foreign entry) must not be promoted to a trusted
+    // cache hit. `deserializeTrackedResult` does not validate its input — it would
+    // silently reconstruct a result with undefined metadata and register it in the
+    // WeakSet, causing `resume()` to skip a computation that never actually committed.
+    if (!isValidSerializedShape(serialized)) {
+      throw new IdempotencyStoreCorruptedError(
+        key,
+        new Error(
+          "entry parsed as JSON but is structurally invalid: " +
+          "required fields (value, source, confidence, sourceChain, minChainConfidence) " +
+          "are absent or have the wrong type. Inspect the backend record before re-executing.",
+        ),
+      );
     }
     try {
       return deserializeTrackedResult(serialized as Parameters<typeof deserializeTrackedResult>[0]);
@@ -95,12 +145,27 @@ function generateTxnId(): string {
 }
 
 /**
- * Write-through `TransactionLogManager` over a `DurableStoreBackend`.
+ * Session-local `TransactionLogManager` with best-effort backend persistence.
  *
- * In-memory map is the source of truth for synchronous reads. Every mutation
- * also kicks off an async write to the backend (fire-and-forget). Individual
- * entries are NOT guaranteed to survive a crash mid-write — this is a
- * best-effort extension of the existing in-memory behavior.
+ * **What this provides:**
+ * In-memory reads — `get()`, `query()`, and `getPending()` — are synchronous and
+ * reflect entries created in the CURRENT process session. Every mutation also
+ * enqueues a best-effort async write to the backend (per-entry write queue ensures
+ * ordering; failures are logged to stderr, not thrown).
+ *
+ * **What this does NOT provide (important):**
+ * The in-memory map is NOT hydrated from the backend on construction. After a
+ * process restart all three read methods operate on an empty map — committed entries
+ * in the backend are invisible until the current session recreates them. This means
+ * `getPending()` will not surface transactions that were pending when the previous
+ * process crashed, and `resume()` cannot consult the transaction log across restarts.
+ *
+ * To query journal entries across restarts, read the backend directly with the
+ * `txn:` key prefix via `backend.list("txn:")` and `backend.get(key)`.
+ *
+ * If cross-restart read access is required, implement hydration in a downstream
+ * adapter rather than in this class — hydration requires an async initialization
+ * path that would break the synchronous `TransactionLogManager` interface.
  *
  * @internal — create via {@link createDurableStore}
  */

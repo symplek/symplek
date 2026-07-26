@@ -18,6 +18,7 @@ import type {
   StreamChunk,
 } from "../providers/interface";
 import { providerRegistry } from "../providers/registry";
+import type { Trace } from "../trace";
 
 /** Captures the request the provider actually received. */
 function makeCapturingProvider(
@@ -107,5 +108,71 @@ describe("ai() wires schemas into strict structured output", () => {
     await ai("just text", { model: "test-model" });
 
     expect(seen[0]?.responseFormat).toBeUndefined();
+  });
+});
+
+// ─── Finding R3-1: ai() degradation signal ───────────────────────────────────
+//
+// When a provider cannot enforce the schema strictly (strictStructuredOutput false),
+// buildResponseFormat silently falls back to json_object. The caller has no way
+// to tell whether the schema was enforced or merely parsed afterwards. The trace
+// must carry structuredOutputDegraded:true so consumers can observe the degradation.
+//
+// PRE-FIX FAILURE: Trace.structuredOutputDegraded is undefined because:
+//   1. buildResponseFormat returns ResponseFormat directly (no degraded signal)
+//   2. traceManager.record() receives no degradation information
+// POST-FIX: Trace.structuredOutputDegraded is true when degradation occurred.
+
+describe("ai() surfaces structuredOutputDegraded signal in trace", () => {
+  beforeEach(() => { providerRegistry.clear?.(); });
+  afterEach(() => { providerRegistry.clear?.(); });
+
+  it("records structuredOutputDegraded:true when strict-mode falls back to json_object", async () => {
+    const { provider } = makeCapturingProvider("degrade-signal", false);
+    providerRegistry.register(provider, true);
+
+    const traces: Trace[] = [];
+    const unsub = ai.onTrace((t) => traces.push(t));
+    try {
+      await ai("decide", { schema: Schema, model: "test-model" });
+    } finally {
+      unsub();
+    }
+
+    expect(traces).toHaveLength(1);
+    // PRE-FIX: structuredOutputDegraded is undefined
+    expect(traces[0]?.structuredOutputDegraded).toBe(true);
+  });
+
+  it("does NOT set structuredOutputDegraded when strict enforcement was used", async () => {
+    const { provider } = makeCapturingProvider("strict-signal", true);
+    providerRegistry.register(provider, true);
+
+    const traces: Trace[] = [];
+    const unsub = ai.onTrace((t) => traces.push(t));
+    try {
+      await ai("decide", { schema: Schema, model: "test-model" });
+    } finally {
+      unsub();
+    }
+
+    expect(traces).toHaveLength(1);
+    expect(traces[0]?.structuredOutputDegraded).not.toBe(true);
+  });
+
+  it("does NOT set structuredOutputDegraded when no schema was provided", async () => {
+    const { provider } = makeCapturingProvider("no-schema-signal", true);
+    providerRegistry.register(provider, true);
+
+    const traces: Trace[] = [];
+    const unsub = ai.onTrace((t) => traces.push(t));
+    try {
+      await ai("just text", { model: "test-model" });
+    } finally {
+      unsub();
+    }
+
+    expect(traces).toHaveLength(1);
+    expect(traces[0]?.structuredOutputDegraded).not.toBe(true);
   });
 });
