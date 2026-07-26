@@ -5,9 +5,12 @@ import type {
   AIMessage,
   AIRequest,
   AIResponse,
+  FinishPart,
   Provider,
   ProviderCapabilities,
+  ResponseFormat,
   StreamChunk,
+  StreamPart,
 } from "./interface";
 
 // ── Lazy SDK loader ──────────────────────────────────────────────────────────
@@ -62,6 +65,9 @@ export async function createGoogleProvider(
     tools: true,
     vision: true,
     structuredOutput: true,
+    // Google supports responseSchema for constrained JSON output.
+    // Enforcement is best-effort (nullable fields unsupported; see validateSchemaForProvider).
+    strictStructuredOutput: true,
     maxContextTokens: 1000000, // Gemini 1.5 Pro
   };
 
@@ -102,6 +108,26 @@ export async function createGoogleProvider(
     }
   }
 
+  /**
+   * Build Google generationConfig fields for the requested response format.
+   * json_schema passes the schema as responseSchema (best-effort enforcement).
+   * Note: nullable fields are not supported in responseSchema.
+   * The schema is cast to `any` to satisfy the Google SDK's Schema union type;
+   * our ResponseFormat.schema is a plain JSON Schema object.
+   */
+  function buildGoogleGenerationConfig(
+    format: ResponseFormat | undefined,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ): { responseMimeType?: string; responseSchema?: any } {
+    if (!format || format.type === "text") return { responseMimeType: "text/plain" };
+    if (format.type === "json_object") return { responseMimeType: "application/json" };
+    // json_schema: pass schema for constrained output
+    return {
+      responseMimeType: "application/json",
+      responseSchema: format.schema,
+    };
+  }
+
   return {
     id: "google",
     name: "Google",
@@ -117,6 +143,7 @@ export async function createGoogleProvider(
           systemInstruction,
         });
 
+        const fmtConfig = buildGoogleGenerationConfig(request.responseFormat);
         const result = await model.generateContent({
           contents,
           generationConfig: {
@@ -124,10 +151,7 @@ export async function createGoogleProvider(
             maxOutputTokens: request.maxTokens,
             stopSequences: request.stop,
             topP: request.topP,
-            responseMimeType:
-              request.responseFormat?.type === "json_object"
-                ? "application/json"
-                : "text/plain",
+            ...fmtConfig,
           },
         });
 
@@ -177,6 +201,7 @@ export async function createGoogleProvider(
           systemInstruction,
         });
 
+        const fmtConfig = buildGoogleGenerationConfig(request.responseFormat);
         const result = await model.generateContentStream({
           contents,
           generationConfig: {
@@ -184,10 +209,7 @@ export async function createGoogleProvider(
             maxOutputTokens: request.maxTokens,
             stopSequences: request.stop,
             topP: request.topP,
-            responseMimeType:
-              request.responseFormat?.type === "json_object"
-                ? "application/json"
-                : "text/plain",
+            ...fmtConfig,
           },
         });
 
@@ -216,6 +238,60 @@ export async function createGoogleProvider(
         throw new WeftError({
           code: "PROVIDER_ERROR",
           why: `Google Gemini streaming failed: ${detail}`,
+          fix: {
+            description:
+              "Verify GOOGLE_GENERATIVE_AI_API_KEY is set and streaming is supported for the requested model.",
+            docsUrl:
+              "https://ai.google.dev/gemini-api/docs/text-generation#generate-a-text-stream",
+          },
+          example: 'process.env.GOOGLE_GENERATIVE_AI_API_KEY = "AIza...";',
+          cause: safeCause(apiKey, error),
+        });
+      }
+    },
+
+    async *streamParts(request: AIRequest): AsyncIterable<StreamPart> {
+      try {
+        if (request.signal?.aborted) return;
+
+        const { systemInstruction, contents } = transformMessages(request.messages);
+        const model = genAI.getGenerativeModel({ model: request.model, systemInstruction });
+
+        const fmtConfig = buildGoogleGenerationConfig(request.responseFormat);
+        const result = await model.generateContentStream({
+          contents,
+          generationConfig: {
+            temperature: request.temperature,
+            maxOutputTokens: request.maxTokens,
+            stopSequences: request.stop,
+            topP: request.topP,
+            ...fmtConfig,
+          },
+        });
+
+        for await (const chunk of result.stream) {
+          if (request.signal?.aborted) return; // abort: no FinishPart
+          const text = chunk.text();
+          if (text) yield { type: "text-delta", textDelta: text };
+        }
+
+        // Google emits usage only on the aggregated response, not per-chunk
+        const response = await result.response;
+        const usage = {
+          promptTokens: response.usageMetadata?.promptTokenCount ?? 0,
+          completionTokens: response.usageMetadata?.candidatesTokenCount ?? 0,
+          totalTokens: response.usageMetadata?.totalTokenCount ?? 0,
+        };
+        yield {
+          type: "finish",
+          finishReason: transformFinishReason(response.candidates?.[0]?.finishReason),
+          usage,
+        } satisfies FinishPart;
+      } catch (error: unknown) {
+        const detail = redactErrorMessage(apiKey, error);
+        throw new WeftError({
+          code: "PROVIDER_ERROR",
+          why: `Google Gemini streamParts failed: ${detail}`,
           fix: {
             description:
               "Verify GOOGLE_GENERATIVE_AI_API_KEY is set and streaming is supported for the requested model.",
