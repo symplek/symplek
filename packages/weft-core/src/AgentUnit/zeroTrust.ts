@@ -8,6 +8,7 @@
  * @surface internal
  */
 
+import type { EnsembleCoherence } from "../coherence/types";
 import type { ObjectiveConfidence } from "../confidence";
 import { createTrackedResult } from "../trust";
 import type { ResultSource, TrackedResult } from "../types";
@@ -63,6 +64,29 @@ export function extractObjectiveConfidence<T>(
   return undefined;
 }
 
+/**
+ * Extract ensemble coherence from a value if it carries one.
+ * Coordination operators (consensus, converge, debate) attach a `coherence`
+ * field to their raw result objects before they reach wrapInTrackedResult().
+ * The field is validated structurally to avoid treating unrelated `coherence`
+ * properties (e.g. a numeric `coherence` on a domain object) as EnsembleCoherence.
+ */
+export function extractCoherence<T>(value: T): EnsembleCoherence | undefined {
+  if (value === null || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  if (!("coherence" in record)) return undefined;
+  const c = record.coherence;
+  if (
+    c !== null &&
+    typeof c === "object" &&
+    "composite" in (c as Record<string, unknown>) &&
+    typeof (c as Record<string, unknown>).composite === "number"
+  ) {
+    return c as EnsembleCoherence;
+  }
+  return undefined;
+}
+
 /** Wrap a raw value in a TrackedResult with source metadata. */
 export function wrapInTrackedResult<T>(
   metadata: AgentUnitMetadata,
@@ -71,6 +95,7 @@ export function wrapInTrackedResult<T>(
   const confidence = calculateConfidence(metadata.operatorChain);
   const source: ResultSource = "agent";
   const objectiveConfidence = extractObjectiveConfidence(value);
+  const coherence = extractCoherence(value);
 
   return createTrackedResult(value, {
     source,
@@ -78,5 +103,6 @@ export function wrapInTrackedResult<T>(
     sourceChain: [source],
     minChainConfidence: confidence,
     objectiveConfidence,
+    coherence,
   });
 }

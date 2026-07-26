@@ -12,6 +12,7 @@
  * @since 2.1.0 — Hardened against forgery (Codex FATAL #1, 2026-07-07)
  */
 import type { ObjectiveConfidence } from "./confidence";
+import type { EnsembleCoherence } from "./coherence/types";
 import type { ResultSource, TrackedResult } from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -52,6 +53,8 @@ export function createTrackedResult<T>(
     verifiedBy?: string;
     verifiedAt?: number;
     objectiveConfidence?: ObjectiveConfidence;
+    /** Ensemble coherence from multi-agent operators. CR-503. */
+    coherence?: EnsembleCoherence;
   },
 ): TrackedResult<T> {
   const result: TrackedResult<T> = {
@@ -67,6 +70,7 @@ export function createTrackedResult<T>(
   if (metadata.verifiedAt) result.verifiedAt = metadata.verifiedAt;
   if (metadata.objectiveConfidence)
     result.objectiveConfidence = metadata.objectiveConfidence;
+  if (metadata.coherence) result.coherence = metadata.coherence;
 
   // Register in the WeakSet — the true unforgeable authority
   _trackedRegistry.add(result);
