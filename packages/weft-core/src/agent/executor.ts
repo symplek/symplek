@@ -1,20 +1,26 @@
 ﻿/**
  * @module executor - Internal agent execution loop
- * @description Drives the generate → tool-call → respond cycle for executeAgent().
- * @rules Tool-parameter serialisation uses only public Zod v3 APIs (instanceof / .shape /
- *   .unwrap). When tool calling is fully wired, replace zodSchemaToJsonSchema() with
- *   the `zod-to-json-schema` package (zod-version-safe, handles every Zod type).
+ * @description Drives the generate → tool-call → respond cycle.
+ *   zodSchemaToJsonSchema() uses only public Zod v3 APIs (instanceof / .shape /
+ *   .unwrap). executeLoop() is the real multi-turn engine used by AgentUnit.loop().
+ * @rules CR-402: tool loop surfaced; Anthropic role:"tool" fix must be in place first.
+ * @since 1.0.0-beta.1 — CR-402: executeLoop() added
  */
 import { z } from "zod";
+import {
+  ToolApprovalRequiredError,
+} from "../interview/computations";
 import { WeftError } from "../errors";
 import { DEFAULT_LOOP_OPTIONS, type LoopOptions, type StepInfo } from "../loop";
 import {
   type AIMessage,
+  type Provider,
+  type ToolDefinition,
   detectProvider,
   providerRegistry,
   selectModelForTask,
 } from "../providers";
-import type { Tool } from "./tool";
+import type { Tool, ToolApprovalPayload } from "./tool";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Zod → JSON Schema conversion (public API only, Zod v3-safe)
@@ -208,6 +214,235 @@ export async function executeAgent(
     text: steps[steps.length - 1].lastResponse || "",
     steps,
     toolCallCount,
+    metadata: {
+      duration: Date.now() - startTime,
+      totalTokens,
+    },
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Real multi-turn loop engine (CR-402)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Options bundle for executeLoop(). Extends LoopOptions with the tool array
+ * and an optional approval gate for requiresApproval tools.
+ */
+export interface LoopExecuteOptions extends LoopOptions {
+  /**
+   * Model identifier to use for generation. Defaults to "claude-opus-4-5"
+   * when not specified. Override for tests or to route to a specific model.
+   */
+  model?: string;
+  /**
+   * Optional approval callback. When a tool has requiresApproval set, this
+   * callback is awaited before execution. Return true to approve (execute the
+   * tool) or false to deny (skip execution and inform the LLM the tool was
+   * refused). When absent and a tool requires approval, ToolApprovalRequiredError
+   * is thrown — this is a configuration error, not a denial.
+   */
+  requireApproval?: (payload: ToolApprovalPayload) => Promise<boolean>;
+}
+
+/**
+ * Drives a multi-turn LLM ↔ tool execution cycle.
+ *
+ * @remarks
+ * The loop runs as follows per step:
+ * 1. Call provider.generate() with current messages and tool definitions.
+ * 2. If response.finishReason === "tool_calls": for each tool call, check
+ *    requiresApproval, gate through requireApproval callback if present,
+ *    execute approved tools, send denial messages for denied tools.
+ * 3. Append tool results as role:"tool" messages (with toolCallId for
+ *    Anthropic's tool_result correlation).
+ * 4. Repeat until stopWhen fires, noToolCalls, or maxSteps is reached.
+ *
+ * The Anthropic adapter's transformMessages fix (CR-402) is a prerequisite:
+ * role:"tool" messages must be converted to tool_result content blocks.
+ *
+ * @param provider - AI provider to use for generation
+ * @param initialMessages - Seed conversation (system prompt + user turn)
+ * @param tools - Tool definitions with execute implementations and optional names
+ * @param options - Loop control including approval gate
+ * @returns Final text, step history, and execution metadata
+ *
+ * @throws {ToolApprovalRequiredError} When a requiresApproval tool is
+ *   encountered but no requireApproval callback is configured.
+ */
+export async function executeLoop(
+  provider: Provider,
+  initialMessages: AIMessage[],
+  tools: Array<Tool & { name: string }>,
+  options: LoopExecuteOptions = {},
+): Promise<AgentResult> {
+  const startTime = Date.now();
+  const maxSteps = options.maxSteps ?? DEFAULT_LOOP_OPTIONS.maxSteps;
+  const messages: AIMessage[] = [...initialMessages];
+  const steps: StepInfo[] = [];
+  let totalTokens = 0;
+  let totalToolCalls = 0;
+
+  // Build provider-neutral ToolDefinition[] once.
+  const toolDefs: ToolDefinition[] = tools.map((t) => ({
+    name: t.name,
+    description: t.description,
+    inputSchema:
+      zodSchemaToJsonSchema(t.parameters) ??
+      ({ type: "object", properties: {}, required: [] } as Record<string, unknown>),
+  }));
+
+  // Index tools by name for O(1) lookup during execution.
+  const toolsByName = new Map<string, Tool & { name: string }>(
+    tools.map((t) => [t.name, t]),
+  );
+
+  // Model defaults to the latest Anthropic workhorse; callers override via options.model.
+  const model = options.model ?? "claude-opus-4-5";
+
+  for (let stepNumber = 1; stepNumber <= maxSteps; stepNumber++) {
+    const response = await provider.generate({
+      model,
+      messages,
+      tools: toolDefs.length > 0 ? toolDefs : undefined,
+    });
+
+    totalTokens += response.usage?.totalTokens ?? 0;
+
+    // No tool calls → normal text response; add to history and stop.
+    const providerToolCalls = response.toolCalls ?? [];
+
+    if (providerToolCalls.length === 0) {
+      // Append the assistant's final text turn.
+      messages.push({ role: "assistant", content: response.text });
+      steps.push({
+        stepNumber,
+        messages: [...messages],
+        toolResults: [],
+        lastResponse: response.text,
+      });
+      break;
+    }
+
+    // Tool calls — record the assistant turn then execute each call.
+    // Anthropic requires the tool_use block (assistant turn) before any
+    // tool_result block, so append the assistant message first.
+    messages.push({ role: "assistant", content: response.text || "" });
+
+    const toolResults: unknown[] = [];
+
+    for (const call of providerToolCalls) {
+      totalToolCalls++;
+
+      const impl = toolsByName.get(call.name);
+      if (!impl) {
+        // Unknown tool — send an error result so the LLM knows.
+        messages.push({
+          role: "tool",
+          content: `Error: tool "${call.name}" is not registered`,
+          toolCallId: call.id,
+        });
+        toolResults.push({ error: `tool "${call.name}" not found` });
+        continue;
+      }
+
+      // Check approval requirement.
+      const needsApproval =
+        typeof impl.requiresApproval === "function"
+          ? impl.requiresApproval(call.input as z.infer<typeof impl.parameters>)
+          : (impl.requiresApproval ?? false);
+
+      if (needsApproval) {
+        const approvalPayload: ToolApprovalPayload = {
+          type: "tool-approval",
+          toolCallId: call.id,
+          toolName: call.name,
+          input: call.input,
+        };
+
+        if (!options.requireApproval) {
+          throw new ToolApprovalRequiredError(approvalPayload);
+        }
+
+        // Suspend until the approval gate resolves.
+        const approved = await options.requireApproval(approvalPayload);
+
+        if (!approved) {
+          // Denial: inform the LLM the tool was refused, do not execute.
+          messages.push({
+            role: "tool",
+            content: "Tool execution was denied by the user.",
+            toolCallId: call.id,
+          });
+          toolResults.push({ denied: true, toolCallId: call.id });
+          continue;
+        }
+      }
+
+      // Execute the tool.
+      try {
+        const result = await impl.execute(
+          call.input as z.infer<typeof impl.parameters>,
+        );
+        const resultText =
+          typeof result === "string" ? result : JSON.stringify(result);
+        messages.push({
+          role: "tool",
+          content: resultText,
+          toolCallId: call.id,
+        });
+        toolResults.push(result);
+      } catch (execErr: unknown) {
+        const errMsg =
+          execErr instanceof Error ? execErr.message : String(execErr);
+        messages.push({
+          role: "tool",
+          content: `Tool execution error: ${errMsg}`,
+          toolCallId: call.id,
+        });
+        toolResults.push({ error: errMsg });
+      }
+    }
+
+    // Feed tool results back: one step = one tool-execution cycle
+    // (initial call → tools execute → feed call). stopWhen fires AFTER the
+    // feed call so it sees both toolResults and the LLM's reaction text.
+    const feedResponse = await provider.generate({
+      model,
+      messages,
+      tools: toolDefs.length > 0 ? toolDefs : undefined,
+    });
+    totalTokens += feedResponse.usage?.totalTokens ?? 0;
+
+    const currentStep: StepInfo = {
+      stepNumber,
+      messages: [...messages],
+      toolResults,
+      lastResponse: feedResponse.text || undefined,
+    };
+    steps.push(currentStep);
+
+    // Check custom stop condition AFTER the feed call.
+    if (options.stopWhen?.(currentStep)) {
+      break;
+    }
+
+    // If feed response has no further tool calls the conversation is complete.
+    if ((feedResponse.toolCalls ?? []).length === 0) {
+      messages.push({ role: "assistant", content: feedResponse.text });
+      break;
+    }
+
+    // Feed response itself requests more tool calls; record the assistant turn
+    // so the next step iteration sees a coherent message history.
+    messages.push({ role: "assistant", content: feedResponse.text || "" });
+  }
+
+  const lastStep = steps[steps.length - 1];
+  return {
+    text: lastStep?.lastResponse ?? "",
+    steps,
+    toolCallCount: totalToolCalls,
     metadata: {
       duration: Date.now() - startTime,
       totalTokens,

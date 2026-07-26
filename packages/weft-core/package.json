@@ -55,6 +55,16 @@
       "types": "./dist/uncertainty/index.d.ts",
       "import": "./dist/uncertainty/index.js",
       "require": "./dist/uncertainty/index.cjs"
+    },
+    "./store": {
+      "types": "./dist/store/index.d.ts",
+      "import": "./dist/store/index.js",
+      "require": "./dist/store/index.cjs"
+    },
+    "./agent": {
+      "types": "./dist/agent/index.d.ts",
+      "import": "./dist/agent/index.js",
+      "require": "./dist/agent/index.cjs"
     }
   },
   "files": [
@@ -85,8 +95,8 @@
   },
   "homepage": "https://github.com/wefthq/weft#readme",
   "scripts": {
-    "build": "tsup src/index.ts src/server.ts src/confidence/index.ts src/coherence/index.ts src/interview/index.ts src/change-kernel/index.ts src/operators/index.ts src/rehearsal/index.ts src/uncertainty/index.ts --format cjs,esm --dts --outDir dist",
-    "dev": "tsup src/index.ts src/server.ts src/confidence/index.ts src/coherence/index.ts src/interview/index.ts src/change-kernel/index.ts src/operators/index.ts src/rehearsal/index.ts src/uncertainty/index.ts --format cjs,esm --watch --dts --outDir dist",
+    "build": "tsup src/index.ts src/server.ts src/confidence/index.ts src/coherence/index.ts src/interview/index.ts src/change-kernel/index.ts src/operators/index.ts src/rehearsal/index.ts src/uncertainty/index.ts src/store/index.ts src/agent/index.ts --format cjs,esm --dts --outDir dist",
+    "dev": "tsup src/index.ts src/server.ts src/confidence/index.ts src/coherence/index.ts src/interview/index.ts src/change-kernel/index.ts src/operators/index.ts src/rehearsal/index.ts src/uncertainty/index.ts src/store/index.ts src/agent/index.ts --format cjs,esm --watch --dts --outDir dist",
     "lint": "biome check .",
     "typecheck": "tsc --noEmit",
     "typecheck:boundary": "tsc --noEmit -p tsconfig.boundary.json",

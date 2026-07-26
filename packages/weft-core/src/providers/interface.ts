@@ -48,6 +48,11 @@ export interface AIRequest {
   /** Response format (e.g., { type: 'json_object' }) */
   responseFormat?: { type: "text" | "json_object" };
   /**
+   * Tool definitions available to the model. When present, the provider
+   * may return tool_calls instead of text. Populated by executeLoop().
+   */
+  tools?: ToolDefinition[];
+  /**
    * AbortSignal for cancelling in-flight requests.
    * N61 fix: wired through streaming.ts and into each provider's SDK call
    * so a stalled stream can be interrupted mid-stream, not just between chunks.
@@ -74,6 +79,11 @@ export interface AIResponse {
   usage: AIUsage;
   /** Reason why the generation finished */
   finishReason: "stop" | "length" | "content_filter" | "tool_calls" | "other";
+  /**
+   * Tool calls requested by the model. Populated when finishReason === "tool_calls".
+   * The caller should execute each tool and supply results as role:"tool" messages.
+   */
+  toolCalls?: ToolCall[];
   /** Raw provider response (optional) */
   raw?: any;
 }
@@ -88,6 +98,31 @@ export interface StreamChunk {
   usage?: AIUsage;
   /** Finish reason (only present in the final chunk) */
   finishReason?: AIResponse["finishReason"];
+}
+
+// ─── Tool types ─────────────────────────────────────────────────────────────
+
+/**
+ * Tool definition sent to a provider. Describes a callable tool the LLM can invoke.
+ * Construct from a Tool<P,R> using zodSchemaToJsonSchema() for the inputSchema.
+ */
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  /** JSON Schema object for the tool's input parameters. */
+  inputSchema: Record<string, unknown>;
+}
+
+/**
+ * A single tool call returned by the provider in a tool_calls response.
+ */
+export interface ToolCall {
+  /** Provider-generated call identifier (used to correlate tool results). */
+  id: string;
+  /** Name of the tool to execute. */
+  name: string;
+  /** Deserialized input arguments for the tool. */
+  input: unknown;
 }
 
 /**

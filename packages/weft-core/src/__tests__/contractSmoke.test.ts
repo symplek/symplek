@@ -11,6 +11,7 @@
 
 import { describe, expect, it } from "vitest";
 import * as entrypoint from "../index";
+import * as storeSubpath from "../store";
 import {
   AgentUnit,
   CheckpointManager,
@@ -199,6 +200,35 @@ describe("weft-core — Package Contract Smoke", () => {
 
     it("exports resolveModelFromContext", () => {
       expect(typeof resolveModelFromContext).toBe("function");
+    });
+  });
+
+  describe("Durable store exports (CR-403) live on the ./store subpath", () => {
+    // Contract decision: Wave 5 capability surface is published on subpaths
+    // (./uncertainty, ./rehearsal, ./agent, ./store), never the root barrel.
+    // Keeping new surface off the root is what lets boundaryTest and
+    // exportCount remain meaningful as the framework grows, so this asserts
+    // BOTH where the API lives and where it deliberately does not.
+    const durableApi = [
+      "createDurableStore",
+      "createFileBackend",
+      "serializeTrackedResult",
+      "deserializeTrackedResult",
+      "resume",
+    ] as const;
+
+    it("the durable API is reachable from weft-core/store", () => {
+      const subpath = storeSubpath as unknown as Record<string, unknown>;
+      for (const name of durableApi) {
+        expect(typeof subpath[name]).toBe("function");
+      }
+    });
+
+    it("the durable API is absent from the root entrypoint", () => {
+      const root = entrypoint as unknown as Record<string, unknown>;
+      for (const name of durableApi) {
+        expect(root[name]).toBeUndefined();
+      }
     });
   });
 

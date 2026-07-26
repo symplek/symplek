@@ -1,13 +1,16 @@
 ﻿/**
  * @fileoverview Interview computation factories
- * @description createInterviewComputation and createConductComputation following operator pattern
+ * @description createInterviewComputation, createConductComputation, and
+ *   createToolApprovalComputation following the operator pattern.
  * @module weft-core/interview/computations
  * @since 1.0.0-beta.3
  *
  * 📝 BUILD[Weft-interview]: Computation factories for interview operators
+ * 📝 BUILD[CR-402]: createToolApprovalComputation for HITL tool approval gate
  */
 
 import type { AgentComputation, AgentUnitMetadata } from "../AgentUnit";
+import type { ToolApprovalPayload } from "../agent/tool";
 import type { AgentContext } from "../types";
 import type { Interview } from "./Interview";
 import type {
@@ -317,6 +320,108 @@ function calculateProgress(
     ),
   };
 }
+
+// =============================================================================
+// TOOL APPROVAL COMPUTATION (CR-402)
+// =============================================================================
+
+/**
+ * Represents the pending state when a tool with requiresApproval is encountered.
+ * Analogous to InterviewPending — the executor creates this when the loop pauses,
+ * and the approval gate (LoopOperatorOptions.requireApproval) resolves it.
+ */
+export interface ToolApprovalPending {
+  /** Marker that identifies this as a pending tool approval state. */
+  readonly __toolApprovalPending: true;
+  /** The payload describing the tool call awaiting approval. */
+  readonly payload: ToolApprovalPayload;
+}
+
+/**
+ * Thrown when a tool with requiresApproval: true is encountered but no
+ * requireApproval handler is configured in the loop options.
+ *
+ * @remarks
+ * This is a configuration error, not a runtime denial. Add a requireApproval
+ * callback to LoopOperatorOptions to handle approval-gated tools.
+ */
+export class ToolApprovalRequiredError extends Error {
+  /** The payload for the tool call that could not be approved. */
+  readonly payload: ToolApprovalPayload;
+
+  constructor(payload: ToolApprovalPayload) {
+    super(
+      `Tool "${payload.toolName}" (id: ${payload.toolCallId}) requires approval ` +
+        "but no requireApproval handler was provided in LoopOperatorOptions.",
+    );
+    this.name = "ToolApprovalRequiredError";
+    this.payload = payload;
+  }
+}
+
+/**
+ * Creates the pending-state computation for a tool approval gate.
+ * Returns ToolApprovalPending — the gate computation resolves it.
+ *
+ * @param payload - The ToolApprovalPayload from the executor
+ * @param _innerMeta - Metadata from the source AgentUnit (follows operator pattern)
+ * @returns AgentComputation producing ToolApprovalPending
+ *
+ * @example
+ * ```typescript
+ * const pendingComp = createToolApprovalComputation(
+ *   { type: "tool-approval", toolCallId: "call_1", toolName: "search", input: { q: "test" } },
+ *   metadata,
+ * );
+ * const pending = await pendingComp(ctx);
+ * // pending.__toolApprovalPending === true
+ * ```
+ */
+export function createToolApprovalComputation(
+  payload: ToolApprovalPayload,
+  _innerMeta: AgentUnitMetadata,
+): AgentComputation<ToolApprovalPending> {
+  return async (_ctx: AgentContext): Promise<ToolApprovalPending> => {
+    return { __toolApprovalPending: true, payload };
+  };
+}
+
+/**
+ * Creates the gate-resolution computation: calls the approval callback and
+ * returns the boolean decision (true = approved, false = denied).
+ *
+ * This is the conduct-phase analog for tool approval — it runs the approval
+ * callback and returns the decision that the executor uses to allow or block
+ * tool execution.
+ *
+ * @param pending - The ToolApprovalPending from createToolApprovalComputation
+ * @param gate - Async function returning true to approve, false to deny
+ * @param _innerMeta - Metadata from the source AgentUnit (follows operator pattern)
+ * @returns AgentComputation producing the approval boolean
+ *
+ * @example
+ * ```typescript
+ * const gateComp = createToolApprovalGateComputation(
+ *   pending,
+ *   async (payload) => promptUserForApproval(payload),
+ *   metadata,
+ * );
+ * const approved = await gateComp(ctx); // true or false
+ * ```
+ */
+export function createToolApprovalGateComputation(
+  pending: ToolApprovalPending,
+  gate: (payload: ToolApprovalPayload) => Promise<boolean>,
+  _innerMeta: AgentUnitMetadata,
+): AgentComputation<boolean> {
+  return async (_ctx: AgentContext): Promise<boolean> => {
+    return gate(pending.payload);
+  };
+}
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
 
 /**
  * Build assumptions list for transparency.
