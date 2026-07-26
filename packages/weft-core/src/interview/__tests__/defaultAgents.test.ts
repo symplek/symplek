@@ -484,6 +484,38 @@ describe("Default Agents Tests", () => {
       // Email must be the CORRECTED (most recent) value, not old@example.com.
       expect(result.email).toBe("new@example.com");
     });
+
+    it("P2 — valid accumulated value survives a later malformed correction at final extraction", async () => {
+      // Failure scenario (without R3 fix):
+      // currentContext.email = "good@example.com" (valid, accepted by partial updater).
+      // Most-recent answer says "My email is not-an-email" (malformed).
+      // Without per-field validation, final extraction overwrites the accumulated
+      // valid value with the invalid string, schema.safeParse() fails, and the
+      // extractor throws VALIDATION_ERROR even though a valid value was available.
+      //
+      // With the fix: the candidate "not-an-email" fails ZodString.email(),
+      // so extracted[field] is NOT overwritten. The accumulated valid value
+      // from currentContext stands, and the full schema parse succeeds.
+      const extractor = createDefaultExtractor(SimpleSchema);
+
+      const state = createTestState({
+        // Simulate a converged context accumulated through prior rounds.
+        currentContext: { name: "Alice", email: "good@example.com" },
+        answers: [
+          createTestAnswer("q-1", "My name is Alice"),
+          createTestAnswer("q-2", "My email is good@example.com"),
+          // Latest answer: malformed correction that must NOT override the valid value.
+          createTestAnswer("q-3", "My email is not-an-email"),
+        ],
+      });
+
+      // Must succeed, not throw VALIDATION_ERROR.
+      const result = await extractor(state).run(ctx, { trustMode: "legacy" });
+
+      expect(result.name).toBe("Alice");
+      // Accumulated valid email must survive the malformed mention.
+      expect(result.email).toBe("good@example.com");
+    });
   });
 
   // ===========================================================================

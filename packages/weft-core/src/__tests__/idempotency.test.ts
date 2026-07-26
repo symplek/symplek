@@ -326,6 +326,56 @@ describe("idempotency", () => {
       expect(isTracked(cached) && cached.value).toBe("cached-value");
     });
 
+    it("R3 — store.get() that re-enters unit.run() during get() does not execute computation twice", async () => {
+      // Failure scenario (without deferred-promise fix):
+      //   1. Outer run() starts IIFE → IIFE calls store.get(key) synchronously.
+      //   2. store.get() fires a nested unit.run() for the same key (without awaiting).
+      //   3. Nested run() checks _idempotencyInFlight → EMPTY (outer hasn't set it yet)
+      //      → installs its own flight entry.
+      //   4. IIFE returns from store.get() → outer sets _idempotencyInFlight, overwriting
+      //      the nested entry.
+      //   5. Both outer and nested run the computation → execCount = 2.
+      //
+      // With fix: flight entry registered BEFORE store.get() is called. Nested run()
+      // finds the entry immediately and awaits the shared promise → execCount = 1.
+      let execCount = 0;
+      // Declare with definite-assignment assertion so the store closure can
+      // reference it before the assignment below.
+      let unit!: AgentUnit<string>;
+
+      let getCallCount = 0;
+      const reentrantStore: IdempotencyStore = {
+        get: async (key: string) => {
+          getCallCount++;
+          if (getCallCount === 1) {
+            // First call: fire a nested run WITHOUT awaiting to match the failure scenario.
+            // The nested call either shares the outer flight (fix) or creates a duplicate (bug).
+            unit
+              .run(ctx, {
+                idempotency: { key, strategy: "return-cached", store: reentrantStore },
+              })
+              .catch(() => {
+                // Circular await resolves fine with the fix; ignore any error here.
+              });
+          }
+          return null; // simulate cache miss
+        },
+        set: async () => {},
+      };
+
+      unit = AgentUnit.from(async () => {
+        execCount++;
+        return `exec-${execCount}`;
+      });
+
+      await unit.run(ctx, {
+        idempotency: { key: "reentrant-k", strategy: "return-cached", store: reentrantStore },
+      });
+
+      // Computation must have executed exactly once.
+      expect(execCount).toBe(1);
+    });
+
     it("R2 — two separately constructed instances of the same operation execute the computation once", async () => {
       // The flight key is scoped to store+key (not unit instance), so at-most-once
       // is enforced at exactly the same boundary as persistence. Two independently

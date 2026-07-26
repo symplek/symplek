@@ -253,5 +253,40 @@ describe("AgentUnit", () => {
       const result = await unit.run(ctxWithSignal);
       expect(result.value.votes[0]!.decision).toBe("abstain");
     });
+
+    it("P1 — pre-aborted ctx.signal aborts voters immediately when voteTimeout is set", async () => {
+      // Failure scenario (without AbortSignal.any):
+      // ctx.signal is already aborted when consensus begins. Listener-based
+      // composition never fires the abort event (the signal is past that point),
+      // so the composed signal stays live. The voter runs for the full timeout
+      // duration, resolves, and its decision counts as a real vote.
+      //
+      // With AbortSignal.any(): the returned signal is immediately aborted
+      // because at least one input is already aborted. The Promise-voter race
+      // rejects instantly via the signal.aborted check, and the vote is counted
+      // as an abstain rather than a real approval.
+      const controller = new AbortController();
+      controller.abort(); // pre-abort: already aborted before consensus starts
+
+      const ctxPreAborted = createContext({ signal: controller.signal });
+
+      const slowVoter = () =>
+        new Promise<{ decision: "approve"; confidence: number }>((resolve) => {
+          // Would resolve in 200 ms without cancellation.
+          // With the fix the race rejects immediately, so this resolve never matters.
+          setTimeout(() => resolve({ decision: "approve", confidence: 0.9 }), 200);
+        });
+
+      const unit = AgentUnit.of("proposal").consensus([slowVoter], {
+        quorum: 0.5,
+        timeout: 5000, // long timeout — the pre-aborted ctx.signal must win
+      });
+
+      const result = await unit.run(ctxPreAborted);
+
+      // Vote must be an abstain: the pre-aborted signal cancelled the voter
+      // before it could return an approval.
+      expect(result.value.votes[0]!.decision).toBe("abstain");
+    });
   });
 });

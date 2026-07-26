@@ -213,7 +213,14 @@ async function _bootstrapProvider(
  * @internal
  */
 export function _resetForTesting(): void {
-  _bootstrapGeneration = 0;
+  // Advance the generation counter so any in-flight bootstrap that was
+  // launched before this reset holds a generation that can never match a
+  // future configure() call. Resetting to 0 creates an ABA window:
+  // a pre-reset bootstrap carrying generation N could pass the equality
+  // check `generation === _bootstrapGeneration` after a post-reset
+  // configure() increments the counter back to N. Advancing makes every
+  // past generation permanently unreachable.
+  _bootstrapGeneration++;
   resetAll();
 }
 

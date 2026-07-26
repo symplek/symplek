@@ -416,20 +416,38 @@ export function createDefaultExtractor<T>(
       //
       // Fix 6 (R2 verdict): always scan from the most recent answer so a
       // correction later in the conversation overrides an earlier mention.
-      // The undefined guard is intentionally absent — if currentContext already
-      // has a value, a more recent answer in the transcript can still override it.
       // Using [...answers].reverse().find() rather than findLast to stay within
       // the ES2022 lib target.
+      //
+      // R3 fix: only overwrite an accumulated valid value when the candidate
+      // from the most-recent answer itself passes per-field validation.
+      // Without this guard, a malformed correction (e.g. "My email is not-an-email")
+      // discards a previously-converged valid value from currentContext and
+      // causes final schema validation to throw even though a valid value exists.
+      const schemaAsObject = schema as unknown as z.AnyZodObject;
+      const fieldSchemas: Record<string, z.ZodTypeAny> | null =
+        typeof schemaAsObject.shape === "object"
+          ? (schemaAsObject.shape as Record<string, z.ZodTypeAny>)
+          : null;
+
       for (const field of fields) {
         const relevantAnswer = [...state.answers].reverse().find((a) =>
           a.text.toLowerCase().includes(field.name.toLowerCase()),
         );
 
         if (relevantAnswer) {
-          extracted[field.name] = extractFieldValue(
-            field.name,
-            relevantAnswer.text,
-          );
+          const candidate = extractFieldValue(field.name, relevantAnswer.text);
+          if (fieldSchemas?.[field.name]) {
+            // Validate against the field's own schema before overwriting.
+            const fieldResult = (fieldSchemas[field.name] as z.ZodTypeAny).safeParse(candidate);
+            if (fieldResult.success) {
+              extracted[field.name] = fieldResult.data;
+            }
+            // else: leave the accumulated value already in `extracted`
+          } else {
+            // Non-ZodObject schema: no per-field schema available, apply as-is.
+            extracted[field.name] = candidate;
+          }
         }
       }
 

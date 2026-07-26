@@ -76,12 +76,12 @@ export function createConsensusComputation<T>(
       let runCtx = ctx;
       if (timeoutSignal) {
         if (ctx.signal) {
-          // Both signals exist: abort the composed controller when either fires.
-          const composedController = new AbortController();
-          const abort = () => composedController.abort();
-          ctx.signal.addEventListener("abort", abort, { once: true });
-          timeoutSignal.addEventListener("abort", abort, { once: true });
-          runCtx = { ...ctx, signal: composedController.signal };
+          // Use platform-native signal composition (Node >= 20 / WHATWG).
+          // AbortSignal.any() immediately aborts the returned signal when ANY
+          // input is already aborted — correctly handling the pre-aborted case
+          // that listener-based composition misses (adding a listener to an
+          // already-aborted signal never fires a new abort event).
+          runCtx = { ...ctx, signal: AbortSignal.any([ctx.signal, timeoutSignal]) };
         } else {
           runCtx = { ...ctx, signal: timeoutSignal };
         }

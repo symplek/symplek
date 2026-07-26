@@ -617,6 +617,39 @@ describe("configure() generation guard — stale bootstrap does not overwrite ne
     expect(_getBootstrapGenerationForTesting()).toBe(genBefore + 1);
     vi.unstubAllEnvs();
   });
+
+  it("R4 — _resetForTesting() advances generation so pre-reset bootstraps cannot match post-reset configure()", async () => {
+    // Failure scenario (without fix):
+    //   1. configure("openai", key="A") → _bootstrapGeneration = 1, OpenAI bootstrap starts.
+    //   2. _resetForTesting()           → _bootstrapGeneration = 0.
+    //   3. configure("anthropic", key) → _bootstrapGeneration = 1 (incremented from 0).
+    //   4. OpenAI bootstrap from step 1 finishes: generation(1) === _bootstrapGeneration(1)
+    //      → passes the guard, registers OpenAI as default — wrong provider wins.
+    //
+    // With fix: step 2 increments rather than resets, so after step 3 the counter
+    // is 3 (or some value > 1). The stale bootstrap holds generation=1, which can
+    // never equal 3. Guard rejects it.
+    const { _getBootstrapGenerationForTesting } = await import("../facade");
+
+    // Step 1: first configure records a generation.
+    Weft.configure({ provider: "openai", apiKey: "sk-first" });
+    const genAfterFirstConfigure = _getBootstrapGenerationForTesting();
+
+    // Step 2: reset.
+    _resetForTesting();
+    const genAfterReset = _getBootstrapGenerationForTesting();
+
+    // With fix: reset ADVANCES the counter, so it is strictly greater than
+    // the generation any pre-reset bootstrap holds.
+    expect(genAfterReset).toBeGreaterThan(genAfterFirstConfigure);
+
+    // Step 3: post-reset configure increments again.
+    Weft.configure({ provider: "anthropic", apiKey: "sk-second" });
+    const genAfterSecondConfigure = _getBootstrapGenerationForTesting();
+
+    // The post-reset generation is strictly greater than any pre-reset generation.
+    expect(genAfterSecondConfigure).toBeGreaterThan(genAfterFirstConfigure);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
