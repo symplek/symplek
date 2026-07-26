@@ -612,3 +612,55 @@ describe("Default Agents Tests", () => {
     });
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// R5 verdict — two deterministic extraction defects.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("extraction robustness (R5 verdict)", () => {
+  let ctx: AgentContext;
+
+  beforeEach(() => {
+    ctx = createContext();
+  });
+
+  it("a later volunteered correction beats an earlier targeted answer", async () => {
+    // The association signal must not be checked as a separate earlier pass:
+    // doing so returns the older targeted answer and ignores the correction.
+    const schema = z.object({ email: z.string().email() });
+    const extractor = createDefaultExtractor(schema);
+
+    const state = createTestState({
+      askedQuestions: [
+        { id: "q-1", text: "What is your email?", targetField: "email" },
+        { id: "q-2", text: "Anything else?", targetField: "notes" },
+      ],
+      answers: [
+        createTestAnswer("q-1", "old@example.com"),
+        createTestAnswer("q-2", "Correction: my email is new@example.com"),
+      ],
+    } as Partial<InterviewState>);
+
+    const result = await extractor(state).run(ctx, { trustMode: "legacy" });
+
+    expect(result.email).toBe("new@example.com");
+  });
+
+  it("a schema key containing regex metacharacters does not crash extraction", async () => {
+    // Field names are caller-supplied object keys and are interpolated into a
+    // RegExp; an unescaped "(" produced a SyntaxError instead of a value.
+    const schema = z.object({ "name(": z.string() });
+    const extractor = createDefaultExtractor(schema);
+
+    const state = createTestState({
+      askedQuestions: [
+        { id: "q-1", text: "What is your name(?", targetField: "name(" },
+      ],
+      answers: [createTestAnswer("q-1", "Alice")],
+    } as Partial<InterviewState>);
+
+    await expect(
+      extractor(state).run(ctx, { trustMode: "legacy" }),
+    ).resolves.toBeDefined();
+  });
+});

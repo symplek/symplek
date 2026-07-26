@@ -354,8 +354,10 @@ function extractFieldValue(fieldName: string, answerText: string): string {
   }
 
   // Strategy 2: "<fieldName> is <value>" / "<fieldName>: <value>"
+  // Field names come from the caller's schema keys, which may contain regex
+  // metacharacters (`z.object({ "name(": ... })`), so escape before interpolating.
   const fieldPattern = new RegExp(
-    `${fieldName}(?:\\s+is|:)\\s+(.+)`,
+    `${fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:\\s+is|:)\\s+(.+)`,
     "i",
   );
   const fieldMatch = trimmed.match(fieldPattern);
@@ -415,12 +417,20 @@ function findRelevantAnswer(
   fieldName: string,
   fieldQuestionIds: Map<string, Set<string>>,
 ): Answer | undefined {
+  // Both signals are scanned in one reverse pass so the genuinely most recent
+  // answer wins. Checking association first as a separate pass would return an
+  // older targeted answer in preference to a newer volunteered correction,
+  // contradicting the correction semantics this function promises.
   const questionIds = fieldQuestionIds.get(fieldName);
   if (questionIds && questionIds.size > 0) {
-    const byAssociation = [...answers].reverse().find((a) =>
-      questionIds.has(a.questionId),
-    );
-    if (byAssociation) return byAssociation;
+    const mostRecent = [...answers]
+      .reverse()
+      .find(
+        (a) =>
+          questionIds.has(a.questionId) ||
+          a.text.toLowerCase().includes(fieldName.toLowerCase()),
+      );
+    if (mostRecent) return mostRecent;
   }
   // Fallback: text matching for volunteered info or when askedQuestions absent
   return [...answers].reverse().find((a) =>

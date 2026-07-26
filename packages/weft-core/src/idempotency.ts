@@ -51,6 +51,17 @@ export interface IdempotencyConfig {
  *
  * Implementations must be safe to share across concurrent runs.
  *
+ * **Scope of the at-most-once guarantee**: the runtime guarantees at-most-once
+ * execution per key *while this store is available*. Concurrent callers on one
+ * key share a single execution, and a completed run is served from the store
+ * thereafter. That guarantee necessarily ends where durability does: if `set()`
+ * fails after the computation succeeded, no record of the work exists, so the
+ * runtime cannot stop a later call from executing again. It raises
+ * {@link IdempotencyStoreWriteError} instead, which reports that the side
+ * effect already ran and must not be retried as a failure. Callers needing
+ * at-most-once across store outages must make the side effect itself
+ * idempotent — that property cannot be supplied by this layer.
+ *
  * **Non-re-entrancy requirement**: `get()` MUST NOT call `AgentUnit.run()`
  * (or any wrapper around it) for the same store+key combination. The runtime
  * registers the in-flight entry after `get()` starts executing; a `get()`
