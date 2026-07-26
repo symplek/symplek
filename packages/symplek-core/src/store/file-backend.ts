@@ -19,6 +19,7 @@
  * @surface public
  */
 
+import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { DurableStoreBackend } from "./backend";
@@ -39,13 +40,39 @@ const EXPIRES_HEADER = "X-Symplek-Expires:";
  * (via the pre-escape step), so no literal `~` can reach the substitution
  * step and collide with a `%`-derived `~`.
  */
-function encodeKey(key: string): string {
+function encodeBody(key: string): string {
   return encodeURIComponent(key.replace(/~/g, "~7E")).replace(/%/g, "~");
+}
+
+/** Length of the disambiguating suffix, including its leading separator. */
+const KEY_SUFFIX_LEN = 13; // "." + 12 hex chars
+
+/**
+ * Encode an idempotency key to a filename that is unique *as a file*, not
+ * merely as a string.
+ *
+ * `encodeBody` alone is injective over strings but not over filenames: the
+ * default filesystems on Windows and macOS are case-insensitive, so the
+ * distinct keys `"OrderA"` and `"ordera"` resolve to the same file. A
+ * committed entry for one would then be served as a cache hit for the other
+ * and its side effect skipped — a data-correctness failure on the majority of
+ * developer machines, and the reason a case-preserving encoding is not enough.
+ *
+ * A short digest of the exact key is appended, so keys differing only by case
+ * differ in the suffix too. The readable body is kept first so directory
+ * listings stay debuggable and `list(prefix)` can still match on the encoded
+ * body alone. The suffix is fixed-length, so decoding slices it off rather
+ * than searching for a delimiter that could occur in the body.
+ */
+function encodeKey(key: string): string {
+  const digest = createHash("sha256").update(key, "utf8").digest("hex");
+  return `${encodeBody(key)}.${digest.slice(0, 12)}`;
 }
 
 /** Decode a filename produced by {@link encodeKey} back to the original key. */
 function decodeKey(encoded: string): string {
-  return decodeURIComponent(encoded.replace(/~/g, "%"));
+  const body = encoded.slice(0, -KEY_SUFFIX_LEN);
+  return decodeURIComponent(body.replace(/~/g, "%"));
 }
 
 /**
@@ -132,7 +159,10 @@ export function createFileBackend(dir: string): DurableStoreBackend {
       } catch {
         return [];
       }
-      const encodedPrefix = encodeKey(prefix);
+      // Match on the encoded BODY, not the full encoded name: encodeKey appends
+      // a digest of the whole key, and a prefix's digest is unrelated to a full
+      // key's digest, so comparing complete encodings would match nothing.
+      const encodedPrefix = encodeBody(prefix);
       return files
         .filter((f) => f.startsWith(encodedPrefix))
         .map(decodeKey)

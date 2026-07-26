@@ -11,7 +11,7 @@
  *   7. Store write failure → IdempotencyStoreWriteError
  */
 
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -193,8 +193,16 @@ describe("createFileBackend", () => {
     const dir = subdir("file-backend-eisdir");
     const backend = createFileBackend(dir);
 
-    // "payment-key" has no special characters; encodeKey("payment-key") === "payment-key".
-    await mkdir(join(dir, "payment-key"), { recursive: true });
+    // Discover the real on-disk name rather than assuming one. The encoding is
+    // an implementation detail (it now carries a digest suffix so that keys
+    // differing only by case cannot alias on a case-insensitive filesystem),
+    // and this test is about read-error handling, not about naming.
+    await backend.set("payment-key", new TextEncoder().encode("committed"));
+    const [written] = await readdir(dir);
+    expect(written).toBeDefined();
+    const path = join(dir, written as string);
+    await rm(path);
+    await mkdir(path, { recursive: true });
 
     // Must throw — NOT return null and silently authorise a re-run
     await expect(backend.get("payment-key")).rejects.toThrow();
@@ -801,5 +809,57 @@ describe("createDurableStore injection into run()", () => {
     });
     expect(result.value).toBe("durable-value");
     expect(isTrackedResult(result)).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Case-insensitive filesystem aliasing.
+//
+// The encoding was injective over strings but not over FILENAMES: Windows and
+// macOS default volumes fold case, so "OrderA" and "ordera" resolved to one
+// file. A committed entry for one was served as a cache hit for the other and
+// its side effect skipped — silent data corruption on most dev machines.
+// These run on any filesystem: they assert the filenames differ even after
+// case folding, which is the property that makes aliasing impossible.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("createFileBackend — keys differing only by case must not alias", () => {
+  it("writes distinct files for keys differing only in case", async () => {
+    const dir = subdir("file-backend-case-alias");
+    const backend = createFileBackend(dir);
+
+    await backend.set("OrderA", new TextEncoder().encode("upper"));
+    await backend.set("ordera", new TextEncoder().encode("lower"));
+
+    const files = await readdir(dir);
+    expect(files).toHaveLength(2);
+
+    // The decisive assertion: distinct even after case folding, so a
+    // case-insensitive volume cannot collapse them onto one file.
+    const folded = new Set(files.map((f) => f.toLowerCase()));
+    expect(folded.size).toBe(2);
+  });
+
+  it("a committed entry is not served as a cache hit for a differently-cased key", async () => {
+    const dir = subdir("file-backend-case-readback");
+    const backend = createFileBackend(dir);
+
+    await backend.set("OrderA", new TextEncoder().encode("committed"));
+
+    // "ordera" never ran. It must read as absent, not inherit OrderA's result.
+    expect(await backend.get("ordera")).toBeNull();
+    expect(await backend.get("OrderA")).not.toBeNull();
+  });
+
+  it("round-trips keys through list() with the digest suffix in place", async () => {
+    const dir = subdir("file-backend-case-list");
+    const backend = createFileBackend(dir);
+
+    await backend.set("idem:OrderA", new TextEncoder().encode("a"));
+    await backend.set("idem:ordera", new TextEncoder().encode("b"));
+    await backend.set("txn:other", new TextEncoder().encode("c"));
+
+    const keys = await backend.list("idem:");
+    expect(keys.sort()).toEqual(["idem:OrderA", "idem:ordera"].sort());
   });
 });
