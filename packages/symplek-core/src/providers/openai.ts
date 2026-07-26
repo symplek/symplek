@@ -6,9 +6,13 @@ import type {
   AIMessage,
   AIRequest,
   AIResponse,
+  FinishPart,
   Provider,
   ProviderCapabilities,
+  ResponseFormat,
   StreamChunk,
+  StreamPart,
+  ToolCallPart,
 } from "./interface";
 
 // ── Lazy SDK loader ──────────────────────────────────────────────────────────
@@ -61,6 +65,8 @@ export async function createOpenAIProvider(
     tools: true,
     vision: true,
     structuredOutput: true,
+    // OpenAI natively supports json_schema with strict:true via response_format.
+    strictStructuredOutput: true,
     maxContextTokens: 128000, // Default for gpt-4o
   };
 
@@ -100,6 +106,27 @@ export async function createOpenAIProvider(
     }
   }
 
+  /**
+   * Translate ResponseFormat to OpenAI's response_format parameter.
+   * json_schema is passed directly; strict controls whether OpenAI enforces
+   * the schema at generation time. No $ref is allowed in strict mode.
+   */
+  function buildOpenAIResponseFormat(
+    format: ResponseFormat | undefined,
+  ): OpenAI.Chat.Completions.ChatCompletionCreateParams["response_format"] | undefined {
+    if (!format || format.type === "text") return undefined;
+    if (format.type === "json_object") return { type: "json_object" };
+    // json_schema: pass name + schema; strict defaults to true when present
+    return {
+      type: "json_schema",
+      json_schema: {
+        name: format.name,
+        schema: format.schema,
+        strict: format.strict ?? true,
+      },
+    } as OpenAI.Chat.Completions.ChatCompletionCreateParams["response_format"];
+  }
+
   return {
     id: "openai",
     name: "OpenAI",
@@ -117,10 +144,7 @@ export async function createOpenAIProvider(
           frequency_penalty: request.frequencyPenalty,
           presence_penalty: request.presencePenalty,
           seed: request.seed,
-          response_format:
-            request.responseFormat?.type === "json_object"
-              ? { type: "json_object" }
-              : undefined,
+          response_format: buildOpenAIResponseFormat(request.responseFormat),
         });
 
         const choice = response.choices[0];
@@ -166,10 +190,7 @@ export async function createOpenAIProvider(
             frequency_penalty: request.frequencyPenalty,
             presence_penalty: request.presencePenalty,
             seed: request.seed,
-            response_format:
-              request.responseFormat?.type === "json_object"
-                ? { type: "json_object" }
-                : undefined,
+            response_format: buildOpenAIResponseFormat(request.responseFormat),
             stream: true,
             stream_options: { include_usage: true },
           },
@@ -200,6 +221,106 @@ export async function createOpenAIProvider(
         throw new SymplekError({
           code: "PROVIDER_ERROR",
           why: `OpenAI streaming failed: ${detail}`,
+          fix: {
+            description:
+              "Verify OPENAI_API_KEY is set and streaming is supported for the requested model.",
+            docsUrl: "https://platform.openai.com/docs/api-reference/streaming",
+          },
+          example: 'process.env.OPENAI_API_KEY = "sk-proj-...";',
+          cause: safeCause(apiKey, error),
+        });
+      }
+    },
+
+    async *streamParts(request: AIRequest): AsyncIterable<StreamPart> {
+      try {
+        const stream = await client.chat.completions.create(
+          {
+            model: request.model,
+            messages: transformMessages(request.messages),
+            temperature: request.temperature,
+            max_tokens: request.maxTokens,
+            stop: request.stop,
+            top_p: request.topP,
+            frequency_penalty: request.frequencyPenalty,
+            presence_penalty: request.presencePenalty,
+            seed: request.seed,
+            response_format: buildOpenAIResponseFormat(request.responseFormat),
+            stream: true,
+            stream_options: { include_usage: true },
+          },
+          request.signal ? { signal: request.signal } : undefined,
+        );
+
+        // Buffer for accumulating incremental tool_calls deltas
+        const toolBuffers = new Map<number, { id: string; name: string; argsJson: string }>();
+
+        for await (const chunk of stream) {
+          if (request.signal?.aborted) return; // abort: no FinishPart
+
+          const choice = chunk.choices[0];
+          const delta = choice?.delta;
+
+          // Text content
+          if (delta?.content) {
+            yield { type: "text-delta", textDelta: delta.content };
+          }
+
+          // Tool call deltas — accumulate until complete
+          if (delta?.tool_calls) {
+            for (const tc of delta.tool_calls) {
+              const idx = tc.index;
+              const buf = toolBuffers.get(idx);
+              if (!buf) {
+                toolBuffers.set(idx, {
+                  id: tc.id ?? "",
+                  name: tc.function?.name ?? "",
+                  argsJson: tc.function?.arguments ?? "",
+                });
+              } else {
+                if (tc.id) buf.id = tc.id;
+                if (tc.function?.name) buf.name = tc.function.name;
+                if (tc.function?.arguments) buf.argsJson += tc.function.arguments;
+              }
+            }
+          }
+
+          // Flush complete tool calls on finish
+          if (choice?.finish_reason === "tool_calls") {
+            for (const buf of toolBuffers.values()) {
+              let input: unknown;
+              try { input = JSON.parse(buf.argsJson || "{}"); } catch { input = buf.argsJson; }
+              yield {
+                type: "tool-call",
+                toolCallId: buf.id,
+                toolName: buf.name,
+                input,
+              } satisfies ToolCallPart;
+            }
+            toolBuffers.clear();
+          }
+
+          // Usage + finish
+          if (chunk.usage) {
+            const usage = {
+              promptTokens: chunk.usage.prompt_tokens,
+              completionTokens: chunk.usage.completion_tokens,
+              totalTokens: chunk.usage.total_tokens,
+            };
+            if (choice?.finish_reason) {
+              yield {
+                type: "finish",
+                finishReason: transformFinishReason(choice.finish_reason),
+                usage,
+              } satisfies FinishPart;
+            }
+          }
+        }
+      } catch (error: unknown) {
+        const detail = redactErrorMessage(apiKey, error);
+        throw new SymplekError({
+          code: "PROVIDER_ERROR",
+          why: `OpenAI streamParts failed: ${detail}`,
           fix: {
             description:
               "Verify OPENAI_API_KEY is set and streaming is supported for the requested model.",

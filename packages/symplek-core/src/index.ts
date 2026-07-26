@@ -91,7 +91,25 @@ export {
 export { CoherenceError, createSoloComputation } from "./operators";
 // ─── Provider ────────────────────────────────────────────────────────────────
 export { resolveModelFromContext } from "./providers/auto";
-export type { AIMessage, Provider } from "./providers/interface";
+export type {
+  AIMessage,
+  FinishPart,
+  Provider,
+  ReasoningPart,
+  ResponseFormat,
+  SourcePart,
+  StreamPart,
+  TextDeltaPart,
+  ToolCallPart,
+  ToolResultPart,
+} from "./providers/interface";
+// ─── Streaming Parts (CR-502) ────────────────────────────────────────────────
+export {
+  resolveResponseFormat,
+  streamPartsFromChunks,
+  textPartsOnly,
+  validateSchemaForProvider,
+} from "./streaming-parts";
 // ─── Rehearsal ───────────────────────────────────────────────────────────────
 export {
   CheckpointManager,
