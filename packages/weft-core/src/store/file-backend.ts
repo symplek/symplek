@@ -25,14 +25,27 @@ import type { DurableStoreBackend } from "./backend";
 
 const EXPIRES_HEADER = "X-Weft-Expires:";
 
-/** Encode a key to a safe filename (reversible). */
+/**
+ * Encode an idempotency key to a filesystem-safe filename.
+ *
+ * Uses `~` as the percent-replacement character. Any literal `~` in the key
+ * is pre-escaped to `~7E` so it cannot be confused with an encoded byte.
+ * The resulting mapping is injective: no two distinct keys share a filename.
+ *
+ * Old `_`-based encoding was NOT injective — `"idem:run/step"` and
+ * `"idem:run_2Fstep"` both produced `"idem_3Arun_2Fstep"` because
+ * `encodeURIComponent` does not encode `_`. The `~` scheme avoids this
+ * because `encodeURIComponent` DOES encode `~` when it appears in the key
+ * (via the pre-escape step), so no literal `~` can reach the substitution
+ * step and collide with a `%`-derived `~`.
+ */
 function encodeKey(key: string): string {
-  return encodeURIComponent(key).replace(/%/g, "_");
+  return encodeURIComponent(key.replace(/~/g, "~7E")).replace(/%/g, "~");
 }
 
-/** Decode a filename back to a key. */
-function decodeKey(filename: string): string {
-  return decodeURIComponent(filename.replace(/_/g, "%"));
+/** Decode a filename produced by {@link encodeKey} back to the original key. */
+function decodeKey(encoded: string): string {
+  return decodeURIComponent(encoded.replace(/~/g, "%"));
 }
 
 /**

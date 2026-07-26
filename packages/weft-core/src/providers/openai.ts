@@ -255,6 +255,12 @@ export async function createOpenAIProvider(
         // Buffer for accumulating incremental tool_calls deltas
         const toolBuffers = new Map<number, { id: string; name: string; argsJson: string }>();
 
+        // N301 fix: OpenAI commonly sends finish_reason on the choice chunk and
+        // usage on a subsequent chunk whose choices array is empty. Buffer both
+        // independently and emit FinishPart as soon as both are known.
+        let pendingFinishReason: string | null = null;
+        let pendingUsage: { promptTokens: number; completionTokens: number; totalTokens: number } | null = null;
+
         for await (const chunk of stream) {
           if (request.signal?.aborted) return; // abort: no FinishPart
 
@@ -285,36 +291,53 @@ export async function createOpenAIProvider(
             }
           }
 
-          // Flush complete tool calls on finish
-          if (choice?.finish_reason === "tool_calls") {
-            for (const buf of toolBuffers.values()) {
-              let input: unknown;
-              try { input = JSON.parse(buf.argsJson || "{}"); } catch { input = buf.argsJson; }
-              yield {
-                type: "tool-call",
-                toolCallId: buf.id,
-                toolName: buf.name,
-                input,
-              } satisfies ToolCallPart;
+          // Capture finish reason; flush tool calls immediately so they precede FinishPart
+          if (choice?.finish_reason) {
+            pendingFinishReason = choice.finish_reason;
+            if (pendingFinishReason === "tool_calls") {
+              for (const buf of toolBuffers.values()) {
+                let input: unknown;
+                try { input = JSON.parse(buf.argsJson || "{}"); } catch { input = buf.argsJson; }
+                yield {
+                  type: "tool-call",
+                  toolCallId: buf.id,
+                  toolName: buf.name,
+                  input,
+                } satisfies ToolCallPart;
+              }
+              toolBuffers.clear();
             }
-            toolBuffers.clear();
           }
 
-          // Usage + finish
+          // Capture usage (may arrive in a different chunk than finish_reason)
           if (chunk.usage) {
-            const usage = {
+            pendingUsage = {
               promptTokens: chunk.usage.prompt_tokens,
               completionTokens: chunk.usage.completion_tokens,
               totalTokens: chunk.usage.total_tokens,
             };
-            if (choice?.finish_reason) {
-              yield {
-                type: "finish",
-                finishReason: transformFinishReason(choice.finish_reason),
-                usage,
-              } satisfies FinishPart;
-            }
           }
+
+          // Emit FinishPart as soon as both finish reason and usage are available
+          if (pendingFinishReason !== null && pendingUsage !== null) {
+            yield {
+              type: "finish",
+              finishReason: transformFinishReason(pendingFinishReason),
+              usage: pendingUsage,
+            } satisfies FinishPart;
+            pendingFinishReason = null;
+            pendingUsage = null;
+          }
+        }
+
+        // Failsafe: emit FinishPart when finish_reason arrived but usage never did.
+        // Prevents consumers from waiting forever on non-standard provider behaviour.
+        if (pendingFinishReason !== null) {
+          yield {
+            type: "finish",
+            finishReason: transformFinishReason(pendingFinishReason),
+            usage: pendingUsage ?? { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+          } satisfies FinishPart;
         }
       } catch (error: unknown) {
         const detail = redactErrorMessage(apiKey, error);

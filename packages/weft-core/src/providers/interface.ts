@@ -16,12 +16,25 @@ export type MessageRole = "system" | "user" | "assistant" | "tool";
 
 /**
  * A single message in a conversation.
+ *
+ * @remarks
+ * For assistant turns that returned tool calls, populate `toolCalls` with the
+ * provider's tool_call objects. Anthropic requires a `tool_use` content block
+ * in the assistant message that precedes each `tool_result` block; the Anthropic
+ * adapter reads `toolCalls` to emit that block. Without it, the adapter emits a
+ * text-only assistant turn and Anthropic rejects the orphaned `tool_result`.
  */
 export interface AIMessage {
   role: MessageRole;
   content: string;
   name?: string;
   toolCallId?: string;
+  /**
+   * Tool calls present in this assistant turn. Set by executeLoop() when the
+   * provider returned tool calls alongside or instead of text.
+   * Only populated for `role: "assistant"` messages.
+   */
+  toolCalls?: ToolCall[];
 }
 
 // ─── Structured Output ───────────────────────────────────────────────────────
@@ -224,10 +237,12 @@ export interface ProviderCapabilities {
   vision: boolean;
   structuredOutput: boolean;
   /**
-   * True when the provider enforces json_schema at generation time (constrained
-   * decoding or tool-forcing). False/absent = only json_object is enforced;
-   * json_schema degrades to post-hoc validation. Check before assuming strict
-   * mode succeeded — callers should use resolveResponseFormat() to confirm.
+   * True when the provider enforces json_schema: either via constrained decoding
+   * at generation time (OpenAI) or via post-hoc validation that throws on failure
+   * (Anthropic). In both cases callers receive a conforming result or a clear
+   * VALIDATION_ERROR — never silent garbage. False/absent = only json_object is
+   * enforced; json_schema degrades to json_object mode with no validation.
+   * Use resolveResponseFormat() before assuming strict mode succeeded.
    */
   strictStructuredOutput?: boolean;
   maxContextTokens: number;

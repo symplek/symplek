@@ -12,7 +12,7 @@
  */
 
 import type { IdempotencyStore } from "../idempotency";
-import { WeftError } from "../errors";
+import { IdempotencyStoreCorruptedError, WeftError } from "../errors";
 import type {
   TransactionEntry,
   TransactionLogManager,
@@ -51,12 +51,21 @@ class DurableIdempotencyStore implements IdempotencyStore {
   async get(key: string): Promise<TrackedResult<any> | null> {
     const raw = await this.backend.get(`${IDEM_PREFIX}${key}`);
     if (raw === null) return null;
+    // raw !== null: an entry was written. A parse failure is corruption, not
+    // absence. Returning null would silently authorise re-execution of a side
+    // effect that may already have completed (e.g. a payment charge). Throw
+    // so the caller can decide whether the side effect is safe to repeat after
+    // manual inspection of the backend entry.
+    let serialized: unknown;
     try {
-      const serialized = JSON.parse(this.dec.decode(raw));
-      return deserializeTrackedResult(serialized);
-    } catch {
-      // Corrupted entry: treat as absent so the computation re-executes.
-      return null;
+      serialized = JSON.parse(this.dec.decode(raw));
+    } catch (cause) {
+      throw new IdempotencyStoreCorruptedError(key, cause);
+    }
+    try {
+      return deserializeTrackedResult(serialized as Parameters<typeof deserializeTrackedResult>[0]);
+    } catch (cause) {
+      throw new IdempotencyStoreCorruptedError(key, cause);
     }
   }
 
@@ -98,17 +107,43 @@ function generateTxnId(): string {
 class DurableTransactionLogManager implements TransactionLogManager {
   private readonly entries = new Map<string, TransactionEntry>();
   private readonly enc = new TextEncoder();
+  /**
+   * Per-entry write queue. Each `persist()` call chains its backend write
+   * after the previous one for the same entry id, guaranteeing that a pending
+   * write can never overwrite a later committed write even when the backend
+   * has variable latency.
+   */
+  private readonly writeQueues = new Map<string, Promise<void>>();
 
   constructor(private readonly backend: DurableStoreBackend) {}
 
-  /** @internal Persist an entry to the backend (fire-and-forget). */
+  /**
+   * Persist `entry` to the backend, serialised per entry id so writes for
+   * the same entry always apply in call order.
+   *
+   * Errors are written to stderr rather than silently swallowed: a failed
+   * persist means the in-memory committed state will not survive a restart,
+   * and the operator must be able to detect that condition.
+   * @internal
+   */
   private persist(entry: TransactionEntry): void {
     const bytes = this.enc.encode(JSON.stringify(entry));
-    this.backend
-      .set(`${TXN_PREFIX}${entry.id}`, bytes)
-      .catch(() => {
-        // Best-effort — in-memory state is canonical.
+    const id = entry.id;
+    const prev = this.writeQueues.get(id) ?? Promise.resolve();
+    const next = prev
+      .then(() => this.backend.set(`${TXN_PREFIX}${id}`, bytes))
+      .catch((err: unknown) => {
+        process.stderr.write(
+          `[weft-journal] persist failed for ${id}: ${err instanceof Error ? err.message : String(err)}\n`,
+        );
       });
+    // Remove the queue entry once settled so the map does not grow unboundedly.
+    void next.finally(() => {
+      if (this.writeQueues.get(id) === next) {
+        this.writeQueues.delete(id);
+      }
+    });
+    this.writeQueues.set(id, next);
   }
 
   create(agentId: string, action: string, input: unknown): TransactionEntry {

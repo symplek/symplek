@@ -47,7 +47,7 @@ export type {
   WeftErrorDetail,
   WeftErrorOptions,
 } from "./errors";
-export { CompensationError, IdempotencyStoreWriteError, WeftError } from "./errors";
+export { CompensationError, IdempotencyStoreCorruptedError, IdempotencyStoreWriteError, WeftError } from "./errors";
 export type {
   InterviewConfig,
   InterviewOptions,
