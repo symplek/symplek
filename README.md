@@ -180,7 +180,7 @@ flowchart LR
 | LangGraph | Time-travel from checkpoints | Yes | No | Yes |
 | Mastra | No replay primitive | N/A | N/A | N/A |
 
-**[Full architecture →](docs/architecture.md)**
+**[Full architecture →](docs/ARCHITECTURE.md)**
 
 > **Legal disclaimer — replay determinism.** `.replay()` replays a stored trace through the same operator logic with the same inputs, producing the same output _for a given version of Weft and a given underlying AI model_. It does **not** guarantee identical outputs across model version upgrades, provider API changes, or different runtime environments. Replay is a testing and debugging aid, not a cryptographic audit trail. Do not rely on replay parity as evidence of correctness in regulated or compliance-critical workflows without independent verification.
 
@@ -237,7 +237,6 @@ Agent re-executed: ✓ NO (deterministic!)
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) — canonical vs mirror model, package structure, known asymmetries
-- [Record/Replay Architecture](docs/architecture.md) — deep dive into `.rehearse()` / `.replay()`
 - [Demo Transcript](docs/demo-transcript.md) — full adversarial demo output
 - [GitHub Discussions](https://github.com/wefthq/weft/discussions) — questions, feature proposals, show-and-tell
 

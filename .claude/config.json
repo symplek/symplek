@@ -1,7 +1,8 @@
 {
   "projectName": "Weft",
   "productCodePaths": [
-    "src"
+    "src",
+    "packages"
   ],
   "protectedPaths": [],
   "schemaGlobs": [],

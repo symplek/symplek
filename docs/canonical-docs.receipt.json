@@ -1,0 +1,19 @@
+{
+  "schema": 2,
+  "status": "pass",
+  "finishedAt": "2026-10-01T10:12:47.748Z",
+  "docs": [
+    "ARCHITECTURE.md",
+    "DECISIONS.md",
+    "DESIGN.md",
+    "INVARIANTS.md",
+    "JOURNEYS.md",
+    "PRODUCT.md"
+  ],
+  "anchors": "docs/ANCHORS.json",
+  "gaps": {
+    "open": 0,
+    "deferred": 0,
+    "deferredIds": []
+  }
+}

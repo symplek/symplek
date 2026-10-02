@@ -1,0 +1,6 @@
+{
+  "design": {
+    "tokenDirs": ["packages/weft-devtools/src/panel/styles"],
+    "surfaceSelector": "^[.](Weft-devtools-panel)$"
+  }
+}

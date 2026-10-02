@@ -1,0 +1,494 @@
+{
+  "version": 1,
+  "$comment": "Machine-readable anchor map read by the drift-gate hooks. Seeded by `node .claude/scripts/docs/canonical-docs.cjs seed-anchors` from the drafted docs; only anchors that resolve are written. sections.<ID>.symbols[] kinds: module (file), dir, route (file declaring a route), e2e-spec and test (file containing a test), ts-export (path + symbol), convex-function (name module.function), convex-table (name). boundaries[]: {id, from, forbid, allow[], doc, decision}. generated: {check, fix, inputs[], outputs[]} (the freshness command must be `node <repo-relative script> [flags]`). tokens: {paths[]} (design token files).",
+  "sections": {
+    "INV-001": { "description": "`packages/weft-core/src` never imports `weft-pro`.", "doc": "docs/INVARIANTS.md INV-001", "see": ["docs/DECISIONS.md DEC-003"], "symbols": [
+      {"kind":"dir","path":"packages/weft-core/src"},
+      {"kind":"module","path":".github/workflows/ci.yml"}
+    ] },
+    "INV-002": { "description": "The `weft-core` root barrel exports no server-only symbol (`Weft`, `WeftBuilder`, `Provide", "doc": "docs/INVARIANTS.md INV-002", "see": ["docs/DECISIONS.md DEC-007"], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/index.ts"},
+      {"kind":"test","path":"packages/weft-core/src/__tests__/boundaryTest.test.ts"},
+      {"kind":"ts-export","path":"packages/weft-core/src/AgentUnit/AgentUnit.ts","symbol":"AgentUnit"},
+      {"kind":"ts-export","path":"packages/weft-core/src/context.ts","symbol":"createContext"}
+    ] },
+    "INV-003": { "description": "Every free-tier operator (`solo`, `interview`, `conduct`, `dialectic`, `debate`, `coherenc", "doc": "docs/INVARIANTS.md INV-003", "see": ["docs/DECISIONS.md DEC-003"], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/operators/index.ts"},
+      {"kind":"test","path":"packages/weft-core/src/__tests__/tierBoundary.test.ts"},
+      {"kind":"ts-export","path":"packages/weft-core/src/AgentUnit/AgentUnit.ts","symbol":"AgentUnit"}
+    ] },
+    "INV-004": { "description": "Only `createTrackedResult` can produce a value that `isTrackedResult` accepts; a forged ob", "doc": "docs/INVARIANTS.md INV-004", "see": ["docs/DECISIONS.md DEC-006"], "symbols": [
+      {"kind":"ts-export","path":"packages/weft-core/src/trust.ts","symbol":"isTrackedResult"},
+      {"kind":"test","path":"packages/weft-core/src/__tests__/trust-hardening.test.ts"},
+      {"kind":"ts-export","path":"packages/weft-core/src/trust.ts","symbol":"createTrackedResult"}
+    ] },
+    "INV-005": { "description": "A run with an idempotency key executes its computation once per key, and a cached value th", "doc": "docs/INVARIANTS.md INV-005", "see": ["docs/DECISIONS.md DEC-006, DEC-010"], "symbols": [
+      {"kind":"ts-export","path":"packages/weft-core/src/idempotency.ts","symbol":"defaultIdempotencyStore"},
+      {"kind":"test","path":"packages/weft-core/src/__tests__/idempotency.test.ts"},
+      {"kind":"test","path":"packages/weft-core/src/__tests__/idempotency-poisoning.test.ts"},
+      {"kind":"ts-export","path":"packages/weft-core/src/idempotency.ts","symbol":"InMemoryIdempotencyStore"},
+      {"kind":"ts-export","path":"packages/weft-core/src/idempotency.ts","symbol":"IdempotencyError"}
+    ] },
+    "INV-006": { "description": "An `AgentUnit` whose operator augmentation did not load fails `run()` with `SETUP_ERROR` i", "doc": "docs/INVARIANTS.md INV-006", "see": ["docs/DECISIONS.md DEC-005"], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/AgentUnit.ts"},
+      {"kind":"test","path":"packages/weft-core/src/__tests__/golden-path.test.ts"},
+      {"kind":"ts-export","path":"packages/weft-core/src/AgentUnit/AgentUnit.ts","symbol":"AgentUnit"}
+    ] },
+    "INV-007": { "description": "Provider errors and unknown-error paths never carry an API key in their message or cause.", "doc": "docs/INVARIANTS.md INV-007", "see": [], "symbols": [
+      {"kind":"ts-export","path":"packages/weft-core/src/providers/redact.ts","symbol":"redactErrorMessage"},
+      {"kind":"test","path":"packages/weft-core/src/providers/__tests__/redact.test.ts"},
+      {"kind":"test","path":"packages/weft-core/src/providers/__tests__/ai-unknown-error-redaction.test.ts"},
+      {"kind":"ts-export","path":"packages/weft-core/src/providers/redact.ts","symbol":"redactEnvKeys"},
+      {"kind":"ts-export","path":"packages/weft-core/src/providers/redact.ts","symbol":"safeCause"}
+    ] },
+    "INV-008": { "description": "A golden trace is written with credential-shaped strings redacted by default.", "doc": "docs/INVARIANTS.md INV-008", "see": ["docs/DECISIONS.md DEC-009"], "symbols": [
+      {"kind":"ts-export","path":"packages/weft-core/src/rehearsal/golden.ts","symbol":"toGoldenTrace"},
+      {"kind":"test","path":"packages/weft-core/src/rehearsal/__tests__/golden.test.ts"},
+      {"kind":"ts-export","path":"packages/weft-core/src/rehearsal/golden.ts","symbol":"DEFAULT_SECRET_PATTERNS"}
+    ] },
+    "INV-009": { "description": "A tool marked `requiresApproval` never executes without passing the approval callback, and", "doc": "docs/INVARIANTS.md INV-009", "see": ["docs/DECISIONS.md DEC-012"], "symbols": [
+      {"kind":"ts-export","path":"packages/weft-core/src/agent/executor.ts","symbol":"executeLoop"},
+      {"kind":"test","path":"packages/weft-core/src/__tests__/tool-loop.test.ts"}
+    ] },
+    "INV-010": { "description": "`weft-mcp` validates `tools/call` arguments against the tool's `inputSchema` before dispat", "doc": "docs/INVARIANTS.md INV-010", "see": ["docs/DECISIONS.md DEC-016"], "symbols": [
+      {"kind":"module","path":"packages/weft-mcp/src/server/validateInput.ts"},
+      {"kind":"test","path":"packages/weft-mcp/src/server/__tests__/validateInput.adversarial.test.ts"},
+      {"kind":"ts-export","path":"packages/weft-mcp/src/server/index.ts","symbol":"WEFT_MCP_TOOLS"},
+      {"kind":"ts-export","path":"packages/weft-mcp/src/server/index.ts","symbol":"startWeftMcpServer"}
+    ] },
+    "INV-011": { "description": "`withAI` refuses activity logging without an `activityContext` and cost tracking without `", "doc": "docs/INVARIANTS.md INV-011", "see": [], "symbols": [
+      {"kind":"ts-export","path":"packages/weft-convex/src/withAI.ts","symbol":"withAI"},
+      {"kind":"test","path":"packages/weft-convex/src/__tests__/withAI-scoping.test.ts"}
+    ] },
+    "INV-012": { "description": "`weft-pro` features load only with a licence key.", "doc": "docs/INVARIANTS.md INV-012", "see": ["docs/DECISIONS.md DEC-015"], "symbols": [
+      {"kind":"module","path":"packages/weft-pro/src/license-gate.ts"},
+      {"kind":"test","path":"packages/weft-pro/src/__tests__/license.test.ts"},
+      {"kind":"ts-export","path":"packages/weft-pro/src/license-gate.ts","symbol":"validateLicense"},
+      {"kind":"ts-export","path":"packages/weft-pro/src/license-gate.ts","symbol":"isProLicensed"}
+    ] },
+    "INV-013": { "description": "The private canonical source and the `weft-core` mirror keep their recorded relationship", "doc": "docs/INVARIANTS.md INV-013", "see": ["docs/DECISIONS.md DEC-004"], "symbols": [
+      {"kind":"test","path":"packages/weft-core/src/__tests__/canonicalMirrorContract.test.ts"}
+    ] },
+    "INV-018": { "description": "The DevTools content script forwards only same-frame messages from allow-listed origins wi", "doc": "docs/INVARIANTS.md INV-018", "see": ["docs/DECISIONS.md DEC-018"], "symbols": [
+      {"kind":"ts-export","path":"packages/weft-devtools/src/content/bridge-listener.ts","symbol":"initBridgeListener"}
+    ] },
+    "INV-014": { "description": "A replayed trace fails loudly on a tampered event or final output.", "doc": "docs/INVARIANTS.md INV-014", "see": ["docs/DECISIONS.md DEC-009"], "symbols": [
+      {"kind":"ts-export","path":"packages/weft-core/src/rehearsal/replayer.ts","symbol":"TraceReplayer"},
+      {"kind":"test","path":"packages/weft-core/src/rehearsal/__tests__/integrity-defects.test.ts"},
+      {"kind":"ts-export","path":"packages/weft-core/src/rehearsal/types.ts","symbol":"ReplayDivergenceError"}
+    ] },
+    "INV-015": { "description": "The durable file backend never lets two distinct keys share a file, including keys that di", "doc": "docs/INVARIANTS.md INV-015", "see": ["docs/DECISIONS.md DEC-010"], "symbols": [
+      {"kind":"ts-export","path":"packages/weft-core/src/store/file-backend.ts","symbol":"createFileBackend"},
+      {"kind":"test","path":"packages/weft-core/src/__tests__/store.test.ts"}
+    ] },
+    "INV-016": { "description": "Every published package builds a `dist` in CI before release.", "doc": "docs/INVARIANTS.md INV-016", "see": ["docs/DECISIONS.md DEC-002"], "symbols": [
+      {"kind":"module","path":".github/workflows/ci.yml"}
+    ] },
+    "INV-017": { "description": "No published package.json still contains a `workspace:` specifier after packing.", "doc": "docs/INVARIANTS.md INV-017", "see": ["docs/DECISIONS.md DEC-002"], "symbols": [
+      {"kind":"module","path":".github/workflows/ci.yml"}
+    ] },
+    "INV-019": { "description": "The `weft-core` root bundle stays within 25 KB and `weft-core/server` within 40 KB.", "doc": "docs/INVARIANTS.md INV-019", "see": ["docs/DECISIONS.md DEC-007"], "symbols": [
+      {"kind":"module","path":"packages/weft-core/package.json"}
+    ] },
+    "INV-020": { "description": "TypeScript blocks in README files do not call removed weft-core APIs.", "doc": "docs/INVARIANTS.md INV-020", "see": [], "symbols": [
+      {"kind":"test","path":"packages/weft-core/src/__tests__/docs-drift.test.ts"}
+    ] },
+    "ARCH-codemap": { "description": "Architecture code map", "doc": "docs/ARCHITECTURE.md Code map", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/AgentUnit.ts"},
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/operators/index.ts"},
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/zeroTrust.ts"},
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/metadata.ts"},
+      {"kind":"module","path":"packages/weft-core/src/operators/consensus.ts"},
+      {"kind":"module","path":"packages/weft-core/src/operators/converge.ts"},
+      {"kind":"module","path":"packages/weft-core/src/operators/debate.ts"},
+      {"kind":"module","path":"packages/weft-core/src/operators/dialectic.ts"},
+      {"kind":"module","path":"packages/weft-core/src/operators/solo.ts"},
+      {"kind":"module","path":"packages/weft-core/src/trust.ts"},
+      {"kind":"module","path":"packages/weft-core/src/errors.ts"},
+      {"kind":"module","path":"packages/weft-core/src/contract.ts"},
+      {"kind":"module","path":"packages/weft-core/src/index.ts"},
+      {"kind":"module","path":"packages/weft-core/src/server.ts"},
+      {"kind":"module","path":"packages/weft-core/src/agent/index.ts"},
+      {"kind":"module","path":"packages/weft-core/src/facade.ts"},
+      {"kind":"module","path":"packages/weft-core/src/builder.ts"},
+      {"kind":"module","path":"packages/weft-core/src/ai.ts"},
+      {"kind":"module","path":"packages/weft-core/src/globalConfig.ts"},
+      {"kind":"module","path":"packages/weft-core/src/providers/interface.ts"},
+      {"kind":"module","path":"packages/weft-core/src/providers/registry.ts"},
+      {"kind":"module","path":"packages/weft-core/src/providers/auto.ts"},
+      {"kind":"module","path":"packages/weft-core/src/providers/anthropic.ts"},
+      {"kind":"module","path":"packages/weft-core/src/providers/openai.ts"},
+      {"kind":"module","path":"packages/weft-core/src/providers/google.ts"},
+      {"kind":"module","path":"packages/weft-core/src/providers/redact.ts"},
+      {"kind":"module","path":"packages/weft-core/src/agent/executor.ts"},
+      {"kind":"module","path":"packages/weft-core/src/agent/tool.ts"},
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/operators/loop.ts"},
+      {"kind":"module","path":"packages/weft-core/src/rehearsal/recorder.ts"},
+      {"kind":"module","path":"packages/weft-core/src/rehearsal/replayer.ts"},
+      {"kind":"module","path":"packages/weft-core/src/rehearsal/interceptor.ts"},
+      {"kind":"module","path":"packages/weft-core/src/rehearsal/golden.ts"},
+      {"kind":"module","path":"packages/weft-core/src/rehearsal/storage.ts"},
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/operators/rehearsal.ts"},
+      {"kind":"module","path":"packages/weft-core/src/idempotency.ts"},
+      {"kind":"module","path":"packages/weft-core/src/store/backend.ts"},
+      {"kind":"module","path":"packages/weft-core/src/store/factory.ts"},
+      {"kind":"module","path":"packages/weft-core/src/store/resume.ts"},
+      {"kind":"module","path":"packages/weft-core/src/solo/decision.ts"},
+      {"kind":"module","path":"packages/weft-core/src/solo/lock.ts"},
+      {"kind":"module","path":"packages/weft-core/src/change-kernel/index.ts"},
+      {"kind":"module","path":"packages/weft-core/src/interview/Interview.ts"},
+      {"kind":"module","path":"packages/weft-core/src/teams/Team.ts"},
+      {"kind":"module","path":"packages/weft-core/src/confidence/index.ts"},
+      {"kind":"module","path":"packages/weft-core/src/coherence/index.ts"},
+      {"kind":"module","path":"packages/weft-core/src/uncertainty/index.ts"},
+      {"kind":"module","path":"packages/weft-core/src/observability.ts"},
+      {"kind":"module","path":"packages/weft-core/src/trace.ts"},
+      {"kind":"module","path":"packages/weft-core/src/otel.ts"},
+      {"kind":"module","path":"packages/weft-pro/src/license-gate.ts"},
+      {"kind":"module","path":"packages/weft-pro/src/taco.ts"},
+      {"kind":"module","path":"packages/weft-pro/src/stigmergy.ts"},
+      {"kind":"module","path":"packages/weft-pro/src/antibodies.ts"},
+      {"kind":"module","path":"packages/weft-pro/src/trust.ts"},
+      {"kind":"module","path":"packages/weft-react/src/index.ts"},
+      {"kind":"module","path":"packages/weft-react/src/hooks/useAgent.ts"},
+      {"kind":"module","path":"packages/weft-react/src/AIErrorBoundary.tsx"},
+      {"kind":"module","path":"packages/weft-convex/src/withAI.ts"},
+      {"kind":"module","path":"packages/weft-convex/src/middleware.ts"},
+      {"kind":"module","path":"packages/weft-mcp/src/server/index.ts"},
+      {"kind":"module","path":"packages/weft-mcp/src/server/validateInput.ts"},
+      {"kind":"module","path":"packages/weft-mcp/src/MCPUnit.ts"},
+      {"kind":"module","path":"packages/weft-mcp/src/policies/TrustPolicyEngine.ts"},
+      {"kind":"module","path":"packages/weft-mcp/src/client/MCPRegistry.ts"},
+      {"kind":"module","path":"packages/weft-harness/src/adapter/claude-agent-sdk.ts"},
+      {"kind":"module","path":"packages/weft-harness/src/operators/plan.ts"},
+      {"kind":"module","path":"packages/weft-harness/src/operators/execute.ts"},
+      {"kind":"module","path":"packages/weft-harness/src/permission-bridge.ts"},
+      {"kind":"module","path":"packages/weft-cli/src/cli.ts"},
+      {"kind":"module","path":"packages/weft-cli/src/index.ts"},
+      {"kind":"module","path":"packages/create-weft/src/index.ts"},
+      {"kind":"module","path":"packages/weft-devtools/manifest.json"},
+      {"kind":"module","path":"packages/weft-devtools/src/content/bridge-listener.ts"},
+      {"kind":"module","path":"packages/weft-devtools/src/background/relay.ts"},
+      {"kind":"module","path":"packages/weft-devtools/src/panel/DevToolsPanel.tsx"},
+      {"kind":"module","path":".github/workflows/ci.yml"},
+      {"kind":"module","path":".changeset/config.json"},
+      {"kind":"module","path":"pnpm-workspace.yaml"},
+      {"kind":"module","path":"biome.json"}
+    ] },
+    "ARCH-flow-1": { "description": "Flow 1: compose and run", "doc": "docs/ARCHITECTURE.md Flow 1", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/errorEnhancement.ts"},
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/AgentUnit.ts"},
+      {"kind":"module","path":"packages/weft-core/src/index.ts"}
+    ] },
+    "ARCH-flow-2": { "description": "Flow 2: one-call AI", "doc": "docs/ARCHITECTURE.md Flow 2", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/facade.ts"},
+      {"kind":"module","path":"packages/weft-core/src/server.ts"}
+    ] },
+    "ARCH-flow-3": { "description": "Flow 3: record and replay", "doc": "docs/ARCHITECTURE.md Flow 3", "see": ["docs/DECISIONS.md DEC-009"], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/operators/rehearsal.ts"},
+      {"kind":"module","path":"packages/weft-core/src/rehearsal/index.ts"}
+    ] },
+    "ARCH-flow-4": { "description": "Flow 4: tool loop", "doc": "docs/ARCHITECTURE.md Flow 4", "see": ["docs/DECISIONS.md DEC-012"], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/operators/loop.ts"},
+      {"kind":"module","path":"packages/weft-core/src/agent/index.ts"}
+    ] },
+    "ARCH-flow-5": { "description": "Flow 5: durable run", "doc": "docs/ARCHITECTURE.md Flow 5", "see": ["docs/DECISIONS.md DEC-010"], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/store/index.ts"}
+    ] },
+    "ARCH-flow-6": { "description": "Flow 6: MCP server", "doc": "docs/ARCHITECTURE.md Flow 6", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-mcp/src/server/bin.ts"},
+      {"kind":"module","path":"packages/weft-mcp/src/server/index.ts"}
+    ] },
+    "ARCH-concern-result-provenance": { "description": "Cross-cutting: Result provenance", "doc": "docs/ARCHITECTURE.md Cross-cutting (Result provenance)", "see": ["docs/INVARIANTS.md INV-004","docs/DECISIONS.md DEC-006"], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/trust.ts"}
+    ] },
+    "ARCH-concern-errors": { "description": "Cross-cutting: Errors", "doc": "docs/ARCHITECTURE.md Cross-cutting (Errors)", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/errors.ts"}
+    ] },
+    "ARCH-concern-llm-access": { "description": "Cross-cutting: LLM access", "doc": "docs/ARCHITECTURE.md Cross-cutting (LLM access)", "see": ["docs/DECISIONS.md DEC-008"], "symbols": [
+      {"kind":"dir","path":"packages/weft-core/src/providers"},
+      {"kind":"module","path":"packages/weft-core/src/providers/registry.ts"}
+    ] },
+    "ARCH-concern-resilience": { "description": "Cross-cutting: Resilience", "doc": "docs/ARCHITECTURE.md Cross-cutting (Resilience)", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/operators/resilience.ts"}
+    ] },
+    "ARCH-concern-side-effect-dedupe": { "description": "Cross-cutting: Side-effect dedupe", "doc": "docs/ARCHITECTURE.md Cross-cutting (Side-effect dedupe)", "see": ["docs/INVARIANTS.md INV-005","docs/DECISIONS.md DEC-010"], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/idempotency.ts"}
+    ] },
+    "ARCH-concern-human-approval": { "description": "Cross-cutting: Human approval", "doc": "docs/ARCHITECTURE.md Cross-cutting (Human approval)", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/interview/computations.ts"},
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/operators/supervised.ts"}
+    ] },
+    "ARCH-concern-secret-redaction": { "description": "Cross-cutting: Secret redaction", "doc": "docs/ARCHITECTURE.md Cross-cutting (Secret redaction)", "see": ["docs/INVARIANTS.md INV-007, INV-008"], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/providers/redact.ts"}
+    ] },
+    "ARCH-concern-tracing": { "description": "Cross-cutting: Tracing", "doc": "docs/ARCHITECTURE.md Cross-cutting (Tracing)", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/trace.ts"},
+      {"kind":"module","path":"packages/weft-core/src/observability.ts"}
+    ] },
+    "ARCH-concern-process-wide-state": { "description": "Cross-cutting: Process-wide state", "doc": "docs/ARCHITECTURE.md Cross-cutting (Process-wide state)", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/globalConfig.ts"}
+    ] },
+    "ARCH-concern-workspace-versioning": { "description": "Cross-cutting: Workspace versioning", "doc": "docs/ARCHITECTURE.md Cross-cutting (Workspace versioning)", "see": ["docs/DECISIONS.md DEC-002"], "symbols": [
+      {"kind":"module","path":".changeset/config.json"}
+    ] },
+    "ARCH-concern-configuration": { "description": "Cross-cutting: Configuration", "doc": "docs/ARCHITECTURE.md Cross-cutting (Configuration)", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/providers/auto.ts"},
+      {"kind":"module","path":"packages/weft-core/src/facade.ts"}
+    ] },
+    "JOURNEY-A": { "description": "Journey A", "doc": "docs/JOURNEYS.md Journey A", "see": ["docs/INVARIANTS.md INV-002, INV-003, INV-004","docs/DECISIONS.md DEC-005, DEC-006, DEC-007, DEC-008"], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/facade.ts"},
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/AgentUnit.ts"},
+      {"kind":"module","path":"packages/weft-core/src/builder.ts"},
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/operators/index.ts"},
+      {"kind":"test","path":"packages/weft-core/src/__tests__/golden-path.test.ts"},
+      {"kind":"test","path":"packages/weft-core/src/__tests__/facade.test.ts"},
+      {"kind":"test","path":"packages/weft-core/src/__tests__/tierBoundary.test.ts"}
+    ] },
+    "JOURNEY-B": { "description": "Journey B", "doc": "docs/JOURNEYS.md Journey B", "see": ["docs/INVARIANTS.md INV-009","docs/DECISIONS.md DEC-008, DEC-012"], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/agent/tool.ts"},
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/operators/loop.ts"},
+      {"kind":"module","path":"packages/weft-core/src/agent/executor.ts"},
+      {"kind":"test","path":"packages/weft-core/src/__tests__/tool-loop.test.ts"},
+      {"kind":"test","path":"packages/weft-core/src/providers/__tests__/anthropic-tool-loop.test.ts"},
+      {"kind":"test","path":"packages/weft-core/src/providers/__tests__/openai-tool-loop.test.ts"}
+    ] },
+    "JOURNEY-C": { "description": "Journey C", "doc": "docs/JOURNEYS.md Journey C", "see": ["docs/INVARIANTS.md INV-008, INV-014","docs/DECISIONS.md DEC-009, DEC-014"], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/operators/rehearsal.ts"},
+      {"kind":"module","path":"packages/weft-core/src/rehearsal/storage.ts"},
+      {"kind":"module","path":"packages/weft-core/src/rehearsal/golden.ts"},
+      {"kind":"module","path":"packages/weft-core/src/rehearsal/replayer.ts"},
+      {"kind":"module","path":"packages/weft-core/src/rehearsal/testing.ts"},
+      {"kind":"test","path":"packages/weft-core/src/rehearsal/__tests__/integration.test.ts"},
+      {"kind":"test","path":"packages/weft-core/src/rehearsal/__tests__/golden.test.ts"},
+      {"kind":"test","path":"packages/weft-core/src/rehearsal/__tests__/integrity-defects.test.ts"},
+      {"kind":"test","path":"packages/weft-harness/src/__tests__/agent-unit-harness.test.ts"}
+    ] },
+    "JOURNEY-D": { "description": "Journey D", "doc": "docs/JOURNEYS.md Journey D", "see": ["docs/INVARIANTS.md INV-005, INV-015","docs/DECISIONS.md DEC-006, DEC-010"], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/store/file-backend.ts"},
+      {"kind":"module","path":"packages/weft-core/src/store/factory.ts"},
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/AgentUnit.ts"},
+      {"kind":"module","path":"packages/weft-core/src/store/resume.ts"},
+      {"kind":"test","path":"packages/weft-core/src/__tests__/store.test.ts"},
+      {"kind":"test","path":"packages/weft-core/src/__tests__/idempotency.test.ts"},
+      {"kind":"test","path":"packages/weft-core/src/__tests__/idempotency-poisoning.test.ts"}
+    ] },
+    "JOURNEY-E": { "description": "Journey E", "doc": "docs/JOURNEYS.md Journey E", "see": ["docs/INVARIANTS.md INV-011","docs/DECISIONS.md DEC-007, DEC-011"], "symbols": [
+      {"kind":"module","path":"packages/weft-react/src/AIProvider.tsx"},
+      {"kind":"module","path":"packages/weft-react/src/hooks/useAgent.ts"},
+      {"kind":"module","path":"packages/weft-react/src/hooks/useConsensus.ts"},
+      {"kind":"module","path":"packages/weft-react/src/hooks/useSwarm.ts"},
+      {"kind":"module","path":"packages/weft-react/src/AIErrorBoundary.tsx"},
+      {"kind":"module","path":"packages/weft-convex/src/withAI.ts"},
+      {"kind":"test","path":"packages/weft-react/src/__tests__/integration.test.tsx"},
+      {"kind":"test","path":"packages/weft-convex/src/__tests__/integration.test.ts"},
+      {"kind":"test","path":"packages/weft-convex/src/__tests__/withAI-scoping.test.ts"},
+      {"kind":"module","path":"README.md"}
+    ] },
+    "JOURNEY-F": { "description": "Journey F", "doc": "docs/JOURNEYS.md Journey F", "see": ["docs/INVARIANTS.md INV-010","docs/DECISIONS.md DEC-016"], "symbols": [
+      {"kind":"module","path":"packages/weft-mcp/src/server/bin.ts"},
+      {"kind":"module","path":"packages/weft-mcp/src/server/index.ts"},
+      {"kind":"module","path":"packages/weft-mcp/src/server/validateInput.ts"},
+      {"kind":"module","path":"packages/weft-mcp/src/MCPUnit.ts"},
+      {"kind":"test","path":"packages/weft-mcp/src/server/__tests__/server.test.ts"},
+      {"kind":"test","path":"packages/weft-mcp/src/server/__tests__/validateInput.adversarial.test.ts"},
+      {"kind":"test","path":"packages/weft-mcp/src/__tests__/binary-startup.test.ts"},
+      {"kind":"test","path":"packages/weft-mcp/src/__tests__/mcpunit-policy.test.ts"}
+    ] },
+    "JOURNEY-G": { "description": "Journey G", "doc": "docs/JOURNEYS.md Journey G", "see": ["docs/DECISIONS.md DEC-002"], "symbols": [
+      {"kind":"module","path":"packages/create-weft/src/index.ts"},
+      {"kind":"module","path":"packages/weft-cli/src/commands/init.ts"},
+      {"kind":"module","path":"packages/weft-cli/src/commands/add.ts"},
+      {"kind":"module","path":"packages/weft-cli/src/commands/validate.ts"},
+      {"kind":"module","path":"packages/weft-cli/src/commands/generate.ts"},
+      {"kind":"module","path":"packages/weft-cli/src/commands/migrate.ts"},
+      {"kind":"test","path":"packages/weft-cli/src/commands/__tests__/init.test.ts"},
+      {"kind":"test","path":"packages/weft-cli/src/commands/__tests__/generate.test.ts"},
+      {"kind":"test","path":"packages/weft-cli/src/commands/__tests__/generate-compile.test.ts"},
+      {"kind":"test","path":"packages/weft-cli/src/commands/__tests__/validate.test.ts"},
+      {"kind":"test","path":"packages/weft-cli/src/commands/__tests__/add.test.ts"},
+      {"kind":"test","path":"packages/weft-cli/src/commands/__tests__/migrate.test.ts"}
+    ] },
+    "JOURNEY-H": { "description": "Journey H", "doc": "docs/JOURNEYS.md Journey H", "see": ["docs/DECISIONS.md DEC-013"], "symbols": [
+      {"kind":"module","path":"packages/weft-harness/src/adapter/claude-agent-sdk.ts"},
+      {"kind":"module","path":"packages/weft-harness/src/operators/plan.ts"},
+      {"kind":"module","path":"packages/weft-harness/src/consensus-defaults.ts"},
+      {"kind":"module","path":"packages/weft-harness/src/permission-bridge.ts"},
+      {"kind":"module","path":"packages/weft-harness/src/operators/execute.ts"},
+      {"kind":"module","path":"packages/weft-harness/src/operators/session.ts"},
+      {"kind":"test","path":"packages/weft-harness/src/__tests__/honesty.test.ts"},
+      {"kind":"test","path":"packages/weft-harness/src/__tests__/provenance.test.ts"},
+      {"kind":"test","path":"packages/weft-harness/src/__tests__/consensus-defaults.test.ts"},
+      {"kind":"test","path":"packages/weft-harness/src/__tests__/replay.test.ts"}
+    ] },
+    "DEC-002": { "description": "Anchors of DEC-002 (pnpm workspace of independently versioned packages, released)", "doc": "docs/DECISIONS.md DEC-002", "see": [], "symbols": [
+      {"kind":"module","path":".changeset/config.json"},
+      {"kind":"module","path":".github/workflows/ci.yml"}
+    ] },
+    "DEC-003": { "description": "Anchors of DEC-003 (Open-core tier split: developer primitives free in weft-core)", "doc": "docs/DECISIONS.md DEC-003", "see": [], "symbols": [
+      {"kind":"test","path":"packages/weft-core/src/__tests__/tierBoundary.test.ts"},
+      {"kind":"module","path":"packages/weft-pro/src/index.ts"},
+      {"kind":"module","path":".github/workflows/ci.yml"}
+    ] },
+    "DEC-004": { "description": "Anchors of DEC-004 (This repo is a distribution mirror of a private canonical so)", "doc": "docs/DECISIONS.md DEC-004", "see": [], "symbols": [
+      {"kind":"test","path":"packages/weft-core/src/__tests__/canonicalMirrorContract.test.ts"}
+    ] },
+    "DEC-005": { "description": "Anchors of DEC-005 (AgentUnit is a lazy immutable monad; operators attach by pro)", "doc": "docs/DECISIONS.md DEC-005", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/AgentUnit.ts"},
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/operators/index.ts"}
+    ] },
+    "DEC-006": { "description": "Anchors of DEC-006 (Zero-trust results by default: run returns a TrackedResult w)", "doc": "docs/DECISIONS.md DEC-006", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/trust.ts"},
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/zeroTrust.ts"}
+    ] },
+    "DEC-007": { "description": "Anchors of DEC-007 (Browser-safe root barrel; provider-bound code lives at weft-)", "doc": "docs/DECISIONS.md DEC-007", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/index.ts"},
+      {"kind":"module","path":"packages/weft-core/src/server.ts"},
+      {"kind":"test","path":"packages/weft-core/src/__tests__/boundaryTest.test.ts"}
+    ] },
+    "DEC-008": { "description": "Anchors of DEC-008 (Providers sit behind one interface and a process-wide regist)", "doc": "docs/DECISIONS.md DEC-008", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/providers/interface.ts"},
+      {"kind":"module","path":"packages/weft-core/src/providers/registry.ts"},
+      {"kind":"module","path":"packages/weft-core/src/providers/auto.ts"}
+    ] },
+    "DEC-009": { "description": "Anchors of DEC-009 (Deterministic record and replay with vector-clocked traces)", "doc": "docs/DECISIONS.md DEC-009", "see": [], "symbols": [
+      {"kind":"dir","path":"packages/weft-core/src/rehearsal"},
+      {"kind":"module","path":"packages/weft-core/src/AgentUnit/operators/rehearsal.ts"}
+    ] },
+    "DEC-010": { "description": "Anchors of DEC-010 (Durable execution through one KV seam; at-most-once is narro)", "doc": "docs/DECISIONS.md DEC-010", "see": [], "symbols": [
+      {"kind":"dir","path":"packages/weft-core/src/store"},
+      {"kind":"module","path":"packages/weft-core/src/idempotency.ts"}
+    ] },
+    "DEC-011": { "description": "Anchors of DEC-011 (weft-react exports only browser-safe hooks)", "doc": "docs/DECISIONS.md DEC-011", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-react/src/index.ts"},
+      {"kind":"module","path":"packages/weft-react/src/hooks/useAI.ts"}
+    ] },
+    "DEC-012": { "description": "Anchors of DEC-012 (Two agent constructors exist; neither runs tools)", "doc": "docs/DECISIONS.md DEC-012", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-core/src/agent/agent.ts"},
+      {"kind":"module","path":"packages/weft-core/src/agent.ts"},
+      {"kind":"module","path":"packages/weft-core/src/agent/executor.ts"}
+    ] },
+    "DEC-013": { "description": "Anchors of DEC-013 (weft-harness runs stub sessions until SDK wiring lands)", "doc": "docs/DECISIONS.md DEC-013", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-harness/src/adapter/claude-agent-sdk.ts"},
+      {"kind":"module","path":"packages/weft-harness/src/adapter/openai-agents.ts"}
+    ] },
+    "DEC-014": { "description": "Anchors of DEC-014 (weft-testing is a re-export shell over weft-core/rehearsal)", "doc": "docs/DECISIONS.md DEC-014", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-testing/src/index.ts"},
+      {"kind":"module","path":"packages/weft-testing/src/rehearsal/replayer.ts"}
+    ] },
+    "DEC-015": { "description": "Anchors of DEC-015 (weft-pro is gated by an import-time licence key format check)", "doc": "docs/DECISIONS.md DEC-015", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-pro/src/license-gate.ts"}
+    ] },
+    "DEC-016": { "description": "Anchors of DEC-016 (weft-mcp speaks stdio JSON-RPC by hand and validates inputs )", "doc": "docs/DECISIONS.md DEC-016", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-mcp/src/server/index.ts"},
+      {"kind":"module","path":"packages/weft-mcp/src/server/validateInput.ts"},
+      {"kind":"module","path":"packages/weft-mcp/src/client/MCPTransportClient.ts"}
+    ] },
+    "DEC-017": { "description": "Anchors of DEC-017 (weft-pro carries its own copy of the contract module)", "doc": "docs/DECISIONS.md DEC-017", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-pro/src/contract.ts"},
+      {"kind":"module","path":"packages/weft-core/src/contract.ts"}
+    ] },
+    "DEC-018": { "description": "Anchors of DEC-018 (The DevTools bridge has a listener but no producer)", "doc": "docs/DECISIONS.md DEC-018", "see": [], "symbols": [
+      {"kind":"module","path":"packages/weft-devtools/src/bridge/page-emitter.ts"},
+      {"kind":"module","path":"packages/weft-devtools/src/content/bridge-listener.ts"},
+      {"kind":"module","path":"packages/weft-core/src/observability.ts"}
+    ] },
+    "INV-021": { "description": "Workspace packages import `weft-core` only through its published entry points, never by re", "doc": "docs/INVARIANTS.md INV-021", "see": ["docs/DECISIONS.md DEC-002, DEC-007"], "symbols": [
+      {"kind":"dir","path":"packages/weft-core"},
+      {"kind":"module","path":"packages/weft-pro/tsconfig.json"}
+    ] }
+  },
+  "boundaries": [
+    {
+      "id": "INV-001",
+      "from": "packages/weft-core/src/",
+      "forbid": "weft-pro",
+      "allow": [],
+      "doc": "docs/INVARIANTS.md INV-001",
+      "decision": "DEC-003"
+    },
+    {
+      "id": "INV-001",
+      "from": "packages/weft-core/src/",
+      "forbid": "packages/weft-pro/",
+      "allow": [],
+      "doc": "docs/INVARIANTS.md INV-001",
+      "decision": "DEC-003"
+    },
+    {
+      "id": "INV-021",
+      "from": "packages/weft-pro/src/",
+      "forbid": "packages/weft-core/",
+      "allow": [],
+      "doc": "docs/INVARIANTS.md INV-021",
+      "decision": "DEC-002"
+    },
+    {
+      "id": "INV-021",
+      "from": "packages/weft-react/src/",
+      "forbid": "packages/weft-core/",
+      "allow": [],
+      "doc": "docs/INVARIANTS.md INV-021",
+      "decision": "DEC-002"
+    },
+    {
+      "id": "INV-021",
+      "from": "packages/weft-convex/src/",
+      "forbid": "packages/weft-core/",
+      "allow": [],
+      "doc": "docs/INVARIANTS.md INV-021",
+      "decision": "DEC-002"
+    },
+    {
+      "id": "INV-021",
+      "from": "packages/weft-mcp/src/",
+      "forbid": "packages/weft-core/",
+      "allow": [],
+      "doc": "docs/INVARIANTS.md INV-021",
+      "decision": "DEC-002"
+    },
+    {
+      "id": "INV-021",
+      "from": "packages/weft-harness/src/",
+      "forbid": "packages/weft-core/",
+      "allow": [],
+      "doc": "docs/INVARIANTS.md INV-021",
+      "decision": "DEC-002"
+    },
+    {
+      "id": "INV-021",
+      "from": "packages/weft-testing/src/",
+      "forbid": "packages/weft-core/",
+      "allow": [],
+      "doc": "docs/INVARIANTS.md INV-021",
+      "decision": "DEC-002"
+    },
+    {
+      "id": "INV-021",
+      "from": "packages/weft-cli/src/",
+      "forbid": "packages/weft-core/",
+      "allow": [],
+      "doc": "docs/INVARIANTS.md INV-021",
+      "decision": "DEC-002"
+    }
+  ],
+  "generated": {
+    "check": "node .claude/scripts/docs/canonical-docs.cjs --check",
+    "fix": "node .claude/scripts/docs/canonical-docs.cjs",
+    "inputs": [
+      "packages/",
+      "docs/generated/",
+      "docs/canonical-docs.config.json",
+      "docs/DESIGN.md"
+    ],
+    "outputs": [
+      "docs/generated/",
+      "docs/DESIGN.md"
+    ]
+  },
+  "tokens": {
+    "paths": [
+      "packages/weft-devtools/src/panel/styles/"
+    ]
+  }
+}
