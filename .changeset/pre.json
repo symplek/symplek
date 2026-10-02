@@ -1,0 +1,17 @@
+{
+  "mode": "pre",
+  "tag": "beta",
+  "initialVersions": {
+    "create-weft": "0.1.0",
+    "weft-cli": "0.1.0",
+    "weft-convex": "0.1.0",
+    "weft-core": "1.0.0-beta.1",
+    "weft-devtools": "0.1.0",
+    "weft-harness": "0.1.0-alpha.1",
+    "weft-mcp": "0.1.0",
+    "weft-pro": "1.0.0-beta.1",
+    "weft-react": "0.1.0",
+    "weft-testing": "0.1.0"
+  },
+  "changesets": []
+}

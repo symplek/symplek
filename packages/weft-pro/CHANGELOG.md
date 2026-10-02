@@ -7,15 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- `test` script (`vitest run`) so `pnpm test` runs the contract suite and CI no longer silently skips this package.
-
-### Fixed
-
-- `converge` parallel last-writer-wins semantics are documented and guarded with a runtime warning so callers are not silently surprised.
-- In-memory lock state (`solo/lock.ts`) is now per-instance rather than a process-global singleton, eliminating state leakage across unrelated operations and tests.
-
 ## [1.0.0-beta.1] - 2026-04-13
 
 ### Added

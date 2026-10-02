@@ -21,7 +21,8 @@ You'll be asked:
    - `patch` — bug fix, internal refactor, no API change.
    - `minor` — new feature, new exports, additive only.
    - `major` — breaking change. While we're 0.x, breaking changes are minor bumps; major is reserved for 1.0+.
-   - **Beta note**: `weft-core` and `weft-pro` are linked — a changeset touching either will bump both to the same version. During the prerelease cycle (`0.x.y-beta.N`) Changesets will append a beta suffix automatically when you are on a prerelease branch.
+   - **Beta note**: `weft-core` and `weft-pro` are linked — a changeset touching either will bump both to the same version. `create-weft` and `weft-cli` are linked the same way, so include both in a CLI changeset to keep their versions matched.
+   - **Prerelease mode is on.** `.changeset/pre.json` puts every release on the `beta` tag (`1.0.0-beta.N`, `0.x.y-beta.N`). Without it, any bump on `1.0.0-beta.N` would publish a stable `1.0.0`. Run `pnpm changeset pre exit` only when cutting the stable release.
 3. **Summary.** One line. This is what appears in the CHANGELOG.
 
 A new file appears in `.changeset/`. Commit it with your PR.
