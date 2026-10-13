@@ -1,4 +1,4 @@
-# Weft Architecture: Record and Replay
+# Symplek Architecture: Record and Replay
 
 ## Overview
 
@@ -37,7 +37,7 @@ flowchart TB
 
 ## How it works
 
-Source paths below are under `packages/weft-core/src/`.
+Source paths below are under `packages/symplek-core/src/`.
 
 ### Record: `.rehearse(opts?)`
 
@@ -49,7 +49,7 @@ Source paths below are under `packages/weft-core/src/`.
 
 Not recorded:
 
-- **Model and tool calls.** `.rehearse()` creates a `RecordingLLMInterceptor`, but the unit runs with the plain context and nothing in `weft-core` routes provider calls through that interceptor. A unit that calls a model still produces only `agent_start` and `agent_end`.
+- **Model and tool calls.** `.rehearse()` creates a `RecordingLLMInterceptor`, but the unit runs with the plain context and nothing in `@symplek/core` routes provider calls through that interceptor. A unit that calls a model still produces only `agent_start` and `agent_end`.
 - **Checkpoints.** The `checkpointInterval` option is accepted, but the automatic checkpoint branch in `rehearsal/recorder.ts` is empty. Checkpoints exist only when you call `createCheckpoint(state)` on a `TraceRecorder` yourself.
 
 If the unit throws, `.rehearse()` throws too and you get no trace.
@@ -74,14 +74,14 @@ The unit you call `.replay()` on is never run and never compared with the trace.
 
 ## Building blocks you can use directly
 
-The pieces under `.rehearse()` and `.replay()` are exported from `weft-core/rehearsal` (and from the `weft-core` root). If you want model calls in a trace, wrap them yourself:
+The pieces under `.rehearse()` and `.replay()` are exported from `@symplek/core/rehearsal` (and from the `@symplek/core` root). If you want model calls in a trace, wrap them yourself:
 
 ```typescript
 import {
   RecordingLLMInterceptor,
   TraceRecorder,
   TraceReplayer,
-} from "weft-core/rehearsal";
+} from "@symplek/core/rehearsal";
 
 // A stand-in for your own model call.
 let modelCalls = 0;

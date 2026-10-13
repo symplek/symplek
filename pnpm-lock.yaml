@@ -15,11 +15,11 @@ importers:
         specifier: ^2.27.0
         version: 2.31.0(@types/node@22.19.18)
 
-  packages/create-weft:
+  packages/create-symplek:
     dependencies:
-      weft-cli:
+      '@symplek/cli':
         specifier: workspace:*
-        version: link:../weft-cli
+        version: link:../symplek-cli
     devDependencies:
       '@types/node':
         specifier: ^20.11.0
@@ -31,7 +31,7 @@ importers:
         specifier: ^5.5.0
         version: 5.9.3
 
-  packages/weft-cli:
+  packages/symplek-cli:
     dependencies:
       ajv:
         specifier: ^8.17.0
@@ -58,6 +58,9 @@ importers:
         specifier: ^8.0.1
         version: 8.2.0
     devDependencies:
+      '@symplek/core':
+        specifier: workspace:*
+        version: link:../symplek-core
       '@types/inquirer':
         specifier: ^9.0.7
         version: 9.0.9
@@ -73,15 +76,12 @@ importers:
       vitest:
         specifier: ^4.0.17
         version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@20.19.40)(jsdom@26.1.0)(vite@6.4.2(@types/node@20.19.40)(jiti@2.7.0))
-      weft-core:
-        specifier: workspace:*
-        version: link:../weft-core
 
-  packages/weft-convex:
+  packages/symplek-convex:
     dependencies:
-      weft-core:
+      '@symplek/core':
         specifier: workspace:^
-        version: link:../weft-core
+        version: link:../symplek-core
       zod:
         specifier: ^3.25.28 || ^4.0.0
         version: 3.25.76
@@ -102,7 +102,7 @@ importers:
         specifier: ^4.0.17
         version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@22.19.18)(jsdom@26.1.0)(vite@6.4.2(@types/node@22.19.18)(jiti@2.7.0))
 
-  packages/weft-core:
+  packages/symplek-core:
     dependencies:
       openai:
         specifier: '>=4.0.0'
@@ -148,7 +148,7 @@ importers:
         specifier: ^3.25.28
         version: 3.25.76
 
-  packages/weft-devtools:
+  packages/symplek-devtools:
     dependencies:
       '@types/dagre':
         specifier: ^0.7.53
@@ -197,12 +197,15 @@ importers:
         specifier: ^4.0.17
         version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@22.19.18)(jsdom@26.1.0)(vite@6.4.2(@types/node@22.19.18)(jiti@2.7.0))
 
-  packages/weft-harness:
+  packages/symplek-harness:
     dependencies:
       react:
         specifier: ^18.0.0 || ^19.0.0
         version: 19.2.6
     devDependencies:
+      '@symplek/core':
+        specifier: workspace:*
+        version: link:../symplek-core
       '@types/node':
         specifier: '*'
         version: 22.19.18
@@ -215,15 +218,12 @@ importers:
       vitest:
         specifier: ^4.0.17
         version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@22.19.18)(jsdom@26.1.0)(vite@6.4.2(@types/node@22.19.18)(jiti@2.7.0))
-      weft-core:
-        specifier: workspace:*
-        version: link:../weft-core
 
-  packages/weft-mcp:
+  packages/symplek-mcp:
     dependencies:
-      weft-core:
+      '@symplek/core':
         specifier: workspace:^
-        version: link:../weft-core
+        version: link:../symplek-core
     devDependencies:
       '@modelcontextprotocol/sdk':
         specifier: ^1.24.0
@@ -241,11 +241,11 @@ importers:
         specifier: ^4.0.17
         version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@22.19.18)(jsdom@26.1.0)(vite@6.4.2(@types/node@22.19.18)(jiti@2.7.0))
 
-  packages/weft-pro:
+  packages/symplek-pro:
     dependencies:
-      weft-core:
+      '@symplek/core':
         specifier: workspace:^
-        version: link:../weft-core
+        version: link:../symplek-core
     devDependencies:
       '@types/node':
         specifier: ^22.14.0
@@ -263,11 +263,11 @@ importers:
         specifier: ^3.24.0
         version: 3.25.76
 
-  packages/weft-react:
+  packages/symplek-react:
     dependencies:
-      weft-core:
+      '@symplek/core':
         specifier: workspace:^
-        version: link:../weft-core
+        version: link:../symplek-core
     devDependencies:
       '@testing-library/react':
         specifier: ^16.0.0
@@ -303,11 +303,11 @@ importers:
         specifier: ^3.24.0
         version: 3.25.76
 
-  packages/weft-testing:
+  packages/symplek-testing:
     dependencies:
-      weft-core:
+      '@symplek/core':
         specifier: workspace:^
-        version: link:../weft-core
+        version: link:../symplek-core
     devDependencies:
       '@types/node':
         specifier: ^22.14.0

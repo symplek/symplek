@@ -32,13 +32,13 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(process.argv[3] ?? path.join(here, ".."));
 // The default lives in the OS temp dir: a project inside the repo would be
 // treated as part of the workspace, and a deep path breaks tooling on Windows.
-const work = path.resolve(process.argv[2] ?? path.join(os.tmpdir(), "weft-consumer-smoke"));
+const work = path.resolve(process.argv[2] ?? path.join(os.tmpdir(), "symplek-consumer-smoke"));
 
-// Environment a package needs before it will load at all. weft-pro refuses to
+// Environment a package needs before it will load at all. @symplek/pro refuses to
 // import without a license key; a consumer who has one sets this variable, so
 // the smoke test loads it the same way. The value only has the right shape.
 const LOAD_ENV = {
-  "weft-pro": { WEFT_PRO_LICENSE_KEY: `weft_pro_${"0".repeat(40)}` },
+  "@symplek/pro": { SYMPLEK_PRO_LICENSE_KEY: `symplek_pro_${"0".repeat(40)}` },
 };
 
 const shell = process.platform === "win32";

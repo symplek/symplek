@@ -1,11 +1,11 @@
-# Weft Open Core — Tier Boundary
+# Symplek Open Core — Tier Boundary
 
-Weft follows the **Buyer-Based Open Core** model: developer tools are free; organisational
+Symplek follows the **Buyer-Based Open Core** model: developer tools are free; organisational
 and governance features require a commercial license.
 
 ---
 
-## Free tier — `weft-core` (MIT)
+## Free tier — `@symplek/core` (MIT)
 
 `AgentUnit<T>` is the core primitive. All developer composition operators are available
 without any commercial license.
@@ -44,26 +44,26 @@ without any commercial license.
 | `trackCost(span, tokens, model?)` | Record token cost on a span |
 | `trackError(span, error)` | Record error metadata on a span |
 
-Moved from `weft-pro` to `weft-core` in the opencore release so developers can
+Moved from `@symplek/pro` to `@symplek/core` in the opencore release so developers can
 debug their agent compositions without a commercial license. Advanced observability
 (multi-agent trace aggregation, cost dashboards, distributed tracing) will live
-in `weft-pro` when added.
+in `@symplek/pro` when added.
 
-### What's in `weft-core`
+### What's in `@symplek/core`
 
 - `AgentUnit` class with all operators above
-- `WeftError` + error codes
+- `SymplekError` + error codes
 - `createContext` + `AgentContext`
 - Provider resolution (`resolveModelFromContext`)
 - Interview module (`interview/`) — full Q&A engine
 - Solo module (`solo/`) — decision, lock, transaction log
 - Rehearsal module (`rehearsal/`) — recorder, replayer, trace storage
 - Observability module (`observability.ts`): in-memory trace store, span instrumentation, collector hook
-- Teams (`Team`, `TeamRegistry`), the change-kernel (`weft-core/change-kernel`), and the coherence and confidence libraries (`weft-core/coherence`, `weft-core/confidence`)
+- Teams (`Team`, `TeamRegistry`), the change-kernel (`@symplek/core/change-kernel`), and the coherence and confidence libraries (`@symplek/core/coherence`, `@symplek/core/confidence`)
 
 ---
 
-## Pro tier — `weft-pro` (Commercial license)
+## Pro tier — `@symplek/pro` (Commercial license)
 
 Features that serve **team coordination, governance, and observability at organisational scale**.
 
@@ -78,41 +78,41 @@ Features that serve **team coordination, governance, and observability at organi
 | **Coherence/Confidence modules** | Standalone calculation libraries (variance, entropy, composite) |
 
 > **Where the code stands today**: the table above is the intended tier line, and the code has not caught up with it.
-> `weft-core` (MIT) exports `Team` and `TeamRegistry`, the change-kernel (`weft-core/change-kernel`) and the coherence and
-> confidence libraries (`weft-core/coherence`, `weft-core/confidence`). `weft-pro` re-exports those same modules from
-> `weft-core` behind its licence gate. The code that exists only in `weft-pro` is TaCo consensus, stigmergy, antibodies
-> and the trust registry. Importing `weft-pro` throws unless the `WEFT_PRO_LICENSE_KEY` environment variable holds a key.
+> `@symplek/core` (MIT) exports `Team` and `TeamRegistry`, the change-kernel (`@symplek/core/change-kernel`) and the coherence and
+> confidence libraries (`@symplek/core/coherence`, `@symplek/core/confidence`). `@symplek/pro` re-exports those same modules from
+> `@symplek/core` behind its licence gate. The code that exists only in `@symplek/pro` is TaCo consensus, stigmergy, antibodies
+> and the trust registry. Importing `@symplek/pro` throws unless the `SYMPLEK_PRO_LICENSE_KEY` environment variable holds a key.
 
 > **Note on observability**: Basic observability (span recording, trace store, cost/error
-> tracking, manual span instrumentation, collector hook) moved to `weft-core` in the opencore
-> release. `weft-pro` will add advanced observability features (multi-agent trace aggregation,
+> tracking, manual span instrumentation, collector hook) moved to `@symplek/core` in the opencore
+> release. `@symplek/pro` will add advanced observability features (multi-agent trace aggregation,
 > cost dashboards, distributed tracing) when those are built.
 
 > **Note on operator vs. factory distinction**:
 >
 > `dialectic`, `debate`, `solo`, and `coherence` are **free-tier `AgentUnit` instance methods**
 > (e.g. `agent.dialectic(leader, advisors, options?)`). They are available on every `AgentUnit`
-> via prototype augmentation and require no commercial license. `weft-pro` adds no operator of its
+> via prototype augmentation and require no commercial license. `@symplek/pro` adds no operator of its
 > own to `AgentUnit`. It does re-export the computation factories behind these operators
 > (`createDebateComputation`, `createDialecticComputation`, `createSoloComputation`,
-> `createCoherenceComputation`) from `weft-core`.
+> `createCoherenceComputation`) from `@symplek/core`.
 >
-> What `weft-pro` adds are **standalone computation factory functions** (e.g. `tacoConsensus`)
+> What `@symplek/pro` adds are **standalone computation factory functions** (e.g. `tacoConsensus`)
 > that wrap multi-round coordination patterns targeting team workflows. `tacoConsensus` is not
 > the same as `.consensus()` — it adds iterative round management and convergence control on
 > top of the free-tier primitive. Other pro factories (stigmergy, antibodies, trust) have no
 > free-tier equivalent at all.
 >
 > Rule of thumb: if you call it as `agent.someMethod()`, it is free-tier. If you import it
-> as a named function from `weft-pro`, it is pro-tier.
+> as a named function from `@symplek/pro`, it is pro-tier.
 
 ---
 
 ## Decision rule
 
-> **Is the feature a developer primitive?** → `weft-core` (free)
+> **Is the feature a developer primitive?** → `@symplek/core` (free)
 >
-> **Is it organisational / governance / operational observability?** → `weft-pro` (commercial)
+> **Is it organisational / governance / operational observability?** → `@symplek/pro` (commercial)
 
 Multi-round TaCo is in pro because it requires iterative round management and convergence
 configuration that targets team workflows, not individual agent composition.
@@ -122,10 +122,10 @@ configuration that targets team workflows, not individual agent composition.
 ## Verification
 
 ```bash
-# Confirm no weft-pro imports in weft-core source (prints nothing when the boundary holds).
-# Searching for the bare string "weft-pro" also matches comments, so match import forms only.
-grep -rEl "(from|import|require)[[:space:]]*\(?[[:space:]]*['\"]weft-pro" packages/weft-core/src --include='*.ts' --include='*.tsx'
+# Confirm no @symplek/pro imports in @symplek/core source (prints nothing when the boundary holds).
+# Searching for the bare string "@symplek/pro" also matches comments, so match import forms only.
+grep -rEl "(from|import|require)[[:space:]]*\(?[[:space:]]*['\"]@symplek/pro" packages/symplek-core/src --include='*.ts' --include='*.tsx'
 
 # Run tier boundary tests
-cd packages/weft-core && pnpm vitest run src/__tests__/tierBoundary.test.ts
+cd packages/symplek-core && pnpm vitest run src/__tests__/tierBoundary.test.ts
 ```

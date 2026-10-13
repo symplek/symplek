@@ -1,5 +1,5 @@
 ---
-"weft-harness": minor
+"@symplek/harness": minor
 ---
 
 - The built package loads in Node. Its relative imports carry file extensions; without them every entry point failed with `ERR_MODULE_NOT_FOUND`.

@@ -27,7 +27,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Lint packages
-        run: pnpm --filter "weft-*" --filter "create-weft" run lint
+        run: pnpm --filter "@symplek/*" --filter "create-symplek" run lint
       # Each package's runtime VERSION constant must equal its package.json.
       # `pnpm version-packages` keeps them in step; this catches a hand edit.
       - name: Version constants match the manifests
@@ -35,9 +35,9 @@ jobs:
       # Packages resolve each other's types through the built `dist/` output,
       # so a clean runner must build before it can type check.
       - name: Build packages
-        run: pnpm --filter "weft-*" --filter "create-weft" run build
+        run: pnpm --filter "@symplek/*" --filter "create-symplek" run build
       - name: Type check packages
-        run: pnpm --filter "weft-*" --filter "create-weft" run typecheck
+        run: pnpm --filter "@symplek/*" --filter "create-symplek" run typecheck
       # Every import a README or doc shows must exist in the built packages.
       - name: Docs name only real exports
         run: pnpm check:docs
@@ -46,19 +46,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Fail if weft-core imports weft-pro
+      - name: Fail if @symplek/core imports @symplek/pro
         run: |
-          # Match import forms only, not comments or prose: `from "weft-pro"`,
-          # a bare side-effect `import "weft-pro"`, dynamic `import("weft-pro")`
-          # and `require("weft-pro")`. A grep for the bare name would
+          # Match import forms only, not comments or prose: `from "@symplek/pro"`,
+          # a bare side-effect `import "@symplek/pro"`, dynamic `import("@symplek/pro")`
+          # and `require("@symplek/pro")`. A grep for the bare name would
           # false-positive on comment text.
-          matches=$(grep -rEl "(from|import|require)[[:space:]]*\(?[[:space:]]*['\"]weft-pro" packages/weft-core/src --include='*.ts' --include='*.tsx' || true)
+          matches=$(grep -rEl "(from|import|require)[[:space:]]*\(?[[:space:]]*['\"]@symplek/pro" packages/symplek-core/src --include='*.ts' --include='*.tsx' || true)
           if [ -n "$matches" ]; then
-            echo "Error: weft-core must not import weft-pro. Offending files:"
+            echo "Error: @symplek/core must not import @symplek/pro. Offending files:"
             echo "$matches"
             exit 1
           fi
-          echo "OK: no weft-pro imports in packages/weft-core/src"
+          echo "OK: no @symplek/pro imports in packages/symplek-core/src"
 
   build:
     runs-on: ubuntu-latest
@@ -73,7 +73,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Build packages
-        run: pnpm --filter "weft-*" --filter "create-weft" run build
+        run: pnpm --filter "@symplek/*" --filter "create-symplek" run build
       # Packs every publishable package as `changeset publish` does, installs
       # the tarballs into a fresh project and loads each entry point by
       # `import` and `require`. This is the only check that sees the packages
@@ -100,9 +100,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Build packages
-        run: pnpm --filter "weft-*" --filter "create-weft" run build
+        run: pnpm --filter "@symplek/*" --filter "create-symplek" run build
       - name: Test packages
-        run: pnpm --filter "weft-*" test
+        run: pnpm --filter "@symplek/*" test
 
   # Gated publish via the changesets flow. Runs ONLY on push to main, after all
   # quality gates pass. On a normal push it opens/updates a "Version Packages" PR;

@@ -12,6 +12,10 @@ new packages, breaking renames, and release-coordination notes.
 
 ## [Unreleased]
 
+### Renamed
+
+- The project is now **Symplek** (formerly Weft). Packages are `@symplek/*` (for example `@symplek/core`), the scaffolder is `create-symplek`, and the CLI is `symplek`. Entries below this section keep the names they were written under.
+
 Nothing has been published to npm yet. `1.0.0-beta.1` (2026-04-13) was an internal milestone
 for `weft-core` and `weft-pro` and was never published or tagged. The notes for the first
 public beta are the changeset files in `.changeset/`; they become the per-package changelog

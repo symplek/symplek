@@ -1,4 +1,4 @@
-# Contributing to Weft
+# Contributing to Symplek
 
 Thanks for looking at the code. Before you open a PR, read this — it will save both of us time.
 
@@ -8,7 +8,7 @@ Thanks for looking at the code. Before you open a PR, read this — it will save
 
 **This repo is a distribution mirror.**
 
-The authoritative Weft source lives in a private monorepo used by our own application. On each release cycle, the portable subset is extracted into the packages here and published to npm. There is no automated sync — see [SYNC.md](SYNC.md) for the flow.
+The authoritative Symplek source lives in a private monorepo used by our own application. On each release cycle, the portable subset is extracted into the packages here and published to npm. There is no automated sync — see [SYNC.md](SYNC.md) for the flow.
 
 What this means for contributors:
 
@@ -29,7 +29,7 @@ A useful bug report includes:
 1. A **minimal reproduction** — the shortest code that triggers the problem. A link to a StackBlitz or a plain Node script is ideal.
 2. What you expected to happen.
 3. What actually happened, including the full error message and stack trace.
-4. Your environment: Node version, package versions (`pnpm list weft-core`).
+4. Your environment: Node version, package versions (`pnpm list @symplek/core`).
 
 We cannot investigate bugs that don't have a reproduction. "It throws sometimes" is not actionable.
 
@@ -39,18 +39,18 @@ We cannot investigate bugs that don't have a reproduction. "It throws sometimes"
 
 **Open a Discussion before opening a PR.**
 
-Feature PRs without prior Discussion agreement are closed without review. This is not a gate to slow you down — it's to avoid the situation where you invest time writing code for something we've already decided not to support, or something that belongs in `weft-pro` rather than `weft-core`.
+Feature PRs without prior Discussion agreement are closed without review. This is not a gate to slow you down — it's to avoid the situation where you invest time writing code for something we've already decided not to support, or something that belongs in `@symplek/pro` rather than `@symplek/core`.
 
 The Discussion process is:
 
-1. Open a thread in [Discussions → Ideas](https://github.com/wefthq/weft/discussions/categories/ideas).
+1. Open a thread in [Discussions → Ideas](https://github.com/symplek/symplek/discussions/categories/ideas).
 2. Describe the problem you're solving, not the solution you've designed.
 3. If maintainers agree it fits the scope and tier, we'll say so explicitly in the thread.
 4. Then open a PR that references the Discussion.
 
-Features in scope for `weft-core`: developer-facing primitives that make AgentUnit composition easier or more expressive. Free forever.
+Features in scope for `@symplek/core`: developer-facing primitives that make AgentUnit composition easier or more expressive. Free forever.
 
-Features in scope for `weft-pro`: organisational coordination, governance, and advanced observability. Commercial licence.
+Features in scope for `@symplek/pro`: organisational coordination, governance, and advanced observability. Commercial licence.
 
 Features out of scope for this repo: anything that requires the upstream application's Convex runtime, scheduler, or database bindings.
 
@@ -99,11 +99,11 @@ Every merged commit that affects a published package needs a changeset. See [.ch
 
 ```
 pnpm install --frozen-lockfile
-pnpm --filter "weft-*" run build
-pnpm --filter "weft-*" test
+pnpm --filter "@symplek/*" run build
+pnpm --filter "@symplek/*" test
 ```
 
-The test suite includes canonical ↔ mirror contract tests (`packages/weft-core/src/__tests__/canonicalMirrorContract.test.ts`) that read source files from a relative path (`../../../../convex/lib/agent_framework/`). That source is not in this repo, so the whole file skips itself here: `weft-core` reports one skipped test file. Nothing fails. It also means nothing in this repo checks for drift against the upstream source. Every other test should pass.
+The test suite includes canonical ↔ mirror contract tests (`packages/symplek-core/src/__tests__/canonicalMirrorContract.test.ts`) that read source files from a relative path (`../../../../convex/lib/agent_framework/`). That source is not in this repo, so the whole file skips itself here: `@symplek/core` reports one skipped test file. Nothing fails. It also means nothing in this repo checks for drift against the upstream source. Every other test should pass.
 
 If you are writing a new test, add it to the appropriate package under `src/__tests__/`. Follow the existing pattern: runtime behaviour tests first, structural fallback tests where live import is impossible due to Convex-specific types.
 
@@ -112,7 +112,7 @@ If you are writing a new test, add it to the appropriate package under `src/__te
 ## What not to send
 
 - PRs that add dependencies on `convex`, `@convex-dev/*`, or any Convex-specific runtime type. Those belong upstream.
-- PRs that modify `weft-pro` in a way that weakens the tier boundary. The boundary between free and commercial is a deliberate product decision, not an implementation accident.
+- PRs that modify `@symplek/pro` in a way that weakens the tier boundary. The boundary between free and commercial is a deliberate product decision, not an implementation accident.
 - PRs against any branch other than `main`.
 - Large refactors without prior Discussion agreement. Refactors that touch the core algebra are high-risk and require careful review against the canonical source.
 

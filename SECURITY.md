@@ -2,24 +2,24 @@
 
 ## Supported versions
 
-Weft is in beta. We support **only the latest published version of each package**. Older versions receive no patches. Pin exact versions and upgrade deliberately.
+Symplek is in beta. We support **only the latest published version of each package**. Older versions receive no patches. Pin exact versions and upgrade deliberately.
 
 | Package | Supported |
 |---|---|
-| `weft-core` | Latest `1.0.0-beta` release |
-| `weft-pro` | Latest `1.0.0-beta` release |
-| `weft-react` | Latest `0.x` release |
-| `weft-convex` | Latest `0.x` release |
-| `weft-cli` | Latest `0.x` release |
-| `create-weft` | Not published (held back; the npm name belongs to another project) |
-| `weft-mcp` | Latest `0.x` release |
-| `weft-harness` | Latest `0.x` release |
-| `weft-testing` | Latest `0.x` release |
-| `weft-devtools` | Not published (private package) |
+| `@symplek/core` | Latest `1.0.0-beta` release |
+| `@symplek/pro` | Latest `1.0.0-beta` release |
+| `@symplek/react` | Latest `0.x` release |
+| `@symplek/convex` | Latest `0.x` release |
+| `@symplek/cli` | Latest `0.x` release |
+| `create-symplek` | Not published (held back; the npm name belongs to another project) |
+| `@symplek/mcp` | Latest `0.x` release |
+| `@symplek/harness` | Latest `0.x` release |
+| `@symplek/testing` | Latest `0.x` release |
+| `@symplek/devtools` | Not published (private package) |
 
 ## Reporting a vulnerability
 
-**Do not open a public issue.** Email **security@weft.dev** with:
+**Do not open a public issue.** Email **security@symplek.dev** with:
 
 1. A description of the issue.
 2. Affected package(s) and version(s).
@@ -43,13 +43,13 @@ If we cannot meet the timeline, we will communicate revised dates in writing. If
 
 ## In scope
 
-- The published `weft-*` packages and their build artefacts on npm.
+- The published `@symplek/*` packages and their build artefacts on npm.
 - This repo's CI configuration and release tooling.
 
 ## Out of scope
 
-- The upstream private application that consumes Weft. Vulnerabilities there are not handled by this project.
-- Third-party LLM providers Weft routes calls through. Report those to the provider.
+- The upstream private application that consumes Symplek. Vulnerabilities there are not handled by this project.
+- Third-party LLM providers Symplek routes calls through. Report those to the provider.
 - Issues in transitive dependencies — please report upstream and let us know.
 - Social engineering of maintainers.
 

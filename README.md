@@ -1,4 +1,4 @@
-# Weft
+# Symplek
 
 Composable agent primitives for TypeScript.
 
@@ -8,14 +8,14 @@ Composable agent primitives for TypeScript.
 
 Coordinating several LLM calls in TypeScript means writing the same scaffolding every time: promise chains, error handling, retry loops, vote counting, result tracking. All of it before you get to any actual agent logic.
 
-Weft replaces that scaffolding with a small algebra. Retry, fallback, parallel consensus and iterative refinement compose as method chains on a single type: `AgentUnit<T>`.
+Symplek replaces that scaffolding with a small algebra. Retry, fallback, parallel consensus and iterative refinement compose as method chains on a single type: `AgentUnit<T>`.
 
 ### Multi-agent consensus in 10 lines
 
 Three agents vote on whether a contract clause is fair. The votes run in parallel and the result carries every one of them:
 
 ```typescript
-import { AgentUnit, createContext } from "weft-core";
+import { AgentUnit, createContext } from "@symplek/core";
 
 const ctx = createContext();
 
@@ -38,34 +38,34 @@ The three `analyseAs...` functions are yours. Each one takes the clause and retu
 
 No agent registration. No routing config. No network topology. Hand it functions and get back the decision, every vote, and a confidence figure worked out from how the voters split (`result.value.objectiveConfidence`).
 
-### Simple AI calls with the Weft facade
+### Simple AI calls with the Symplek facade
 
-For single-prompt work, the `Weft` callable is the fastest path:
+For single-prompt work, the `Symplek` callable is the fastest path:
 
 ```typescript
-import { Weft } from "weft-core/server";
+import { Symplek } from "@symplek/core/server";
 
-Weft.configure({ provider: "anthropic", model: "claude-sonnet-5-5" });
+Symplek.configure({ provider: "anthropic", model: "claude-sonnet-5-5" });
 
-const result = await Weft("Summarise this contract in three bullet points");
+const result = await Symplek("Summarise this contract in three bullet points");
 console.log(result.value);
 ```
 
 This one calls a real model, so it needs two things the first example does not: the provider's SDK (`pnpm add @anthropic-ai/sdk`) and `ANTHROPIC_API_KEY` in your environment. The other supported providers are `openai` (SDK `openai`, key `OPENAI_API_KEY`) and `google` (SDK `@google/generative-ai`, key `GOOGLE_GENERATIVE_AI_API_KEY`). Miss either and the call fails with a `PROVIDER_ERROR` that names what to install or set.
 
-With the key in the environment, `Weft.configure()` is optional: the first call finds the key and loads the matching provider. Leave `model` out and Weft picks one for you, using the provider's larger model for long or analysis-style prompts. [`weft-core`'s README](packages/weft-core/README.md#which-model-runs) has the table and the exact rule.
+With the key in the environment, `Symplek.configure()` is optional: the first call finds the key and loads the matching provider. Leave `model` out and Symplek picks one for you, using the provider's larger model for long or analysis-style prompts. [`@symplek/core`'s README](packages/symplek-core/README.md#which-model-runs) has the table and the exact rule.
 
 ### From single call to coordination: `.coordinate()`
 
 The facade and the coordination algebra connect through `.coordinate()`. Start simple, compose up:
 
 ```typescript
-import { Weft, createContext } from "weft-core/server";
+import { Symplek, createContext } from "@symplek/core/server";
 
-Weft.configure({ provider: "anthropic", model: "claude-sonnet-5-5" });
+Symplek.configure({ provider: "anthropic", model: "claude-sonnet-5-5" });
 const ctx = createContext();
 
-const result = await Weft("Analyse this contract clause for risk")
+const result = await Symplek("Analyse this contract clause for risk")
   .coordinate()
   .consensus([
     (analysis) => reviewAsLegalCounsel(analysis),
@@ -83,7 +83,7 @@ One import. The same chain handles the model call, the vote and the retry.
 If you just need retry, timeout, and fallback, that composes too:
 
 ```typescript
-import { AgentUnit, createContext } from "weft-core";
+import { AgentUnit, createContext } from "@symplek/core";
 
 const ctx = createContext();
 
@@ -112,7 +112,7 @@ Written by hand, that is a retry loop with backoff, a `Promise.race` against a t
 Every `.run(ctx)` resolves to a `TrackedResult<T>`: your value, plus a few fields about where it came from.
 
 ```typescript
-import { AgentUnit, createContext } from "weft-core";
+import { AgentUnit, createContext } from "@symplek/core";
 
 const approve = () => ({ decision: "approve" as const, confidence: 0.9 });
 const result = await AgentUnit.of("ship it")
@@ -133,14 +133,14 @@ The number that does reflect what happened is `objectiveConfidence` on a consens
 Two more pieces:
 
 - `.tracked({ source, confidence })` lets you label a result yourself, for example `source: "tool"` or `source: "verified"`.
-- `isTrackedResult(x)` tells a result Weft produced from a look-alike object.
+- `isTrackedResult(x)` tells a result Symplek produced from a look-alike object.
 
 ---
 
 ## Install
 
 ```
-pnpm add weft-core zod
+pnpm add @symplek/core zod
 ```
 
 Node 20 or later. `zod` is a required peer dependency. The provider SDKs (`@anthropic-ai/sdk`, `openai`, `@google/generative-ai`) and the OpenTelemetry packages are optional peers: install the ones you call.
@@ -151,24 +151,24 @@ Node 20 or later. `zod` is a required peer dependency. The provider SDKs (`@anth
 
 | Package | What is in it | License |
 |---|---|---|
-| `weft-core` | `AgentUnit` algebra: operators, error handling, record and replay, observability, provider adapters | MIT |
-| `weft-react` | React bindings: `useAgent`, `useConsensus`, `useSwarm`, `AIProvider`, `useAIConfig`, `AIErrorBoundary` | MIT |
-| `weft-convex` | Convex action helpers: `withAI`, `streamToMutation`, activity and cost middleware | MIT |
-| `weft-cli` | The `weft` command: `init`, `add`, `validate`, `generate`, `migrate` | MIT |
-| `create-weft` | Wrapper that runs `weft init`. Held back from release: the name `create-weft` on npm is someone else's package | MIT |
-| `weft-mcp` | MCP client (`MCPUnit`, `TrustPolicyEngine`) plus a stdio demo server. The default policies do not restrict anything yet, and the server's `weft_debate` and `weft_consensus` tools run on stub agents, not models | MIT |
-| `weft-harness` | Plan, permission-gate and execute operators for agent sessions. Pre-alpha: no agent SDK is wired yet, so every result is a stand-in | MIT |
-| `weft-testing` | Re-exports the record and replay engine from `weft-core/rehearsal` | MIT |
-| `weft-devtools` | Chrome DevTools extension for agent traces. Private, not published to npm | MIT |
-| `weft-pro` | TaCo consensus, stigmergy, antibodies, trust registry. Needs a licence key to import | BSL 1.1 |
+| `@symplek/core` | `AgentUnit` algebra: operators, error handling, record and replay, observability, provider adapters | MIT |
+| `@symplek/react` | React bindings: `useAgent`, `useConsensus`, `useSwarm`, `AIProvider`, `useAIConfig`, `AIErrorBoundary` | MIT |
+| `@symplek/convex` | Convex action helpers: `withAI`, `streamToMutation`, activity and cost middleware | MIT |
+| `@symplek/cli` | The `symplek` command: `init`, `add`, `validate`, `generate`, `migrate` | MIT |
+| `create-symplek` | Wrapper that runs `symplek init`. Held back from release: the name `create-symplek` on npm is someone else's package | MIT |
+| `@symplek/mcp` | MCP client (`MCPUnit`, `TrustPolicyEngine`) plus a stdio demo server. The default policies do not restrict anything yet, and the server's `symplek_debate` and `symplek_consensus` tools run on stub agents, not models | MIT |
+| `@symplek/harness` | Plan, permission-gate and execute operators for agent sessions. Pre-alpha: no agent SDK is wired yet, so every result is a stand-in | MIT |
+| `@symplek/testing` | Re-exports the record and replay engine from `@symplek/core/rehearsal` | MIT |
+| `@symplek/devtools` | Chrome DevTools extension for agent traces. Private, not published to npm | MIT |
+| `@symplek/pro` | TaCo consensus, stigmergy, antibodies, trust registry. Needs a licence key to import | BSL 1.1 |
 
-The examples in this README use `weft-core` only.
+The examples in this README use `@symplek/core` only.
 
 ---
 
 ## Core operators
 
-Every operator on `AgentUnit<T>` ships in `weft-core` under MIT.
+Every operator on `AgentUnit<T>` ships in `@symplek/core` under MIT.
 
 **Create**
 - `AgentUnit.of(value)`: lift a value
@@ -221,7 +221,7 @@ Every operator on `AgentUnit<T>` ships in `weft-core` under MIT.
 - `.run(ctx, opts?)`: execute with a context from `createContext()`
 - `.runStandalone()`: execute without building a context first
 
-**Observability** (also in `weft-core`)
+**Observability** (also in `@symplek/core`)
 - `observable(unit, opts?)`: record one trace entry when the unit succeeds. No timing, and failures are not recorded
 - `createOperatorSpan(type, name, parentSpanId?)`: a manually timed span, recorded when you call `.end()`
 - `getTraces()` / `clearTraces()`: in-memory trace store
@@ -235,7 +235,7 @@ Every operator on `AgentUnit<T>` ships in `weft-core` under MIT.
 `.rehearse()` runs a unit once and keeps the outcome. `.replay(trace)` hands that outcome back later without running the unit, after checking the trace has not been altered.
 
 ```typescript
-import { AgentUnit, createContext } from "weft-core";
+import { AgentUnit, createContext } from "@symplek/core";
 
 const ctx = createContext();
 
@@ -267,7 +267,7 @@ What it does not do yet, so nobody finds out the hard way:
 - **Replay does not re-run your agent.** It cannot tell you whether today's code would still produce the recorded output. Replay the same trace on a completely different unit and you still get `matched: true`.
 - **`matched` is an integrity check on the trace.** An edited event throws `ReplayDivergenceError`. An edited output comes back with `matched: false` and a critical divergence. The hashes are DJB2, a fast 32-bit checksum, not a cryptographic one.
 
-`FileStorage` (from `weft-core/rehearsal`) saves and loads traces as JSON files. The lower-level pieces, `TraceRecorder` and `RecordingLLMInterceptor`, are exported if you want to record individual model calls yourself.
+`FileStorage` (from `@symplek/core/rehearsal`) saves and loads traces as JSON files. The lower-level pieces, `TraceRecorder` and `RecordingLLMInterceptor`, are exported if you want to record individual model calls yourself.
 
 **[How record and replay works](docs/ARCHITECTURE.md)**
 
@@ -277,15 +277,15 @@ What it does not do yet, so nobody finds out the hard way:
 
 ## Status
 
-Beta. `weft-core` and `weft-pro` are on a `1.0.0-beta` line; the other packages are `0.x`. The API may change between beta releases. We commit to a changelog entry for every breaking change.
+Beta. `@symplek/core` and `@symplek/pro` are on a `1.0.0-beta` line; the other packages are `0.x`. The API may change between beta releases. We commit to a changelog entry for every breaking change.
 
 ---
 
 ## Documentation
 
 - [Record and replay](docs/ARCHITECTURE.md): what `.rehearse()` and `.replay()` do, and the building blocks underneath
-- [Tier boundary](docs/tier-boundary.md): what is in `weft-core` and what is in `weft-pro`
-- [GitHub Discussions](https://github.com/wefthq/weft/discussions): questions, feature proposals, show-and-tell
+- [Tier boundary](docs/tier-boundary.md): what is in `@symplek/core` and what is in `@symplek/pro`
+- [GitHub Discussions](https://github.com/symplek/symplek/discussions): questions, feature proposals, show-and-tell
 
 ---
 
@@ -297,7 +297,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). File bugs as Issues. Propose features in
 
 ## Licence
 
-`weft-core` and all packages except `weft-pro` are MIT.  
-`weft-pro` is [Business Source License 1.1](packages/weft-pro/LICENSE): source-available, converting to MIT on the Change Date in that file.
+`@symplek/core` and all packages except `@symplek/pro` are MIT.  
+`@symplek/pro` is [Business Source License 1.1](packages/symplek-pro/LICENSE): source-available, converting to MIT on the Change Date in that file.
 
 See [LICENSE](LICENSE) for the full per-package breakdown.

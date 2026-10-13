@@ -1,6 +1,6 @@
-# Weft Demo: Terminal Transcript
+# Symplek Demo: Terminal Transcript
 
-> **Status.** This is a transcript from a demo script that lives outside this repository. The demo repository it came from (`wefthq/weft-demo`) is not published, so the output below has not been re-run against this checkout and cannot be reproduced from here. For something you can run yourself, use the record and replay example in the [README](../README.md#record-and-replay). It shows the same behaviour: two events recorded, nothing executed on replay.
+> **Status.** This is a transcript from a demo script that lives outside this repository. The demo repository it came from (`symplek/symplek-demo`) is not published, so the output below has not been re-run against this checkout and cannot be reproduced from here. For something you can run yourself, use the record and replay example in the [README](../README.md#record-and-replay). It shows the same behaviour: two events recorded, nothing executed on replay.
 
 ## The Adversarial Demo
 
@@ -8,7 +8,7 @@ The demo simulates a flaky data pipeline with **5 API calls**, two of which fail
 
 ### Phase 1: The Problem, a Flaky Agent
 
-Running the bare agent 5 times without Weft:
+Running the bare agent 5 times without Symplek:
 
 ```
   Run 1: ✗ FAILED — [API #3] POST /analyze → TIMEOUT (5000ms)
@@ -23,7 +23,7 @@ Running the bare agent 5 times without Weft:
 
 ### Phase 2: Record with `.rehearse()`
 
-Weft wraps the agent and records a successful run:
+Symplek wraps the agent and records a successful run:
 
 ```
   Attempt 1: ✗ Failed, retrying...
@@ -67,7 +67,7 @@ The sentinel value `apiCallCount = -999` shows the agent body never executed. Th
 
 ## What this shows, and what it does not
 
-| Without Weft | With Weft |
+| Without Symplek | With Symplek |
 |---|---|
 | A flaky agent fails intermittently and is hard to reproduce | `.rehearse()` keeps the outcome of one good run |
 | Each debug attempt re-executes the calls and gets different results | `.replay()` hands that stored outcome back, with zero re-execution |
@@ -75,4 +75,4 @@ The sentinel value `apiCallCount = -999` shows the agent body never executed. Th
 
 Replay does not re-run the agent. It cannot tell you whether the agent still behaves the way it did when the trace was recorded. `Replay matched: YES` means the trace is intact, not that today's agent would produce the same output. See [Record and replay](ARCHITECTURE.md) for the detail.
 
-The original transcript ended with a full capture of the demo's terminal output, including a "Get started" command that used `npm create weft`. That section is removed: the capture cannot be reproduced without the demo repository, and `create-weft` on npm is someone else's package.
+The original transcript ended with a full capture of the demo's terminal output, including a "Get started" command that used `npm create symplek`. That section is removed: the capture cannot be reproduced without the demo repository, and `create-symplek` on npm is someone else's package.
