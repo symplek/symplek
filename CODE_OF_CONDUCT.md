@@ -26,4 +26,4 @@ Bans are appealable in writing to the same email after 90 days.
 
 ## Scope
 
-This applies to all project spaces: this repo's issues, PRs, discussions, the `@weft/*` npm registry pages where comments are possible, and any public communication that explicitly references this project.
+This applies to all project spaces: this repo's issues, PRs, discussions, the `weft-*` npm registry pages where comments are possible, and any public communication that explicitly references this project.

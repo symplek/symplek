@@ -6,9 +6,6 @@
  * Wraps MCP tool outputs with trust metadata: integrity hashes,
  * time-decay freshness, policy verdicts, and provenance chains.
  * Carries a Symbol marker for TrackedResult compatibility.
- *
- * STORY-04.05 will unify MCP_TRACKED_MARKER with the canonical
- * TRACKED_MARKER from agent.types.ts when MCPUnit wraps into AgentUnit<T>.
  */
 
 import { createHash } from "node:crypto";
@@ -30,9 +27,6 @@ import type {
  * TrackedResult-compatible marker for MCP evidence objects.
  * Uses `Symbol.for()` (global registry) so cross-package consumers can
  * test with `MCP_TRACKED_MARKER in value`.
- *
- * The canonical TRACKED_MARKER in agent.types.ts uses `Symbol()` (private).
- * Unification happens in STORY-04.05 when MCPUnit wraps into AgentUnit<T>.
  */
 export const MCP_TRACKED_MARKER = Symbol.for("__Weft_tracked_mcp__");
 

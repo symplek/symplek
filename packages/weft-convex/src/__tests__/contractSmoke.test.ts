@@ -5,6 +5,7 @@
  * and that the API surface matches the documented supported path.
  */
 
+import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import {
   createActivityMiddleware,
@@ -17,12 +18,17 @@ import { withAI } from "../withAI";
 
 const stubCtx = { runMutation: async () => {} } as any;
 
+// The manifest is the source of truth for the version; the constant must match it.
+const packageJson = createRequire(import.meta.url)("../../package.json") as {
+  version: string;
+};
+
 describe("weft-convex — Package Contract Smoke", () => {
   describe("Entrypoint version export", () => {
     it("exports version string from entrypoint", async () => {
       const entrypoint = await import("../index");
       expect(typeof entrypoint.version).toBe("string");
-      expect(entrypoint.version).toBe("0.1.0");
+      expect(entrypoint.version).toBe(packageJson.version);
     });
   });
 

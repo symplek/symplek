@@ -2,7 +2,7 @@
  * @fileoverview Distributed Lock Manager
  * @description In-memory lock implementation for solo mechanism
  * @module weft-core/solo/lock
- * @since 2.2.0
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[STORY-01.05]: Lock manager implementation
  *

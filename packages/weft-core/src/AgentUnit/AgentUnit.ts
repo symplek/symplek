@@ -501,20 +501,25 @@ export class AgentUnit<T> {
    * ```typescript
    * const unit = AgentUnit.of("hello");
    * const tracked = await unit.run(ctx);
-   * console.log(tracked.value); // "hello"
-   * console.log(tracked.source); // { operatorChain: ["of"], id: "..." }
+   * console.log(tracked.value);      // "hello"
+   * console.log(tracked.source);     // "agent"
+   * console.log(tracked.confidence); // 0.85 (base) — adjusts per operator chain
    * ```
-   *
-   * @deprecated trustMode: 'legacy' will be removed in v3.0
    */
   async run(ctx: import("../types").AgentContext): Promise<TrackedResult<T>>;
   async run(
     ctx: import("../types").AgentContext,
-    options: { trustMode?: "zero-trust"; captureIntermediates?: boolean },
+    options: Omit<RunOptionsWithTrust, "trustMode"> & {
+      trustMode?: "zero-trust";
+    },
   ): Promise<TrackedResult<T>>;
+  /**
+   * @deprecated trustMode: 'legacy' will be removed in v3.0. Use the default
+   *   zero-trust mode instead.
+   */
   async run(
     ctx: import("../types").AgentContext,
-    options: { trustMode: "legacy"; captureIntermediates?: boolean },
+    options: Omit<RunOptionsWithTrust, "trustMode"> & { trustMode: "legacy" },
   ): Promise<T>;
   async run(
     ctx: import("../types").AgentContext,

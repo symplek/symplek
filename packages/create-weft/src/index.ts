@@ -1,53 +1,30 @@
 #!/usr/bin/env node
 /**
- * create-weft — thin `npm create` scaffolding wrapper.
+ * create-weft: the `npm create` wrapper around `weft init`.
  *
- * Delegates entirely to `weft-cli init`, forwarding every CLI argument
- * through untouched. Invoked as `npm create weft@latest [args]`, which npm
- * resolves to this `create-weft` bin.
- *
- * Carries no runtime dependencies of its own: it fetches weft-cli at the
- * same version via npx so the scaffolder matches this create package.
+ * Runs the weft-cli installed alongside this package (an ordinary dependency,
+ * released at the same version) and hands every argument through to
+ * `weft init`. The CLI's entry file is started with the running Node binary:
+ * no shell, no second download, and the same behaviour on every platform.
  */
 
 import { spawn } from "node:child_process";
 
-// Everything after the binary name is forwarded verbatim to `weft init`.
-const forwardedArgs = process.argv.slice(2);
+const cliEntry = require.resolve("weft-cli/bin/weft.js");
 
-// Resolve weft-cli at the same version as this create-weft package.
-// Version parity is enforced at release time: create-weft and weft-cli
-// are in the same Changesets linked group (.changeset/config.json), so
-// every release publishes both packages at the same version.  The npx
-// call below is therefore guaranteed to find weft-cli@<this version>
-// on the registry — the two packages cannot drift independently.
-const weftVersion = require("../package.json").version;
-
-const npxArgs = [
-  "--yes",
-  "-p",
-  `weft-cli@${weftVersion}`,
-  "weft",
-  "init",
-  ...forwardedArgs,
-];
-
-// spawn without shell to prevent command injection via untrusted CLI args.
-const child = spawn("npx", npxArgs, {
-  stdio: "inherit",
-});
+const child = spawn(
+  process.execPath,
+  [cliEntry, "init", ...process.argv.slice(2)],
+  { stdio: "inherit" },
+);
 
 child.on("error", (err) => {
-  console.error("\ncreate-weft could not launch the Weft scaffolder.");
-  console.error(`  Reason: ${err.message}`);
-  console.error("\n  Check that Node.js and npm are installed, then retry:");
-  console.error("    npm create weft@latest");
-  console.error("\n  Or run the underlying CLI directly:");
-  console.error("    npx -p weft-cli weft init\n");
+  console.error("\ncreate-weft could not start the Weft scaffolder.");
+  console.error(`  Reason: ${err.message}\n`);
   process.exit(1);
 });
 
 child.on("exit", (code, signal) => {
-  // A signal kill (e.g. Ctrl-C) has no exit code — treat as failure.
+  // A signal kill (e.g. Ctrl-C) has no exit code: treat it as failure.
   process.exit(signal ? 1 : (code ?? 0));
 });

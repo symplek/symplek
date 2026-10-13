@@ -46,11 +46,12 @@ describe("weft-react — Package Contract Smoke", () => {
   });
 
   it("publishes a single root entrypoint in package.json", () => {
+    // One root entry. Each module format carries its own declaration file, so
+    // a CommonJS consumer is not handed ESM types.
     expect(packageJson.exports).toEqual({
       ".": {
-        types: "./dist/index.d.ts",
-        import: "./dist/index.js",
-        require: "./dist/index.cjs",
+        import: { types: "./dist/index.d.ts", default: "./dist/index.js" },
+        require: { types: "./dist/index.d.cts", default: "./dist/index.cjs" },
       },
     });
 
@@ -67,7 +68,8 @@ describe("weft-react — Package Contract Smoke", () => {
   });
 
   it("keeps the package marked experimental while the surface is still small", () => {
-    expect(packageJson.version).toBe("0.1.0");
+    // Pre-1.0 is the marker; the exact number moves with every release.
+    expect(packageJson.version).toMatch(/^0\./);
     expect(packageJson.peerDependencies).toMatchObject({
       "weft-core": expect.any(String),
       react: expect.any(String),

@@ -2,8 +2,6 @@
  * @fileoverview MCP Trust Registry — manages server connections, health, and attestation
  * @module weft-mcp/client
  * @since 0.1.0
- *
- * 📝 BUILD[F-068/04.07]: Full trust registry with health tracking and connection pooling
  */
 
 import type { MCPConnectionStatus } from "../types";
@@ -43,8 +41,7 @@ export interface MCPRegistryConfig {
 // ---------------------------------------------------------------------------
 
 /**
- * In-memory MCP server registry with health tracking.
- * Backs Convex persistence through mcpConnections table (Story 04.08).
+ * In-memory MCP server registry with health tracking and single-flight connect.
  */
 export class MCPRegistry {
   private servers = new Map<string, MCPServerEntry>();

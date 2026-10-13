@@ -1,15 +1,18 @@
 /**
- * @fileoverview weft-mcp — MCP Fabric for trust-aware tool consumption
+ * @fileoverview weft-mcp — MCP server binary and trust-evidence client for Weft
  * @module weft-mcp
  * @since 0.1.0
  *
- * Provides trust-policy-driven MCP server consumption with provenance
- * tracking, attestation, and evidence corroboration.
+ * Two surfaces:
+ *   1. Server binary (dist/bin.cjs) — exposes weft_debate, weft_consensus, and
+ *      weft_tracked as MCP tools over stdio JSON-RPC 2.0.
+ *   2. Client library (dist/index.*) — MCPUnit wraps MCP tool calls with
+ *      evidence objects and evaluates them against trust policies.
  *
- * Canonical type definitions live in:
- *   convex/lib/agent_framework/algebra/core/types/mcp.types.ts
- * This package re-exports compatible local definitions to avoid
- * cross-boundary imports from packages/ into convex/.
+ * The default trust policies (allowTrustedOnly, requireAttestation,
+ * degradeToReadOnly) check structural fields that the client itself generates.
+ * They provide shape guarantees, not external attestation. To enforce real
+ * server-identity checks, supply a custom policy that reads your own registry.
  */
 
 // ---------------------------------------------------------------------------
@@ -88,7 +91,7 @@ export {
 } from "./client/MCPTransportClient";
 
 // ---------------------------------------------------------------------------
-// MCPUnit (STORY-04.05)
+// MCPUnit
 // ---------------------------------------------------------------------------
 
 export type { MCPUnitConfig } from "./MCPUnit";
@@ -104,4 +107,4 @@ export {
 // Version
 // ---------------------------------------------------------------------------
 
-export const VERSION = "0.1.0";
+export { VERSION } from "./version";

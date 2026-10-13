@@ -1,5 +1,5 @@
 ﻿/**
- * `Weft migrate` command - scans codebase for zero-trust migration issues
+ * `weft migrate` command - scans codebase for zero-trust migration issues
  * Detects patterns affected by the zero-trust breaking change and provides
  * auto-fix for safe patterns.
  */

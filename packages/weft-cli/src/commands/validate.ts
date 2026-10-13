@@ -1,5 +1,5 @@
 /**
- * `Weft validate` command - validates YAML agent definitions
+ * `weft validate` command - validates YAML agent definitions
  * @description Validates YAML files against the Weft agent schema with line-number error reporting
  */
 
@@ -9,6 +9,8 @@ import chalk from "chalk";
 import { Command } from "commander";
 import { glob } from "glob";
 import yaml, { type YAMLException } from "js-yaml";
+import { DEFAULT_MODEL, MODEL_ID_HINT, MODEL_ID_PATTERN } from "../models.js";
+import { agentNameProblem, KEBAB_CASE_REGEX } from "../naming.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SCHEMA (inline to avoid cross-package imports)
@@ -21,19 +23,11 @@ const AGENT_SCHEMA = {
   properties: {
     name: {
       type: "string",
-      pattern: "^[a-z][a-z0-9-]*$",
+      pattern: KEBAB_CASE_REGEX.source,
     },
     model: {
       type: "string",
-      enum: [
-        "gpt-4o",
-        "gpt-4o-mini",
-        "claude-3-opus",
-        "claude-3-sonnet",
-        "claude-3-haiku",
-        "gemini-3.1-flash-lite-preview",
-        "gemini-1.5-pro",
-      ],
+      pattern: MODEL_ID_PATTERN,
     },
     systemPrompt: {
       type: "string",
@@ -257,21 +251,21 @@ function getSuggestion(error: ErrorObject): string | undefined {
       const field = params.missingProperty;
       if (field === "name") return "Add 'name' field like: name: my-agent";
       if (field === "model")
-        return "Add 'model' field like: model: claude-3-sonnet";
+        return `Add 'model' field like: model: ${DEFAULT_MODEL}`;
       if (field === "systemPrompt")
         return "Add 'systemPrompt' field with your agent instructions";
       return `Add the required '${field}' field`;
     }
     case "enum": {
-      if (instancePath.endsWith("/model")) {
-        return "Use one of: gpt-4o, gpt-4o-mini, claude-3-opus, claude-3-sonnet, claude-3-haiku, gemini-2.0-flash, gemini-1.5-pro";
-      }
       if (instancePath.includes("/defaultSource")) {
         return "Use one of: agent, user, tool, verified, synthesized";
       }
       return undefined;
     }
     case "pattern": {
+      if (instancePath.endsWith("/model")) {
+        return MODEL_ID_HINT;
+      }
       if (instancePath.endsWith("/name")) {
         return "Use kebab-case: lowercase letters, numbers, and hyphens (e.g., my-agent-v2)";
       }
@@ -470,6 +464,21 @@ export function validateFile(filePath: string): FileValidationResult {
         column: 1,
         message: formatAjvError(error),
         suggestion: getSuggestion(error),
+      });
+    }
+  }
+
+  // The schema checks the name's shape. A name can have the right shape and
+  // still be unusable as the exported function's name.
+  const agentName = (parsed as { name?: unknown }).name;
+  if (typeof agentName === "string" && KEBAB_CASE_REGEX.test(agentName)) {
+    const nameProblem = agentNameProblem(agentName);
+    if (nameProblem) {
+      errors.push({
+        file: filePath,
+        line: lineMap.get("/name") ?? 1,
+        column: 1,
+        message: nameProblem,
       });
     }
   }

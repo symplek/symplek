@@ -2,7 +2,7 @@
  * @fileoverview Composite Confidence Calculation
  * @description Combines all tier signals into a single weighted confidence score
  * @module weft-core/confidence/calculations/composite
- * @since 2.0.0
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[01.08]: Main entry point for objective confidence calculation
  *

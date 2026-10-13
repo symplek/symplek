@@ -2,7 +2,7 @@
  * @fileoverview Rollback Manager for Solo Mechanism (re-export from weft-core)
  * @description Re-exports rollback functions from weft-core.
  * @module weft-pro/solo/rollback
- * @since 2.2.1
+ * @since 1.0.0-beta.1
  */
 
 export {

@@ -7,9 +7,15 @@
 import type { MCPEvidence, MCPPolicyVerdict, MCPTrustPolicy } from "../types";
 
 /**
- * Non-attested evidence is degraded rather than denied outright,
- * allowing read operations while blocking mutations.
- * Attested = pre-approved verdict AND traceable provenance.
+ * Degrades evidence that does not carry both a pre-set "allow" verdict and a
+ * non-empty provenance chain.
+ *
+ * For a fresh call both conditions are always true (set by `createMCPEvidence`
+ * before policies run), so this policy returns "allow" by default.
+ *
+ * **What this does NOT do:** it does not verify server identity or check an
+ * external attestation source. "Attested" here means the client-generated
+ * fields are structurally present, not that an external authority approved them.
  */
 export const degradeToReadOnly: MCPTrustPolicy = {
   name: "degradeToReadOnly",

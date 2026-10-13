@@ -8,12 +8,14 @@
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */
 
-import { appendFile, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import type { ResultSource, TrackedResult } from "weft-core";
 import { AgentUnit, createTrackedResult } from "weft-core";
-import { ContractViolationError, HarnessDeviationError } from "../errors";
-import { buildPermissionBridge } from "../permission-bridge";
-import type { ExecuteOptions, VerifiedPlan } from "../types";
+import { ContractViolationError, HarnessDeviationError } from "../errors.js";
+import { buildPermissionBridge } from "../permission-bridge.js";
+import type { SessionEndEntry } from "../replay/index.js";
+import type { ExecuteOptions, VerifiedPlan } from "../types.js";
 
 // ─── SDK Interface Stub ───────────────────────────────────────────────────────
 // @anthropic-ai/claude-agent-sdk is NOT a direct dependency. The adapter module
@@ -78,10 +80,38 @@ async function restoreSnapshots(snapshots: FileSnapshot[]): Promise<void> {
 
 // ─── Rehearsal Trace ──────────────────────────────────────────────────────────
 
-async function appendTrace(tracePath: string, entry: unknown): Promise<void> {
-  await appendFile(tracePath, `${JSON.stringify(entry)}\n`, {
-    encoding: "utf8",
-  });
+interface BufferedEvent {
+  tool: string;
+  args: unknown;
+  result: unknown;
+  /** When the event happened, not when the trace was written. */
+  timestamp: number;
+}
+
+/**
+ * Append the buffered events to the trace file in one write, numbered in the
+ * order they happened. `sessionEnd` goes last and is passed only for a run
+ * that completed: a trace with no SessionEnd line is the trace of a run that
+ * failed.
+ */
+async function writeTrace(
+  tracePath: string,
+  events: readonly BufferedEvent[],
+  sessionEnd?: SessionEndEntry,
+): Promise<void> {
+  const entries: unknown[] = events.map((event, index) => ({
+    step: index + 1,
+    ...event,
+  }));
+  if (sessionEnd) entries.push(sessionEnd);
+  if (entries.length === 0) return;
+
+  await mkdir(dirname(tracePath), { recursive: true });
+  await appendFile(
+    tracePath,
+    entries.map((entry) => `${JSON.stringify(entry)}\n`).join(""),
+    { encoding: "utf8" },
+  );
 }
 
 // ─── Execute Operator ─────────────────────────────────────────────────────────
@@ -92,12 +122,20 @@ async function appendTrace(tracePath: string, entry: unknown): Promise<void> {
  * The returned `AgentUnit` is lazy — the session only starts when `.run()` is
  * called by the caller.
  *
+ * **isStub default is `true`**: calling `execute(session, plan)` with no third
+ * or fourth argument produces `source:"synthesized"`, not `source:"verified"`.
+ * Pass `{ isStub: false }` only when the session is a real SDK session that
+ * actually executed the plan. This ensures that replay adapters, stubs, and
+ * any session whose provenance is unknown default to the honest label.
+ *
  * @param session  - An SdkSession provided by the adapter (W1-B).
  * @param verified - The consensus-approved VerifiedPlan to execute.
- * @param options  - Optional rehearsal trace and deviation behaviour.
- * @param context  - Execution context. Pass `{ isStub: true }` when the session
- *                   is a no-op stub (SDK not installed) so the result is honestly
- *                   labelled `source:"synthesized"` instead of `source:"verified"`.
+ * @param options  - Optional rehearsal trace, deviation behaviour, and
+ *                   `allowShell` flag forwarded to the permission bridge.
+ * @param context  - Execution context. A session is treated as a stub unless
+ *                   told otherwise, so un-labelled callers get
+ *                   `source:"synthesized"`. Pass `{ isStub: false }` to stamp
+ *                   `source:"verified"` on real SDK execution.
  */
 export function execute<T>(
   session: SdkSession,
@@ -106,14 +144,13 @@ export function execute<T>(
   context: { isStub?: boolean } = {},
 ): AgentUnit<TrackedResult<T>> {
   return AgentUnit.from<TrackedResult<T>>(async (_ctx) => {
-    const bridge = buildPermissionBridge(verified as VerifiedPlan<unknown>);
+    const bridge = buildPermissionBridge(verified as VerifiedPlan<unknown>, {
+      allowShell: options.allowShell,
+    });
     const tracePath =
       options.rehearsalPath ?? `traces/${verified.plan.id}.jsonl`;
-    let stepCounter = 0;
 
     // Snapshot file paths before execution when rollback is requested.
-    // This is a simplified best-effort rollback — it restores the pre-session
-    // state of every declared target path but cannot undo network side-effects.
     const declaredPaths = verified.plan.steps
       .filter((s) => s.targetPath !== undefined)
       .map((s) => s.targetPath as string);
@@ -123,23 +160,26 @@ export function execute<T>(
         ? await snapshotPaths(declaredPaths)
         : [];
 
-    const needsEvent = options.rehearse || options.onProgress !== undefined;
-    const onEvent = needsEvent
-      ? async (event: SdkEvent) => {
+    // Events are buffered as they happen, each with its own timestamp, and
+    // written once the session has ended, whether it completed or failed.
+    const eventBuffer: BufferedEvent[] = [];
+
+    const needsProgressOrRehearsal =
+      options.rehearse || options.onProgress !== undefined;
+    const onEvent = needsProgressOrRehearsal
+      ? (event: SdkEvent): void => {
           if (event.type === "tool_use") {
             options.onProgress?.({
               phase: "executing",
               tool: event.tool ?? "unknown",
             });
             if (options.rehearse) {
-              const entry = {
-                step: ++stepCounter,
+              eventBuffer.push({
                 tool: event.tool ?? "unknown",
                 args: event.args,
                 result: event.result,
                 timestamp: Date.now(),
-              };
-              await appendTrace(tracePath, entry);
+              });
             }
           }
         }
@@ -147,88 +187,86 @@ export function execute<T>(
 
     options.onProgress?.({ phase: "executing", message: "Starting execution" });
 
-    let sdkResult: { finalMessage: string };
+    // Set once the run has completed and its output has met the contract.
+    // The trace is written either way, so a failed run can be inspected.
+    let sessionEnd: SessionEndEntry | undefined;
     try {
-      sdkResult = await session.run({
-        permissionMode: "acceptEdits",
-        canUseTool: bridge,
-        onEvent: onEvent
-          ? (event) => {
-              void onEvent(event);
-            }
-          : undefined,
-      });
-    } catch (err) {
-      if (err instanceof HarnessDeviationError) {
-        options.onProgress?.({
-          phase: "failed",
-          message: err instanceof Error ? err.message : String(err),
+      let sdkResult: { finalMessage: string };
+      try {
+        sdkResult = await session.run({
+          permissionMode: "acceptEdits",
+          canUseTool: bridge,
+          onEvent,
         });
-        if (options.onDeviation === "rollback") {
-          await restoreSnapshots(snapshots);
+      } catch (err) {
+        if (err instanceof HarnessDeviationError) {
+          options.onProgress?.({ phase: "failed", message: err.message });
+          if (options.onDeviation === "rollback") {
+            await restoreSnapshots(snapshots);
+          }
         }
         throw err;
       }
-      throw err;
-    }
 
-    options.onProgress?.({ phase: "complete", planId: verified.plan.id });
+      options.onProgress?.({ phase: "complete", planId: verified.plan.id });
 
-    // ─── Contract Validation ─────────────────────────────────────────────────
-    // If the VerifiedPlan declared an expectedOutput schema, validate the actual
-    // SDK output against it. Duck-typed .parse() avoids vendor lock-in — works
-    // with Valibot, Zod, or any library that exposes a .parse(value) method.
-    if (
-      verified.expectedOutput !== undefined &&
-      verified.expectedOutput !== null
-    ) {
-      const schema = verified.expectedOutput as unknown as {
-        parse?: (value: unknown) => unknown;
-        description?: string;
-      };
-      if (typeof schema.parse === "function") {
-        try {
-          schema.parse(sdkResult.finalMessage);
-        } catch {
-          throw new ContractViolationError(
-            `Output contract violated: plan ${verified.plan.id} expected output matching "${schema.description ?? "schema"}" but actual output did not satisfy the schema`,
-            verified.plan.id,
-            schema.description ?? "schema",
-            JSON.stringify(sdkResult.finalMessage).slice(0, 500),
-          );
+      // ── Contract Validation ────────────────────────────────────────────────
+      if (
+        verified.expectedOutput !== undefined &&
+        verified.expectedOutput !== null
+      ) {
+        const schema = verified.expectedOutput as unknown as {
+          parse?: (value: unknown) => unknown;
+          description?: string;
+        };
+        if (typeof schema.parse === "function") {
+          try {
+            schema.parse(sdkResult.finalMessage);
+          } catch {
+            throw new ContractViolationError(
+              `Output contract violated: plan ${verified.plan.id} expected output matching "${schema.description ?? "schema"}" but actual output did not satisfy the schema`,
+              verified.plan.id,
+              schema.description ?? "schema",
+              JSON.stringify(sdkResult.finalMessage).slice(0, 500),
+            );
+          }
         }
       }
-    }
 
-    // Write sentinel on session end when rehearsing.
-    if (options.rehearse) {
-      await appendTrace(tracePath, {
+      sessionEnd = {
         _type: "SessionEnd",
         plan_id: verified.plan.id,
-        total_steps: stepCounter,
+        total_steps: eventBuffer.length,
         final_output: sdkResult.finalMessage,
+      };
+
+      // ── Build result ────────────────────────────────────────────────────────
+      // source:"verified" is only honest when a real SDK session executed the
+      // plan, so a session is a stub unless the caller says otherwise.
+      const isStub = context.isStub ?? true;
+      const source: ResultSource = isStub ? "synthesized" : "verified";
+      return createTrackedResult(sdkResult.finalMessage as unknown as T, {
+        source,
+        confidence: verified.approvalScore,
+        sourceChain: verified.plan.sources.map(() => source),
+        minChainConfidence: verified.approvalScore,
+        // verifiedAt/verifiedBy only make sense when a real execution happened.
+        ...(source === "verified"
+          ? {
+              verifiedAt: Date.now(),
+              verifiedBy: `weft-harness/execute@${verified.plan.id}`,
+            }
+          : {}),
       });
+    } finally {
+      if (options.rehearse) {
+        await writeTrace(tracePath, eventBuffer, sessionEnd).catch(
+          (traceError: unknown) => {
+            // When the run itself failed, that error is the one to report.
+            if (sessionEnd) throw traceError;
+          },
+        );
+      }
     }
-
-    // Build a TrackedResult<T> inheriting source chain from the verified plan.
-    // source:"verified" is only honest when a real SDK session executed the plan.
-    // When the SDK is absent and the session is a stub, use source:"synthesized"
-    // so callers can distinguish un-run stub results from genuinely executed ones.
-    const source: ResultSource = context.isStub ? "synthesized" : "verified";
-    const tracked = createTrackedResult(sdkResult.finalMessage as unknown as T, {
-      source,
-      confidence: verified.approvalScore,
-      sourceChain: verified.plan.sources.map(() => source),
-      minChainConfidence: verified.approvalScore,
-      // verifiedAt/verifiedBy only make sense when a real execution happened.
-      ...(source === "verified"
-        ? {
-            verifiedAt: Date.now(),
-            verifiedBy: `weft-harness/execute@${verified.plan.id}`,
-          }
-        : {}),
-    });
-
-    return tracked;
   });
 }

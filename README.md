@@ -6,13 +6,13 @@ Composable agent primitives for TypeScript.
 
 ## The problem
 
-Coordinating multiple LLM calls in TypeScript usually means writing 80+ lines of scaffolding: promise chains, error handling, retry logic, consensus aggregation, and result tracking, before you get to any actual agent logic.
+Coordinating several LLM calls in TypeScript means writing the same scaffolding every time: promise chains, error handling, retry loops, vote counting, result tracking. All of it before you get to any actual agent logic.
 
-Weft replaces that scaffolding with a small algebra. The same coordination patterns, retry, fallback, parallel consensus, iterative refinement, compose as method chains on a single type: `AgentUnit<T>`.
+Weft replaces that scaffolding with a small algebra. Retry, fallback, parallel consensus and iterative refinement compose as method chains on a single type: `AgentUnit<T>`.
 
 ### Multi-agent consensus in 10 lines
 
-Three agents vote on whether a contract clause is fair. Parallel execution, weighted voting, confidence tracking, all composed:
+Three agents vote on whether a contract clause is fair. The votes run in parallel and the result carries every one of them:
 
 ```typescript
 import { AgentUnit, createContext } from "weft-core";
@@ -29,12 +29,14 @@ const result = await AgentUnit.from(async () =>
   ])
   .run(ctx);
 
-console.log(result.value.approved);      // false
-console.log(result.value.weightedApproval);  // 0.33
-console.log(result.value.votes);          // [{decision: 'reject', confidence: 0.92, ...}]
+console.log(result.value.approved);          // false
+console.log(result.value.weightedApproval);  // 0.333...
+console.log(result.value.votes);             // [{ decision: "reject", confidence: 0.92, ... }, ...]
 ```
 
-No agent registration. No routing config. No network topology. Hand it functions, get a consensus result with provenance.
+The three `analyseAs...` functions are yours. Each one takes the clause and returns `{ decision: "approve" | "reject" | "abstain", confidence, reasoning? }`. The output shown is what you get when two of them reject and one approves.
+
+No agent registration. No routing config. No network topology. Hand it functions and get back the decision, every vote, and a confidence figure worked out from how the voters split (`result.value.objectiveConfidence`).
 
 ### Simple AI calls with the Weft facade
 
@@ -43,17 +45,26 @@ For single-prompt work, the `Weft` callable is the fastest path:
 ```typescript
 import { Weft } from "weft-core/server";
 
-Weft.configure({ provider: "anthropic", model: "claude-sonnet-4-20250514" });
+Weft.configure({ provider: "anthropic", model: "claude-sonnet-5-5" });
 
 const result = await Weft("Summarise this contract in three bullet points");
 console.log(result.value);
 ```
+
+This one calls a real model, so it needs two things the first example does not: the provider's SDK (`pnpm add @anthropic-ai/sdk`) and `ANTHROPIC_API_KEY` in your environment. The other supported providers are `openai` (SDK `openai`, key `OPENAI_API_KEY`) and `google` (SDK `@google/generative-ai`, key `GOOGLE_GENERATIVE_AI_API_KEY`). Miss either and the call fails with a `PROVIDER_ERROR` that names what to install or set.
+
+With the key in the environment, `Weft.configure()` is optional: the first call finds the key and loads the matching provider. Leave `model` out and Weft picks one for you, using the provider's larger model for long or analysis-style prompts. [`weft-core`'s README](packages/weft-core/README.md#which-model-runs) has the table and the exact rule.
 
 ### From single call to coordination: `.coordinate()`
 
 The facade and the coordination algebra connect through `.coordinate()`. Start simple, compose up:
 
 ```typescript
+import { Weft, createContext } from "weft-core/server";
+
+Weft.configure({ provider: "anthropic", model: "claude-sonnet-5-5" });
+const ctx = createContext();
+
 const result = await Weft("Analyse this contract clause for risk")
   .coordinate()
   .consensus([
@@ -65,13 +76,17 @@ const result = await Weft("Analyse this contract clause for risk")
   .run(ctx);
 ```
 
-One import. One namespace. The same chain handles AI execution, multi-agent coordination, and resilience.
+One import. The same chain handles the model call, the vote and the retry.
 
 ### Resilience without coordination
 
 If you just need retry, timeout, and fallback, that composes too:
 
 ```typescript
+import { AgentUnit, createContext } from "weft-core";
+
+const ctx = createContext();
+
 const result = await AgentUnit.from(async () => {
   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -83,175 +98,206 @@ const result = await AgentUnit.from(async () => {
   .retry(3, { baseDelayMs: 500 })
   .timeout(10_000)
   .fallback(AgentUnit.of("Summary unavailable."))
-  .run(ctx, { trustMode: "legacy" });
+  .run(ctx);
+
+console.log(result.value); // the summary, or "Summary unavailable." if all three attempts fail
 ```
 
-**Equivalent without Weft: ~80 lines** of try/catch, `Promise.race`, setTimeout, custom error classes, and a `while` loop.
+Written by hand, that is a retry loop with backoff, a `Promise.race` against a timer, and a try/catch for the fallback. Here it is three method calls.
+
+---
+
+## What `.run()` gives you back
+
+Every `.run(ctx)` resolves to a `TrackedResult<T>`: your value, plus a few fields about where it came from.
+
+```typescript
+import { AgentUnit, createContext } from "weft-core";
+
+const approve = () => ({ decision: "approve" as const, confidence: 0.9 });
+const result = await AgentUnit.of("ship it")
+  .consensus([approve, approve, approve])
+  .run(createContext());
+
+console.log(result.value.approved);     // true
+console.log(result.source);             // "agent": always, from .run()
+console.log(result.confidence);         // 0.95: the 0.85 base plus 0.10 for consensus
+console.log(result.sourceChain);        // ["agent"]
+console.log(result.minChainConfidence); // 0.95
+```
+
+Be clear about what that `confidence` number is. It starts at 0.85 and moves by a fixed amount for each operator in the chain: +0.10 for `consensus`, +0.15 for `converge` or `debate`, +0.10 for `dialectic`, -0.05 for `retry`, -0.10 for `fallback`. It never looks at the output. A unanimous rejection scores the same 0.95 as a unanimous approval, and a `retry` that never had to retry still costs 0.05.
+
+The number that does reflect what happened is `objectiveConfidence` on a consensus or debate result. That one is calculated from the votes themselves: agreement rate, entropy and variance.
+
+Two more pieces:
+
+- `.tracked({ source, confidence })` lets you label a result yourself, for example `source: "tool"` or `source: "verified"`.
+- `isTrackedResult(x)` tells a result Weft produced from a look-alike object.
 
 ---
 
 ## Install
 
 ```
-pnpm add weft-core
+pnpm add weft-core zod
 ```
 
-Node 18+. No required peer dependencies for the core package.
+Node 20 or later. `zod` is a required peer dependency. The provider SDKs (`@anthropic-ai/sdk`, `openai`, `@google/generative-ai`) and the OpenTelemetry packages are optional peers: install the ones you call.
 
 ---
 
 ## Packages
 
-| Package | Description | License |
+| Package | What is in it | License |
 |---|---|---|
-| `weft-core` | `AgentUnit` algebra: operators, error handling, observability | MIT |
-| `weft-react` | React hooks (`useWeftStream`, `AIErrorBoundary`) | MIT |
-| `weft-convex` | Convex action bindings | MIT |
-| `weft-cli` | Scaffolding and agent debugging CLI | MIT |
-| `weft-mcp` | MCP server exposing Weft operations as tool calls | MIT |
-| `weft-harness` | Unit-testing harness for AgentUnit compositions | MIT |
-| `weft-testing` | Vitest utilities and mock factories | MIT |
-| `weft-devtools` | Chrome DevTools extension bridge for agent traces | MIT |
-| `weft-pro` | Organisational features: TaCo consensus, trust registry, antibodies | BSL 1.1 |
+| `weft-core` | `AgentUnit` algebra: operators, error handling, record and replay, observability, provider adapters | MIT |
+| `weft-react` | React bindings: `useAgent`, `useConsensus`, `useSwarm`, `AIProvider`, `useAIConfig`, `AIErrorBoundary` | MIT |
+| `weft-convex` | Convex action helpers: `withAI`, `streamToMutation`, activity and cost middleware | MIT |
+| `weft-cli` | The `weft` command: `init`, `add`, `validate`, `generate`, `migrate` | MIT |
+| `create-weft` | Wrapper that runs `weft init`. Held back from release: the name `create-weft` on npm is someone else's package | MIT |
+| `weft-mcp` | MCP client (`MCPUnit`, `TrustPolicyEngine`) plus a stdio demo server. The default policies do not restrict anything yet, and the server's `weft_debate` and `weft_consensus` tools run on stub agents, not models | MIT |
+| `weft-harness` | Plan, permission-gate and execute operators for agent sessions. Pre-alpha: no agent SDK is wired yet, so every result is a stand-in | MIT |
+| `weft-testing` | Re-exports the record and replay engine from `weft-core/rehearsal` | MIT |
+| `weft-devtools` | Chrome DevTools extension for agent traces. Private, not published to npm | MIT |
+| `weft-pro` | TaCo consensus, stigmergy, antibodies, trust registry. Needs a licence key to import | BSL 1.1 |
+
+The examples in this README use `weft-core` only.
 
 ---
 
 ## Core operators
 
-All operators on `AgentUnit<T>` are free (MIT). The full list:
+Every operator on `AgentUnit<T>` ships in `weft-core` under MIT.
+
+**Create**
+- `AgentUnit.of(value)`: lift a value
+- `AgentUnit.from(fn)`: wrap an async function of the context
+- `AgentUnit.fromPromise(promise)`, `AgentUnit.fromWithFallback(fn, fallbackFn)`, `AgentUnit.fail(error)`
 
 **Composition**
-- `.map(fn)` — transform the resolved value
-- `.flatMap(fn)` / `.chain(fn)` — sequence two computations
-
+- `.map(fn)`: transform the resolved value
+- `.flatMap(fn)` / `.chain(fn)`: sequence two computations
+- `.branch(pred, ifTrue, ifFalse)`: pick the next unit from the value
+- `.tap(fn)`: side effect, value unchanged
 
 **Resilience**
-- `.retry(n, opts?)` — exponential backoff retry
-- `.timeout(ms)` — hard deadline
-- `.fallback(unit)` — backup AgentUnit on failure
-- `.orElse(value)` — static value on failure
+- `.retry(n, opts?)`: up to `n` attempts with exponential backoff and jitter
+- `.timeout(ms)`: fail if not finished in `ms`. The work underneath is not cancelled
+- `.fallback(unit)`: run a backup `AgentUnit` on failure
+- `.orElse(value)`: static value on failure
+- `.compensate(fn)`: run a rollback function when this unit fails
+- `.saga(steps)`: execute/undo pairs, undone in reverse on failure
+- `.supervised(predicate, review)`: send selected outputs to a human reviewer
 
 **Coordination**
-- `AgentUnit.zipAll(units)` — parallel execution, ordered results
-- `AgentUnit.race(units)` — return first to settle
-- `.consensus(voters, opts?)` — single-round multi-voter decision
-- `.converge(agents, opts?)` — iterative multi-agent refinement
-- `.debate(agents, opts?)` — converge + unanimous sign-off
-- `.dialectic(leader, advisors, opts?)` — thesis/antithesis/synthesis
+- `AgentUnit.zipAll(units)`: run in parallel, results in input order
+- `.zip(other)`: run two in parallel, get a tuple
+- `AgentUnit.race(units)`: first to settle wins, including a failure
+- `.consensus(voters, opts?)`: single-round vote. Voters count equally unless you pass `weights`
+- `.converge(agents, opts?)`: iterate until every agent says it is done
+- `.debate(agents, opts?)`: converge, then a unanimous sign-off
+- `.dialectic(leader, advisors, opts?)`: thesis, critiques, synthesis
+- `.reflect(opts?)`: critique, verify and optionally improve the output with agents you pass in. Without them it only runs a built-in structural check
+- `.coherence(opts?)`: coherence score and threshold check after a consensus
+- `.solo(opts?)`: gate. Passes the value through only when confidence, coherence and risk clear the thresholds, otherwise throws `SoloBlockedError`
 
-**Reliability**
-- `.rehearse(opts?)` — record execution trace
-- `.replay(trace, opts?)` — deterministic replay
-- `.solo(opts?)` — autonomous execution with confidence gate
-- `.coherence(opts?)` — post-consensus coherence check
-- `.interview(config)` — lazy human-in-the-loop configuration
-- `.conduct(handlers)` — execute a pending interview
+**Human in the loop**
+- `.interview(config)`: set up a question and answer round against a Zod schema
+- `.conduct(handlers)`: run it, calling your `onQuestion` handler for each question
 
-## Record & Replay
+**Contracts and model hints**
+- `.provides(schema)` / `.expects(schema, selector)`: validate output or input against a Zod schema
+- `.model(name)` / `.quality(level)`: per-step model and quality hints, handed to the unit through the context
 
-Weft's record/replay engine is the foundation for deterministic agent testing. Record a run once, replay it infinitely at zero cost. The agent body is **never called** during replay — responses come from the stored trace.
-
-```mermaid
-flowchart LR
-    subgraph RECORD["🎬 .rehearse()"]
-        A[AgentUnit] --> B[TraceRecorder]
-        B --> C["capture events + hashes"]
-        C --> D[("ExecutionTrace")]
-    end
-
-    subgraph REPLAY["▶ .replay(trace)"]
-        D --> E[TraceReplayer]
-        E --> F[verify hashes]
-        F --> G["serve cached responses<br/>(model NEVER called)"]
-        G --> H[ReplayResult]
-    end
-
-    RECORD --> REPLAY
-
-    style RECORD fill:#1a1a2e,stroke:#16213e,color:#e0e0e0
-    style REPLAY fill:#1a1a2e,stroke:#16213e,color:#e0e0e0
-    style D fill:#0f3460,stroke:#533483,color:#e0e0e0
-    style G fill:#16213e,stroke:#e94560,color:#e94560,stroke-width:2px
-```
-
-| Framework | Replay Type | Re-executes LLM? | Deterministic? | Costs Tokens? |
-|---|---|---|---|---|
-| **Weft** | Recorded trace replay | **No** | **Yes** | **No** |
-| LangGraph | Time-travel from checkpoints | Yes | No | Yes |
-| Mastra | No replay primitive | N/A | N/A | N/A |
-
-**[Full architecture →](docs/architecture.md)**
-
-> **Legal disclaimer — replay determinism.** `.replay()` replays a stored trace through the same operator logic with the same inputs, producing the same output _for a given version of Weft and a given underlying AI model_. It does **not** guarantee identical outputs across model version upgrades, provider API changes, or different runtime environments. Replay is a testing and debugging aid, not a cryptographic audit trail. Do not rely on replay parity as evidence of correctness in regulated or compliance-critical workflows without independent verification.
+**Record and replay**
+- `.rehearse(opts?)`: run once and record a trace of the outcome
+- `.replay(trace, opts?)`: check a recorded trace and return its stored output without running anything
 
 **Tracking**
-- `.tracked(opts?)` — source-tracking wrapper
-- `.tap(fn)` — side-effect without modifying value
+- `.tracked({ source, confidence })`: label the result with a source and confidence you supply
 
-**Observability** (also free, in `weft-core`)
-- `observable(unit, opts?)` — emit trace entries for a unit
-- `createOperatorSpan(type, name, parentSpanId?)` — manual span timing
-- `getTraces()` / `clearTraces()` — in-memory trace store
-- `configureObservability(opts)` — verbosity, cost/error tracking, collector
+**Run**
+- `.run(ctx, opts?)`: execute with a context from `createContext()`
+- `.runStandalone()`: execute without building a context first
+
+**Observability** (also in `weft-core`)
+- `observable(unit, opts?)`: record one trace entry when the unit succeeds. No timing, and failures are not recorded
+- `createOperatorSpan(type, name, parentSpanId?)`: a manually timed span, recorded when you call `.end()`
+- `getTraces()` / `clearTraces()`: in-memory trace store
+- `configureObservability(opts)`: verbosity and an optional collector callback
+- `configureOpenTelemetry()` / `exportTraces()` / `shutdownOpenTelemetry()`: export the stored traces as OpenTelemetry spans (optional peer packages)
+
+---
+
+## Record and replay
+
+`.rehearse()` runs a unit once and keeps the outcome. `.replay(trace)` hands that outcome back later without running the unit, after checking the trace has not been altered.
+
+```typescript
+import { AgentUnit, createContext } from "weft-core";
+
+const ctx = createContext();
+
+let runs = 0;
+const flaky = AgentUnit.from(async () => {
+  runs++;
+  if (Math.random() < 0.5) throw new Error("upstream timeout");
+  return { answer: 42 };
+}).retry(20, { baseDelayMs: 1 });
+
+// Record: runs the unit once (retries included) and keeps the outcome.
+const recorded = await flaky.rehearse().run(ctx);
+const { trace } = recorded.value;
+console.log(trace.events.map((e) => e.type)); // ["agent_start", "agent_end"]
+
+// Replay: nothing runs. The stored output comes back after its hashes are checked.
+const runsBefore = runs;
+const replayed = await flaky.replay(trace).run(ctx);
+console.log(replayed.value.value);   // { answer: 42 }
+console.log(replayed.value.matched); // true
+console.log(runs === runsBefore);    // true: the unit was not called again
+```
+
+What that buys you: capture a good run of a flaky or expensive chain once, then reuse its output in tests and demos with no model call and no tokens spent.
+
+What it does not do yet, so nobody finds out the hard way:
+
+- **The trace is the outcome, not the steps.** `.rehearse()` records two events, `agent_start` and `agent_end`, plus the final output and its hash. Model calls, tool calls and intermediate values inside the unit are not recorded.
+- **Replay does not re-run your agent.** It cannot tell you whether today's code would still produce the recorded output. Replay the same trace on a completely different unit and you still get `matched: true`.
+- **`matched` is an integrity check on the trace.** An edited event throws `ReplayDivergenceError`. An edited output comes back with `matched: false` and a critical divergence. The hashes are DJB2, a fast 32-bit checksum, not a cryptographic one.
+
+`FileStorage` (from `weft-core/rehearsal`) saves and loads traces as JSON files. The lower-level pieces, `TraceRecorder` and `RecordingLLMInterceptor`, are exported if you want to record individual model calls yourself.
+
+**[How record and replay works](docs/ARCHITECTURE.md)**
+
+> **Legal disclaimer: replay.** `.replay()` returns the output stored in a trace. It does not execute your agent, your operators or any model, so it says nothing about what a fresh run would produce today. The integrity hashes are a non-cryptographic checksum. Replay is a testing and debugging aid, not a cryptographic audit trail. Do not rely on it as evidence of correctness in regulated or compliance-critical workflows without independent verification.
 
 ---
 
 ## Status
 
-Pre-1.0. API is stabilising but may change between minor versions. We commit to a changelog entry for every breaking change and a migration path in the release notes.
-
----
-
-## Demo
-
-See the adversarial demo at [wefthq/weft-demo](https://github.com/wefthq/weft-demo) — a flaky agent that fails 80% of the time, recorded and replayed deterministically.
-
-**[Full demo transcript →](docs/demo-transcript.md)**
-
-Quick version:
-
-```
-# Phase 1: Flaky agent — 4/5 runs fail (genuinely non-deterministic)
-Run 1: ✗ FAILED — POST /analyze → TIMEOUT
-Run 2: ✗ FAILED — POST /analyze → TIMEOUT
-Run 3: ✗ FAILED — POST /export → TIMEOUT
-Run 4: ✓ SUCCESS — 5 results
-Run 5: ✗ FAILED — POST /export → TIMEOUT
-
-# Phase 2: .rehearse() captures a successful run
-Attempt 3: ✓ Success — 2 events recorded
-
-# Phase 3: .replay() — agent body NEVER called
-Events replayed: 2/2
-apiCallCount:    -999 (agent never ran!)
-Replay matched:  ✓ YES
-Divergences:     0
-
-# Phase 4: Output matches exactly. Zero re-execution.
-Exact match:      ✓ YES
-Agent re-executed: ✓ NO (deterministic!)
-```
+Beta. `weft-core` and `weft-pro` are on a `1.0.0-beta` line; the other packages are `0.x`. The API may change between beta releases. We commit to a changelog entry for every breaking change.
 
 ---
 
 ## Documentation
 
-- [Architecture](docs/ARCHITECTURE.md) — canonical vs mirror model, package structure, known asymmetries
-- [Record/Replay Architecture](docs/architecture.md) — deep dive into `.rehearse()` / `.replay()`
-- [Demo Transcript](docs/demo-transcript.md) — full adversarial demo output
-- [GitHub Discussions](https://github.com/wefthq/weft/discussions) — questions, feature proposals, show-and-tell
+- [Record and replay](docs/ARCHITECTURE.md): what `.rehearse()` and `.replay()` do, and the building blocks underneath
+- [Tier boundary](docs/tier-boundary.md): what is in `weft-core` and what is in `weft-pro`
+- [GitHub Discussions](https://github.com/wefthq/weft/discussions): questions, feature proposals, show-and-tell
 
 ---
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Short version: this repo is a distribution mirror — source changes originate upstream. External contributions are reviewed here and backported. File bugs as Issues; propose features in Discussions first.
+See [CONTRIBUTING.md](CONTRIBUTING.md). File bugs as Issues. Propose features in Discussions first.
 
 ---
 
 ## Licence
 
 `weft-core` and all packages except `weft-pro` are MIT.  
-`weft-pro` is [Business Source License 1.1](packages/weft-pro/LICENSE) — source-available; converts to MIT on 2030-04-24.
+`weft-pro` is [Business Source License 1.1](packages/weft-pro/LICENSE): source-available, converting to MIT on the Change Date in that file.
 
 See [LICENSE](LICENSE) for the full per-package breakdown.

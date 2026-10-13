@@ -6,9 +6,6 @@
 >
 > This package provides Convex-specific wrappers that bridge Convex `ActionCtx`
 > with `weft-core` AI primitives. It has no standalone consumer proof yet.
->
-> For Convex actions that need the full feature set (context builder, memory bootstrap, tracing),
-> use the internal spine directly: `convex/lib/agent_framework/` with `buildContext(actionCtx)`.
 
 ---
 
@@ -16,26 +13,51 @@
 
 `weft-convex` exports Convex action wrappers for the Weft framework:
 
-- `withAI(ctx, options)` — create an AI client bound to a Convex `ActionCtx`
+- `withAI(ctx, options)`: create an AI client bound to a Convex `ActionCtx`
 - Middleware: activity logging and cost tracking via typed `FunctionReference` mutations
 - Streaming: `streamToMutation()` for piping AI output into Convex mutations
-- Types: `WeftConvexOptions`, `WeftConvexClient`
+- Types: `ConvexAIOptions`, `ConvexAI`
 
 ---
 
-## Quick Start
+## Quick Start: minimal path (no middleware)
+
+The simplest usage omits mutations entirely. Guards only fire when mutation refs are present.
+
+```typescript
+import { withAI } from "weft-convex";
+
+export const myAction = internalAction({
+  handler: async (ctx) => {
+    const ai = withAI(ctx);                          // no mutations: no guards
+
+    const result = await ai.generate("Summarize this project");
+    return result;
+  },
+});
+```
+
+---
+
+## With middleware (activity logging and cost tracking)
+
+When you provide mutation refs, you **must** also provide the matching scope context.
+Both guards throw at construction time, before any AI call, so misconfiguration is caught early.
 
 ```typescript
 import { withAI } from "weft-convex";
 import { internal } from "./_generated/api";
 
 export const myAction = internalAction({
-  handler: async (ctx) => {
+  args: { userId: v.string(), projectId: v.string(), threadId: v.string() },
+  handler: async (ctx, args) => {
     const ai = withAI(ctx, {
       mutations: {
-        logActivity: internal.ai.logActivity,
-        trackCost: internal.ai.trackCost,
+        logActivity: internal.ai.logActivity,   // requires activityContext
+        trackCost: internal.ai.trackCost,        // requires costContext.userId
       },
+      activityContext: { projectId: args.projectId, threadId: args.threadId },
+      costContext: { userId: args.userId, projectId: args.projectId },
     });
 
     const result = await ai.generate("Summarize this project");
@@ -43,6 +65,12 @@ export const myAction = internalAction({
   },
 });
 ```
+
+Guard behaviour:
+- `mutations.logActivity` provided without `activityContext` → throws immediately
+- `mutations.trackCost` provided without `costContext.userId` → throws immediately
+
+---
 
 ## Supported API (Main Path)
 
@@ -52,7 +80,7 @@ export const myAction = internalAction({
 | `streamToMutation(stream, config)` | Stream AI output to a Convex mutation |
 | `raw` | Direct access to the `ai()` function from `weft-core` |
 
-### Options
+### Options (`ConvexAIOptions`)
 
 ```typescript
 withAI(ctx, {
@@ -63,12 +91,12 @@ withAI(ctx, {
   logActivity: true,        // default: true when mutation provided
   trackCosts: true,         // default: true when mutation provided
   defaultModel: "gpt-4o",  // optional default model
-  activityContext: { projectId, threadId },
-  costContext: { userId, projectId },
+  activityContext: { projectId, threadId },  // required with logActivity mutation
+  costContext: { userId, projectId },         // userId required with trackCost mutation
 });
 ```
 
-The `mutations` field accepts explicit `FunctionReference` values - no more
+The `mutations` field accepts explicit `FunctionReference` values: no more
 `internalApi: any` object. If a mutation ref is not provided, the corresponding
 middleware is silently skipped.
 
@@ -96,7 +124,7 @@ const result = await ai.experimental.generateTyped("Create data", zodSchema);
 | Activity logging to Convex tables | Exists but no production proof |
 | Cost tracking | Exists but no production proof |
 | `streamToMutation()` | Exists but no production proof |
-| Upstream-app-specific types | Not part of this package's API surface — removed in Waves 1–3 |
+| Upstream-app-specific types | Not part of this package's API surface: removed in Waves 1–3 |
 
 ---
 

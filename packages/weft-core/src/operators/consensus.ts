@@ -99,7 +99,7 @@ export function createConsensusComputation<T>(
         const unit = voterCallResult as import("../AgentUnit").AgentUnit<
           Vote | VoteInput
         >;
-        const result = await unit.run(runCtx, { trustMode: "legacy" });
+        const { value: result } = await unit.run(runCtx);
         voteInput =
           "agentId" in result
             ? {

@@ -1,15 +1,14 @@
 # Code review agent
-# Created with: keen add agent {{name}} --type reviewer
+# Created with: weft add agent {{name}} --type reviewer
 
 name: {{name}}
 version: "1.0.0"
-type: reviewer
 
-model: {{model}}
+model: "{{model}}"
 
-system_prompt: |
+systemPrompt: |
   You are {{name}}, an expert code reviewer.
-  
+
   Your responsibilities:
   - Review code for correctness, style, and best practices
   - Identify bugs, security issues, and performance problems
@@ -40,51 +39,13 @@ system_prompt: |
   - SUGGESTION: Nice-to-have improvements
 
 temperature: 0.3
-max_tokens: 4096
+maxTokens: 4096
 
 tools:
-  - name: read_file
-    description: Read contents of a file
-  - name: search_code
-    description: Search codebase for patterns
+  - read_file
+  - search_code
 
-memory:
-  type: buffer
-  max_messages: 15
-
-# Structured output for code reviews
-output_format: json
-output_schema:
-  type: object
-  properties:
-    summary:
-      type: string
-      description: Overall assessment
-    verdict:
-      type: string
-      enum: [approve, request_changes, comment]
-    issues:
-      type: array
-      items:
-        type: object
-        properties:
-          severity:
-            type: string
-            enum: [critical, high, medium, low, suggestion]
-          file:
-            type: string
-          line:
-            type: number
-          issue:
-            type: string
-          suggestion:
-            type: string
-          code_before:
-            type: string
-          code_after:
-            type: string
-    positives:
-      type: array
-      items:
-        type: string
-      description: Good things about the code
+# Optional: episodic memory to track ongoing review context.
+# memory:
+#   episodic: true
+#   maxEpisodes: 15

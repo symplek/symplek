@@ -1,15 +1,12 @@
 /**
- * @fileoverview MCPUnit — factory for creating MCP-aware AgentUnit computations
+ * @fileoverview MCPUnit — factory for MCP tool calls with evidence wrapping and policy evaluation
  * @module weft-mcp
  * @since 0.1.0
  *
- * 📝 BUILD[F-068/04.05]: MCPUnit factory wrapping transport + evidence + policies
- *
  * Level 3 API: Full control over transport, policies, and execution.
- * MCPUnit is a factory around AgentUnit (NOT a second monad).
  *
  * Usage:
- *   const mcp = MCPUnit.create({ transport: { transport: "http", endpoint: "..." } });
+ *   const mcp = MCPUnit.create({ transport: { transport: "stdio", command: "node", args: ["./dist/bin.cjs"] } });
  *   const result = await mcp.call("toolName", { input: "data" });
  */
 
@@ -36,19 +33,44 @@ import type { MCPPolicyVerdict, MCPTrustPolicy } from "./types";
 export interface MCPUnitConfig {
   transport: MCPTransportConfig;
   /**
+   * Stable identifier for this server, used in evidence provenance chains.
+   *
+   * When omitted, the identity is derived from `transport.endpoint` (for
+   * HTTP/SSE) or `transport.command + args` (for stdio). With stdio, every
+   * server started with `node` would otherwise share the identity `"node"`.
+   * Provide an explicit `serverId` when you run more than one stdio server.
+   */
+  serverId?: string;
+  /**
    * Trust policies to evaluate on every tool call.
    *
-   * - `undefined` (default): safe defaults — `createDefaultPolicyEngine()`
-   *   pre-loads `allowTrustedOnly`, `requireAttestation`, `requireTwoSources`,
-   *   `degradeToReadOnly`. Recommended for production.
-   * - `MCPTrustPolicy[]`: explicit policy list (use `[]` to opt out of all
-   *   policy enforcement — every call returns `allow`. This is an explicit
-   *   trust-everything mode, intended for tests and trusted internal tools).
+   * **What default policies actually check today:**
+   * - `allowTrustedOnly`: checks that the client-generated `policyVerdict`
+   *   field is "allow" and that the provenance chain is non-empty. Both
+   *   conditions are always true for a freshly created evidence object.
+   * - `requireAttestation`: checks that the provenance chain is non-empty.
+   *   Always true for a fresh call.
+   * - `degradeToReadOnly`: same two checks; always returns "allow" for a fresh
+   *   call.
+   *
+   * These policies run **after** the tool has already executed — a "deny"
+   * stops evidence from being returned but cannot undo a side effect.
+   *
+   * None of the defaults consult an external registry or verify the server
+   * identity. They provide structural shape guarantees on the evidence object,
+   * not attestation. To add real enforcement, supply a custom policy that reads
+   * your own registry or trust store.
+   *
+   * - `undefined` (default): the three built-in policies above. Every fresh
+   *   call passes them.
+   * - `MCPTrustPolicy[]`: explicit policy list. Use `[]` to opt out of all
+   *   policy evaluation (trust-everything mode, suitable for tests and
+   *   well-known internal tools).
    */
   policies?: MCPTrustPolicy[];
   /** Default per-call timeout in ms (falls back to transport-level default). */
   defaultTimeout?: number;
-  /** Default retry count (reserved for Story 04.06 retry operator). */
+  /** Default retry count (reserved for future retry operator). */
   defaultRetry?: number;
 }
 
@@ -65,10 +87,10 @@ export class MCPUnit {
   private constructor(config: MCPUnitConfig) {
     this._config = config;
     this.client = createTransport(config.transport);
-    // Safe default: when callers omit `policies` entirely, pre-load the four
-    // built-in trust policies. Callers who want trust-everything must pass
-    // an explicit empty array (`policies: []`) — making that choice visible
-    // in code and at code review time.
+    // Safe default: when callers omit `policies` entirely, pre-load the three
+    // built-in trust policies that a fresh call can satisfy. Callers who want
+    // trust-everything must pass an explicit empty array (`policies: []`) —
+    // making that choice visible in code and at code review time.
     this.policyEngine =
       config.policies === undefined
         ? createDefaultPolicyEngine()
@@ -126,12 +148,22 @@ export class MCPUnit {
       throw new MCPCallError(toolName, result.meta);
     }
 
+    // M12 fix: derive a meaningful server identity when serverId is not explicit.
+    // Using only `command` (e.g. "node") gave every stdio server the same
+    // identity, making provenance chains indistinguishable.
+    const derivedServerId =
+      this._config.serverId ??
+      this._config.transport.endpoint ??
+      (this._config.transport.command
+        ? [
+            this._config.transport.command,
+            ...(this._config.transport.args ?? []),
+          ].join(" ")
+        : "unknown");
+
     const evidence = createMCPEvidence<T>({
       value: result.content as T,
-      serverId:
-        this._config.transport.endpoint ??
-        this._config.transport.command ??
-        "unknown",
+      serverId: derivedServerId,
       toolName,
       transport: this._config.transport.transport,
       input,
@@ -198,8 +230,36 @@ export class MCPCallError extends Error {
     public readonly toolName: string,
     public readonly meta?: Record<string, unknown>,
   ) {
-    super(`MCP tool call failed: ${toolName}`);
+    // Include what the server said, so callers do not have to dig through
+    // `.meta` to learn why the call failed.
+    const text = serverErrorText(meta);
+    super(
+      `MCP tool call failed: ${toolName}${text === undefined ? "" : `: ${text}`}`,
+    );
   }
+}
+
+/**
+ * The text a server sent with a failed call, if it sent any. A JSON-RPC error
+ * carries it as `message`. A tool-level error (`isError`) carries it as a text
+ * item in the result's `content` array.
+ */
+function serverErrorText(
+  meta: Record<string, unknown> | undefined,
+): string | undefined {
+  if (typeof meta?.message === "string") return meta.message;
+  if (!Array.isArray(meta?.content)) return undefined;
+  for (const item of meta.content) {
+    if (
+      item !== null &&
+      typeof item === "object" &&
+      "text" in item &&
+      typeof item.text === "string"
+    ) {
+      return item.text;
+    }
+  }
+  return undefined;
 }
 
 export class MCPPolicyDeniedError extends Error {

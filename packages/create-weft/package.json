@@ -1,7 +1,8 @@
 {
   "name": "create-weft",
   "version": "0.1.0",
-  "description": "Scaffold a Weft agent project — npm create wrapper around weft-cli init.",
+  "private": true,
+  "description": "Scaffold a Weft agent project: a thin wrapper around `weft init` from weft-cli.",
   "license": "MIT",
   "bin": {
     "create-weft": "./dist/index.js"
@@ -28,13 +29,16 @@
     "lint": "biome check .",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "weft-cli": "workspace:*"
+  },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "tsup": "^8.0.0",
     "typescript": "^5.5.0"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20.19"
   },
   "publishConfig": {
     "access": "public",

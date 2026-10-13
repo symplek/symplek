@@ -1,41 +1,43 @@
 /**
- * @module TrackedTool - MCP tool definition for the Weft tracked operator
- * @description Wires weft_tracked MCP calls to AgentUnit.tracked() operator.
- * Wraps the prompt with source-chain provenance and adds a SHA-256 content hash
- * for downstream claim verification.
+ * @module TrackedTool - MCP tool definition for the weft_tracked tool
+ * @description Records a caller-supplied claim with its stated source URI,
+ * confidence, a SHA-256 content hash, and an ISO-8601 timestamp. Nothing is
+ * verified: source and confidence are the caller's own assertions, recorded
+ * verbatim. The hash is deterministic for the same (prompt, source) pair and
+ * is tamper-evident for the content, not the source's external trustworthiness.
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */
 
 import { createHash } from "node:crypto";
-import { AgentUnit, createContext } from "weft-core";
 
 // ─── Tool Definition ──────────────────────────────────────────────────────────
 
 export const trackedTool = {
   name: "weft_tracked",
-  // N57 fix: removed "verifiable source" language. The hash now covers both the
-  // prompt text and the source URI so the binding is tamper-evident, but we make
-  // no claim about verifying the source's external trustworthiness.
   description:
-    "Wrap a value with source-chain provenance. Records the source URI, confidence score, and a SHA-256 content hash (covers prompt text + source URI) for downstream tracking.",
+    "Record a claim with its stated source URI and confidence score. " +
+    "Returns the claim unchanged with a SHA-256 content hash (covers prompt + source URI) " +
+    "and a timestamp. " +
+    "Source and confidence are the caller's own assertions — nothing is verified or attested. " +
+    "Use the hash to detect accidental or adversarial content changes across turns.",
   inputSchema: {
     type: "object" as const,
     properties: {
       prompt: {
         type: "string",
         maxLength: 16_384,
-        description: "The agent prompt or claim to track",
+        description: "The agent prompt or claim to record",
       },
       source: {
         type: "string",
         maxLength: 2_048,
-        description: "Source URI (file path or URL)",
+        description: "Source URI (file path or URL) — recorded as stated, not verified",
       },
       confidence: {
         type: "number",
         minimum: 0,
         maximum: 1,
-        description: "Confidence score (0.0–1.0)",
+        description: "Confidence score (0.0–1.0) — recorded as stated, not verified",
       },
     },
     required: ["prompt", "source", "confidence"],
@@ -50,30 +52,29 @@ export const trackedTool = {
     confidence: number;
     hash: string;
     timestamp: string;
+    notice: string;
   }> => {
-    const ctx = createContext();
-
-    // Use trustMode: 'legacy' so the return type is TrackedResult<string>
-    // (not TrackedResult<TrackedResult<string>> from double-wrapping in zero-trust mode).
-    const tracked = await AgentUnit.of(input.prompt)
-      .tracked({ source: "agent", confidence: input.confidence })
-      .run(ctx, { trustMode: "legacy" });
-
-    // N57 fix: bind source URI into the hash so the same prompt at a different
-    // source produces a different hash. Previously hashing only the prompt meant
-    // callers could substitute an arbitrary source URI without breaking the hash.
+    // M7 fix: use JSON.stringify([prompt, source]) as hash input so that a
+    // separator character inside prompt cannot bleed into source and produce
+    // the same hash as a different (prompt, source) split.
+    // e.g. prompt="a|b", source="c" vs prompt="a", source="b|c" previously
+    // both produced SHA256("a|b|c") — now they produce different hashes.
     const hash = `sha256:${createHash("sha256")
-      .update(input.prompt)
-      .update("|")
-      .update(input.source)
+      .update(JSON.stringify([input.prompt, input.source]))
       .digest("hex")}`;
 
     return {
-      value: tracked.value,
+      value: input.prompt,
       source: input.source,
-      confidence: tracked.confidence,
+      confidence: input.confidence,
       hash,
       timestamp: new Date().toISOString(),
+      // M7 fix: state explicitly that nothing was verified so a calling agent
+      // cannot mistake this result for external attestation.
+      notice:
+        "Source and confidence are the caller's own claims, recorded verbatim. " +
+        "Nothing was verified or attested. " +
+        "The hash is tamper-evident for (prompt + source); it does not certify the source's trustworthiness.",
     };
   },
 };

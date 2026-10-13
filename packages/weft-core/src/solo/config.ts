@@ -2,7 +2,7 @@
  * @fileoverview Solo Mechanism Configuration
  * @description Default configuration and presets for solo execution
  * @module weft-core/solo/config
- * @since 2.2.0
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[STORY-01.03]: Configuration and presets
  *

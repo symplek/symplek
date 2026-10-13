@@ -1,15 +1,14 @@
 # General conversational agent
-# Created with: keen add agent {{name}} --type general
+# Created with: weft add agent {{name}} --type general
 
 name: {{name}}
 version: "1.0.0"
-type: general
 
-model: {{model}}
+model: "{{model}}"
 
-system_prompt: |
+systemPrompt: |
   You are {{name}}, a helpful AI assistant.
-  
+
   Your responsibilities:
   - Answer questions clearly and accurately
   - Provide helpful explanations
@@ -22,24 +21,14 @@ system_prompt: |
   - Provide examples when helpful
 
 temperature: 0.7
-max_tokens: 2048
+maxTokens: 2048
 
-# Optional: Add tools for enhanced capabilities
+# Optional: enable tools when you have defined them in your project.
 # tools:
-#   - name: search
-#     description: Search for information
-#   - name: calculator
-#     description: Perform calculations
+#   - search
+#   - calculator
 
-# Memory for conversation context
-memory:
-  type: buffer
-  max_messages: 10
-
-# Response format (optional)
-# output_format: json
-# output_schema:
-#   type: object
-#   properties:
-#     response:
-#       type: string
+# Optional: episodic memory — store recent turns for context.
+# memory:
+#   episodic: true
+#   maxEpisodes: 10

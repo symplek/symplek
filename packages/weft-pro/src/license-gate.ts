@@ -12,8 +12,13 @@
  * - The import side-effect is NOT strippable by bundlers (unlike a bare statement)
  * - `validateLicense()` and `isProLicensed()` are exported for the public API
  *
+ * The key can only be supplied through the WEFT_PRO_LICENSE_KEY environment
+ * variable, and it must be set before the package is first imported: the gate
+ * runs when this module loads, so nothing exported from here can be called
+ * until it has already passed.
+ *
  * @module weft-pro/license-gate
- * @since 1.0.0-beta.2 — License-gated at module level
+ * @since 1.0.0-beta.1 — License-gated at module level
  */
 
 const LICENSE_ENV_VAR = "WEFT_PRO_LICENSE_KEY";
@@ -24,10 +29,14 @@ let _licenseKey: string | null = null;
 /**
  * Validate a Weft Pro license key.
  *
- * Called automatically on module load if WEFT_PRO_LICENSE_KEY is set.
- * Otherwise, consumers must call this before using any Pro features.
+ * Called automatically on module load with WEFT_PRO_LICENSE_KEY. Because the
+ * gate below runs at module load, this function is only reachable once a key
+ * has already been accepted; calling it with a key re-checks that key.
  *
- * @throws {Error} if the key is invalid or expired
+ * The check is format-only (`weft_pro_` followed by 40 lowercase hex
+ * characters). No signature, expiry or server lookup is performed.
+ *
+ * @throws {Error} if the key is missing or malformed
  */
 export function validateLicense(key?: string): void {
   // If already validated and no new key is passed, skip re-validation
@@ -37,9 +46,8 @@ export function validateLicense(key?: string): void {
 
   if (!effectiveKey || effectiveKey.trim().length === 0) {
     throw new Error(
-      "Weft Pro requires a valid license key. " +
-        `Set ${LICENSE_ENV_VAR} or call validateLicense(key). ` +
-        "Get a key at https://weft.gg/pro",
+      "Weft Pro requires a license key. " +
+        `Set the ${LICENSE_ENV_VAR} environment variable before importing weft-pro.`,
     );
   }
 
@@ -50,8 +58,8 @@ export function validateLicense(key?: string): void {
   if (!KEY_PATTERN.test(effectiveKey.trim())) {
     throw new Error(
       "Invalid Weft Pro license key format. " +
-        "Expected: weft_pro_<40 hex chars>. Got: " +
-        `${effectiveKey.slice(0, 20)}...`,
+        "Expected: weft_pro_<40 lowercase hex chars>. " +
+        `Check the value of ${LICENSE_ENV_VAR}.`,
     );
   }
 
@@ -73,25 +81,10 @@ export function isProLicensed(): boolean {
  */
 function requireLicense(): void {
   if (!_licenseValidated) {
-    throw new Error(
-      "Weft Pro features require a valid license. " +
-        `Call validateLicense(key) or set ${LICENSE_ENV_VAR}. ` +
-        "Get a key at https://weft.gg/pro",
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// AUTO-VALIDATE ON MODULE LOAD (if env var set)
-// ─────────────────────────────────────────────────────────────────────────────
-
-try {
-  if (process.env[LICENSE_ENV_VAR]) {
+    // Re-run validation so the caller sees the specific reason: the variable
+    // is missing, or it is set but malformed.
     validateLicense();
   }
-} catch {
-  // Suppress auto-validation errors — consumers must call validateLicense()
-  // explicitly if they want the error to propagate
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

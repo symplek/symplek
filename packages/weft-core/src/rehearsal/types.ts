@@ -50,6 +50,12 @@ export interface LLMCallPayload {
   readonly model: string;
   readonly prompt?: string; // Optional - excluded by default for privacy
   readonly promptHash: string; // Always included for comparison
+  /**
+   * Hash of the whole call config. This is the value replay compares a call
+   * against, so it is recorded with the call. Absent from traces written
+   * before it was added.
+   */
+  readonly configHash?: string;
   readonly temperature?: number;
   readonly maxTokens?: number;
   readonly systemPrompt?: string;

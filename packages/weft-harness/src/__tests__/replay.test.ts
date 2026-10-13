@@ -11,9 +11,11 @@ import {
   assertDeterministic,
   DeterminismViolationError,
 } from "../replay/assert-deterministic";
+import type { SdkEvent } from "../operators/execute";
 import {
   parseTrace,
   ReplayAdapter,
+  ReplayIncompleteError,
   ReplayMismatchError,
 } from "../replay/index";
 
@@ -192,16 +194,70 @@ describe("ReplayAdapter", () => {
     ).rejects.toBeInstanceOf(ReplayMismatchError);
   });
 
-  it("returns empty finalMessage when trace has no sentinel", async () => {
-    const noSentinelTrace = toJSONL([TOOL_ENTRY_1]);
+  // This case used to return an empty finalMessage. A trace with no SessionEnd
+  // line is what a failed run leaves behind, so handing back "" replayed a
+  // failure as a completed run with empty output.
+  it("refuses a trace whose last run did not complete", async () => {
+    const events: SdkEvent[] = [];
     const adapter = new ReplayAdapter({
       tracePath: "traces/test.jsonl",
-      reader: makeReader(noSentinelTrace),
+      reader: makeReader(toJSONL([TOOL_ENTRY_1])),
     });
 
-    const result = await adapter.run({ permissionMode: "acceptEdits" });
+    await expect(
+      adapter.run({
+        permissionMode: "acceptEdits",
+        onEvent: (event) => events.push(event),
+      }),
+    ).rejects.toBeInstanceOf(ReplayIncompleteError);
+    expect(events).toEqual([]);
+  });
 
-    expect(result.finalMessage).toBe("");
+  it("refuses when a completed run is followed by a failed one", async () => {
+    const adapter = new ReplayAdapter({
+      tracePath: "traces/test.jsonl",
+      reader: makeReader(toJSONL([TOOL_ENTRY_1, TOOL_ENTRY_2, SENTINEL, TOOL_ENTRY_1])),
+    });
+
+    await expect(
+      adapter.run({ permissionMode: "acceptEdits" }),
+    ).rejects.toBeInstanceOf(ReplayIncompleteError);
+  });
+
+  it("replays only the last run when a failed run and its retry share a file", async () => {
+    // A failed run left one entry with no SessionEnd. The retry appended its
+    // two entries and a SessionEnd that records two steps.
+    const failedRunEntry = { ...TOOL_ENTRY_1, tool: "Grep", args: { path: "src/old.ts" } };
+    const tools: (string | undefined)[] = [];
+    const adapter = new ReplayAdapter({
+      tracePath: "traces/test.jsonl",
+      reader: makeReader(toJSONL([failedRunEntry, TOOL_ENTRY_1, TOOL_ENTRY_2, SENTINEL])),
+    });
+
+    const result = await adapter.run({
+      permissionMode: "acceptEdits",
+      onEvent: (event) => tools.push(event.tool),
+    });
+
+    expect(tools).toEqual(["Read", "Edit"]);
+    expect(result.finalMessage).toBe("Refactor complete.");
+  });
+
+  it("replays only the last run when two completed runs share a file", async () => {
+    const firstRun = [TOOL_ENTRY_1, { ...SENTINEL, total_steps: 1, final_output: "first" }];
+    const tools: (string | undefined)[] = [];
+    const adapter = new ReplayAdapter({
+      tracePath: "traces/test.jsonl",
+      reader: makeReader(toJSONL([...firstRun, TOOL_ENTRY_1, TOOL_ENTRY_2, SENTINEL])),
+    });
+
+    const result = await adapter.run({
+      permissionMode: "acceptEdits",
+      onEvent: (event) => tools.push(event.tool),
+    });
+
+    expect(tools).toEqual(["Read", "Edit"]);
+    expect(result.finalMessage).toBe("Refactor complete.");
   });
 });
 

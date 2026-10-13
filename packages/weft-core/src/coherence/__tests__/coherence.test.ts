@@ -2,7 +2,7 @@
  * @fileoverview Coherence Module Tests
  * @description Unit and integration tests for ensemble coherence calculations
  * @module weft-core/coherence/__tests__/coherence
- * @since 2.1.0
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[STORY-02.06]: Integration tests for coherence module
  */

@@ -2,7 +2,7 @@
  * @fileoverview Variance-Based Coherence Calculation
  * @description Measures coherence from vote confidence variance
  * @module weft-core/coherence/calculations/varianceCoherence
- * @since 2.1.0
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[STORY-01.03]: Variance coherence implementation
  *

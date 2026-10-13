@@ -1,7 +1,7 @@
 {
   "name": "weft-pro",
   "version": "1.0.0-beta.1",
-  "description": "Advanced multi-agent coordination for Weft — TaCo consensus, teams, solo gate, rehearsal",
+  "description": "Advanced multi-agent coordination for Weft: TaCo consensus, stigmergic confidence, agent antibodies, trust registry",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -9,9 +9,8 @@
   "license": "BUSL-1.1",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+      "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
     }
   },
   "files": [
@@ -26,8 +25,6 @@
     "multi-agent",
     "consensus",
     "enterprise",
-    "observability",
-    "testing",
     "coordination"
   ],
   "repository": {
@@ -51,7 +48,7 @@
     "test:contract": "vitest run src/__tests__/contractSmoke.test.ts"
   },
   "peerDependencies": {
-    "weft-core": "workspace:*"
+    "weft-core": "workspace:^"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

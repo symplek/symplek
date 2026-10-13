@@ -9,12 +9,24 @@
 import type { ConsensusOptions, Vote, VoteInput } from "weft-core";
 import { AgentUnit, createContext } from "weft-core";
 
+/** Carried in every result so a stub approval cannot be read as a decision. */
+const SIMULATION_NOTICE =
+  "No evaluation took place. Every voter is a fixed stub that approves, whatever the prompt says. Do not treat `approved` as a decision.";
+
 // ─── Tool Definition ──────────────────────────────────────────────────────────
 
 export const consensusTool = {
   name: "weft_consensus",
+  // N52-consensus: previous description claimed each voter evaluates the prompt
+  // independently. Voters are deterministic stubs — each always approves at 0.8
+  // regardless of prompt content. The description now discloses simulation so no
+  // caller mistakes the approval for genuine multi-perspective evaluation.
   description:
-    "Run a consensus vote across multiple agents. Each voter evaluates the prompt independently. Returns approval status and individual votes.",
+    "Fixture: exercises the Weft consensus operator wiring without making LLM calls. " +
+    "Voters are deterministic stubs — each always approves the prompt with confidence 0.8. " +
+    "Quorum and veto rules are enforced by weft-core. " +
+    "Use for operator wiring tests, threshold validation, and result-shape verification. " +
+    "For real independent agent votes use AgentUnit.consensus() with model-backed voters.",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -46,6 +58,8 @@ export const consensusTool = {
     threshold: number;
     vetoers?: string[];
   }): Promise<{
+    simulated: true;
+    notice: string;
     approved: boolean;
     score: number;
     votes: Vote[];
@@ -58,7 +72,7 @@ export const consensusTool = {
         (_proposal: string): VoteInput => ({
           decision: "approve" as const,
           confidence: 0.8,
-          reasoning: `${voterName} reviewed the proposal and approves`,
+          reasoning: `stub vote for "${voterName}": always approve, nothing was evaluated`,
         }),
     );
 
@@ -73,6 +87,10 @@ export const consensusTool = {
       .run(ctx);
 
     return {
+      // The result says so itself, because a calling agent may act on the
+      // payload without re-reading the tool description.
+      simulated: true,
+      notice: SIMULATION_NOTICE,
       approved: result.value.approved,
       score: result.value.weightedApproval,
       votes: result.value.votes,

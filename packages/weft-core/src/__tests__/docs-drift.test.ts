@@ -6,7 +6,12 @@
  *   Add new FORBIDDEN entries here as future APIs are removed or renamed.
  */
 
-import { readdirSync, readFileSync } from "node:fs";
+import {
+  type Dirent,
+  existsSync,
+  readdirSync,
+  readFileSync,
+} from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -51,7 +56,17 @@ const FORBIDDEN: ForbiddenPattern[] = [
 function findReadmes(dir: string): string[] {
   const SKIP = new Set(["node_modules", ".git", "dist", ".cache", "coverage"]);
   const results: string[] = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch (error) {
+    // Other test files create and delete scratch directories inside the
+    // workspace while this walk runs. One that disappears between being
+    // listed and being opened holds no README worth checking.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return results;
+    throw error;
+  }
+  for (const entry of entries) {
     if (SKIP.has(entry.name)) continue;
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
@@ -73,13 +88,19 @@ function extractTsBlocks(content: string): string[] {
 
 // ─── Scan workspace ───────────────────────────────────────────────────────────
 
-// __dirname resolves to packages/weft-core/src/__tests__; workspace root is 4 up.
-const WORKSPACE_ROOT = resolve(__dirname, "../../../../..");
+// __dirname is packages/weft-core/src/__tests__, so the workspace root is four
+// levels up. Five reaches the folder that holds the repository and scans
+// every project checked out beside it.
+const WORKSPACE_ROOT = resolve(__dirname, "../../../..");
 const allReadmes = findReadmes(WORKSPACE_ROOT);
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("docs-drift: README fenced TypeScript blocks", () => {
+  it("scans this repository, not the folder that contains it", () => {
+    expect(existsSync(join(WORKSPACE_ROOT, "pnpm-workspace.yaml"))).toBe(true);
+  });
+
   it("discovers at least one README to check", () => {
     expect(allReadmes.length).toBeGreaterThan(0);
   });

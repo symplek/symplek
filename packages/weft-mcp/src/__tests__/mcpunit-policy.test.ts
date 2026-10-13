@@ -258,6 +258,48 @@ describe("MCPUnit policy verdict: quarantine (B6 fix)", () => {
   });
 });
 
+// ─── Default policy engine ────────────────────────────────────────────────────
+// T6 gate: MCPUnit with DEFAULT policies must be callable — not blocked by every
+// built-in policy. Before the fix, requireTwoSources was in the defaults and
+// always returned "degrade" (no corroboration mechanism exists), making every
+// default-policy MCPUnit.call() throw MCPPolicyDegradedError.
+
+describe("MCPUnit with default policies (undefined policies)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockConnect.mockResolvedValue(undefined);
+    mockCallToolWithTimeout.mockResolvedValue(successResult);
+  });
+
+  it("default policies allow a fresh call with self-generated provenance", async () => {
+    // policies:undefined → createDefaultPolicyEngine() → [allowTrustedOnly, requireAttestation, degradeToReadOnly]
+    // Fresh evidence from createMCPEvidence() has policyVerdict:"allow" and a
+    // non-empty provenanceChain — all three default policies return "allow".
+    const mcp = MCPUnit.create({
+      transport: { transport: "stdio", command: "echo" },
+      // policies omitted — uses createDefaultPolicyEngine()
+    });
+
+    // Must NOT throw; MCPPolicyDegradedError would mean defaults blocked the call.
+    const evidence = await mcp.call("some_tool", {});
+    expect(evidence.mcp.policyVerdict).toBe("allow");
+    expect(evidence.source).toBe("mcp");
+  });
+
+  it("default policies degrade when requireTwoSources is added explicitly", async () => {
+    // requireTwoSources is NOT in defaults but can be added explicitly.
+    // This test documents that the policy works and DOES degrade when corroboration
+    // is absent — callers who add it knowingly accept that behaviour.
+    const { requireTwoSources } = await import("../policies/requireTwoSources");
+    const mcp = MCPUnit.create({
+      transport: { transport: "stdio", command: "echo" },
+      policies: [requireTwoSources],
+    });
+
+    await expect(mcp.call("tool", {})).rejects.toThrow(MCPPolicyDegradedError);
+  });
+});
+
 // ─── Verdict precedence across multiple policies ──────────────────────────────
 
 describe("verdict precedence: deny > quarantine > degrade > allow", () => {
@@ -331,5 +373,56 @@ describe("trustOverride bypasses policy evaluation", () => {
       trustOverride: "allow",
     });
     expect(evidence.mcp.policyVerdict).toBe("allow");
+  });
+});
+
+// ─── M13: TrustPolicyEngine.policies getter ───────────────────────────────────
+
+describe("TrustPolicyEngine.policies getter (M13 fix)", () => {
+  it("policies getter returns the configured policy array", async () => {
+    const { createDefaultPolicyEngine } = await import("../policies/TrustPolicyEngine.js");
+    const engine = createDefaultPolicyEngine();
+    // Must be accessible (not a TypeScript error before the fix) and non-empty.
+    expect(Array.isArray(engine.policies)).toBe(true);
+    expect(engine.policies.length).toBeGreaterThan(0);
+  });
+
+  it("spread pattern compiles and produces correct length", async () => {
+    const { createDefaultPolicyEngine } = await import("../policies/TrustPolicyEngine.js");
+    const { requireTwoSources } = await import("../policies/requireTwoSources.js");
+
+    const defaultEngine = createDefaultPolicyEngine();
+    // This is the exact pattern from the doc comment — must compile and run.
+    const extendedPolicies = [...defaultEngine.policies, requireTwoSources];
+
+    expect(extendedPolicies.length).toBe(defaultEngine.policies.length + 1);
+    expect(extendedPolicies.at(-1)?.name).toBe("requireTwoSources");
+  });
+});
+
+// ─── M10: MCPCallError message includes server text ────────────────────────────
+
+describe("MCPCallError message (M10 fix)", () => {
+  it("includes the server message when meta.message is a string", async () => {
+    const { MCPCallError } = await import("../MCPUnit.js");
+    const err = new MCPCallError("my_tool", {
+      code: -32603,
+      message: "disk full",
+    });
+    expect(err.message).toContain("my_tool");
+    expect(err.message).toContain("disk full");
+  });
+
+  it("falls back gracefully when meta has no message", async () => {
+    const { MCPCallError } = await import("../MCPUnit.js");
+    const err = new MCPCallError("my_tool", { code: 500 });
+    expect(err.message).toContain("my_tool");
+    expect(err.message).not.toContain("undefined");
+  });
+
+  it("does not throw when meta is undefined", async () => {
+    const { MCPCallError } = await import("../MCPUnit.js");
+    const err = new MCPCallError("my_tool");
+    expect(err.message).toBe("MCP tool call failed: my_tool");
   });
 });

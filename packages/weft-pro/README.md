@@ -1,8 +1,22 @@
 # weft-pro
 
-**Advanced multi-agent consensus, observability, and security primitives for production AI systems.**
+**Multi-round consensus, stigmergic confidence, output screening and trust lanes for multi-agent systems.**
 
-> **Status: Experimental** — All exports produce real, testable behavior. No production consumers yet. Treat the API surface as unstable until 1.0.0 stable.
+> **Status: Experimental**: All exports produce real, testable behavior. No production consumers yet. Treat the API surface as unstable until 1.0.0 stable.
+
+---
+
+## A license key is required before import
+
+`weft-pro` checks for a license key when the package is first loaded. Set it in the environment before your application starts:
+
+```bash
+export WEFT_PRO_LICENSE_KEY="weft_pro_<40 lowercase hex chars>"
+```
+
+Without it, `import "weft-pro"` (or `require`) throws. The environment variable is the only way to supply the key: the check runs at import, so no function from the package can be called first.
+
+Today the check is on the key's format only (`weft_pro_` followed by 40 lowercase hex characters). There is no signature, expiry or network lookup.
 
 ---
 
@@ -20,39 +34,31 @@ pnpm add weft-core weft-pro
 
 ## What weft-pro adds
 
-| Feature | Description | weft-core | weft-pro |
-|---|---|:---:|:---:|
-| Lazy agent monad (`AgentUnit`) | Compose agents without executing until `.run()` | ✓ | ✓ |
-| Resilience operators | `.retry()`, `.timeout()`, `.fallback()` | ✓ | ✓ |
-| Single-round consensus | Vote once, tally, return `approved` | ✓ | ✓ |
-| **Multi-round TaCo consensus** | Agents share rationale and revote until convergence | — | ✓ |
-| **Stigmergic confidence** | Pheromone-based coordination with evaporation/decay | — | ✓ |
-| **Agent antibodies** | Runtime output pattern scanning — reject, warn, quarantine | — | ✓ |
-| **Basic observability** | Span tracing, cost tracking, collector hooks (in-memory) | ✓ | ✓ |
-| **Advanced observability** | Multi-agent trace aggregation, cost dashboards, distributed tracing | — | ✓ |
-| **Trust registry** | Trusted-traveler lanes, configurable scan depth per agent | — | ✓ |
-| **Teams** | Named reusable agent teams with shared configuration | — | ✓ |
-| **Change-kernel** | Approval workflows, escalation, merge, classification | — | ✓ |
-| **Coherence/Confidence modules** | Standalone calculation libraries (variance, entropy, composite) | — | ✓ |
+Four things live only in `weft-pro`:
+
+| Feature | Description |
+|---|---|
+| **Multi-round TaCo consensus** (`tacoConsensus`) | Agents share rationale and revote until they converge |
+| **Stigmergic confidence** (`ConfidentStigmergyLayer`) | Pheromone-style coordination with evaporation and decay |
+| **Agent antibodies** (`AntibodyRegistry`) | Scans agent output against registered patterns: reject, warn or quarantine |
+| **Trust registry** (`TrustRegistry`) | Trusted-traveler lanes with a configurable scan depth per agent |
+
+Everything else is already in `weft-core` under MIT and needs no license key: `AgentUnit` and its operators, single-round consensus, teams, the solo gate, coherence, confidence, interview, change-kernel, contracts and observability.
+
+`weft-pro` re-exports the coordination modules from `weft-core` unchanged (teams, solo, coherence, confidence, interview, change-kernel, contracts and the coordination operators). Importing them from `weft-pro` puts them behind the license check, so if those are all you need, import from `weft-core`. `AgentUnit`, `createContext` and observability are not re-exported; always import them from `weft-core`.
 
 ---
 
 ## When you need pro
 
 **Your agents need to reach agreement over multiple rounds.**
-Single-round consensus (free) votes once. TaCo iterates — agents see each other's rationale, revise their votes, and converge. Use when a single-pass vote produces low-confidence or unstable outcomes.
+Single-round consensus (free) votes once. TaCo iterates: agents see each other's rationale, revise their votes, and converge. Use when a single-pass vote produces low-confidence or unstable outcomes.
 
 **You need to catch bad outputs before they propagate.**
 Agent antibodies scan every result against a registry of regex, substring, and structural matchers. Block XSS patterns, hallucinated field names, schema violations, or any custom pattern before it reaches downstream consumers.
 
-**You need span-level tracing across a workflow.**
-Basic observability (span recording, cost/error tracking, in-memory trace store, collector hook) is included in `weft-core` at no cost. `weft-pro` adds advanced observability: multi-agent trace aggregation, cost dashboards, and distributed tracing for organisational-scale deployments.
-
 **You need trust-based routing.**
 Tag agents or callers with trust levels and expiration. Route deeper, more expensive analysis only when trust score warrants it.
-
-**You're building reusable agent teams.**
-Define a `Team` once with its agents, mode (converge/dialectic), and options. Reuse it across multiple workflows without repeating configuration.
 
 ---
 
@@ -118,12 +124,14 @@ if (scan.recommendation === "reject") {
 
 ---
 
-## Observability example
+## Observability
+
+Basic observability is included in `weft-core` and works without a pro license. Import from `weft-core`:
 
 ```typescript
 import { createOperatorSpan, getTraces, configureObservability } from "weft-core";
 
-configureObservability({ enabled: true, verbosity: "verbose" });
+configureObservability({ verbosity: "detailed" });
 
 const span = createOperatorSpan("llm", "generate");
 span.setAttribute("model", "gpt-4o");
@@ -133,14 +141,16 @@ const output = await runMyAgent();
 span.end({ tokens: output.usage?.totalTokens });
 
 const traces = getTraces();
-console.log(traces[0].durationMs); // wall-clock time for the span
+console.log(traces[0].durationMs);
 ```
+
+Valid verbosity values: `"minimal"` | `"detailed"` | `"full"`.
 
 ---
 
 ## Upgrade path
 
-Already using `weft-core`? Add `weft-pro` alongside it — no breaking changes.
+Already using `weft-core`? Add `weft-pro` alongside it: no breaking changes.
 
 ```bash
 # Add pro without removing core
@@ -158,4 +168,4 @@ import { tacoConsensus, AntibodyRegistry } from "weft-pro"; // additive
 
 ## License
 
-Commercial License — see [LICENSE](LICENSE) for details.
+BUSL-1.1: see [LICENSE](LICENSE) for full terms. The license converts to MIT on 2030-04-13.

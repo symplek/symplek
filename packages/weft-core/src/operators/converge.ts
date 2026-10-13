@@ -94,7 +94,7 @@ export function createConvergeComputation<T>(
           const unit = result as import("../AgentUnit").AgentUnit<
             ConvergeContribution<T>
           >;
-          contribution = await unit.run(ctx, { trustMode: "legacy" });
+          contribution = (await unit.run(ctx)).value;
         } else if (result instanceof Promise) {
           contribution = await result;
         } else {

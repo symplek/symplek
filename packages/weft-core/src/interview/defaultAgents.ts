@@ -2,7 +2,7 @@
  * @fileoverview Schema-driven default agent generation
  * @description Generates evaluator, questioner, and extractor from Zod schema
  * @module weft-core/interview/defaultAgents
- * @since 1.0.0-beta.3
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[Weft-interview]: Schema-driven agent generation
  */
@@ -57,72 +57,80 @@ export interface AnalyzedField {
  * ```
  */
 /**
- * Derive a stable Zod class-name string from a field schema using only public
- * Zod v3 `instanceof` checks.  Mirrors the strings previously read from
- * `._def.typeName` so downstream consumers receive identical values.
+ * What `analyzeSchema` needs to know about one schema node: what kind it is
+ * and, for a wrapper (optional, nullable, default), what it wraps.
  *
- * @param field - Any Zod type (already unwrapped of Optional/Nullable/Default)
- * @returns Class-name string (e.g. "ZodString") or "unknown"
+ * Read from the schema's own definition object, not with `instanceof` against
+ * the installed Zod's classes. A project can hold both generations at once
+ * (`zod@3.25` ships Zod 4 under `zod/v4`, and Zod 4 has no `ZodNativeEnum` at
+ * all), so class identity gives the wrong answer or throws; the definition
+ * object is present on every schema of either generation.
  */
-function zodTypeName(field: z.ZodTypeAny): string {
-  if (field instanceof z.ZodString) return "ZodString";
-  if (field instanceof z.ZodNumber) return "ZodNumber";
-  if (field instanceof z.ZodBoolean) return "ZodBoolean";
-  if (field instanceof z.ZodBigInt) return "ZodBigInt";
-  if (field instanceof z.ZodDate) return "ZodDate";
-  if (field instanceof z.ZodArray) return "ZodArray";
-  if (field instanceof z.ZodObject) return "ZodObject";
-  if (field instanceof z.ZodEnum) return "ZodEnum";
-  if (field instanceof z.ZodNativeEnum) return "ZodNativeEnum";
-  if (field instanceof z.ZodUnion) return "ZodUnion";
-  if (field instanceof z.ZodLiteral) return "ZodLiteral";
-  if (field instanceof z.ZodTuple) return "ZodTuple";
-  if (field instanceof z.ZodRecord) return "ZodRecord";
-  if (field instanceof z.ZodNull) return "ZodNull";
-  if (field instanceof z.ZodUndefined) return "ZodUndefined";
-  if (field instanceof z.ZodAny) return "ZodAny";
-  if (field instanceof z.ZodUnknown) return "ZodUnknown";
-  return "unknown";
+function describeNode(node: unknown): { kind: string; inner?: unknown } {
+  // Zod 4: `_zod.def.type` is a lowercase kind; wrappers carry `innerType`.
+  const def4 = (
+    node as { _zod?: { def?: { type?: unknown; innerType?: unknown } } } | null
+  )?._zod?.def;
+  if (typeof def4?.type === "string") {
+    return { kind: def4.type, inner: def4.innerType };
+  }
+  // Zod 3: `_def.typeName` is "ZodString" and so on; wrappers carry `innerType`.
+  const def3 = (
+    node as { _def?: { typeName?: unknown; innerType?: unknown } } | null
+  )?._def;
+  if (typeof def3?.typeName === "string") {
+    return {
+      kind: def3.typeName.replace(/^Zod/, "").toLowerCase(),
+      inner: def3.innerType,
+    };
+  }
+  return { kind: "unknown" };
 }
+
+/** The type names `AnalyzedField.type` has always reported, by node kind. */
+const FIELD_TYPE_NAMES: Record<string, string> = {
+  string: "ZodString",
+  number: "ZodNumber",
+  boolean: "ZodBoolean",
+  bigint: "ZodBigInt",
+  date: "ZodDate",
+  array: "ZodArray",
+  object: "ZodObject",
+  enum: "ZodEnum",
+  nativeenum: "ZodNativeEnum",
+  union: "ZodUnion",
+  literal: "ZodLiteral",
+  tuple: "ZodTuple",
+  record: "ZodRecord",
+  null: "ZodNull",
+  undefined: "ZodUndefined",
+  any: "ZodAny",
+  unknown: "ZodUnknown",
+};
 
 export function analyzeSchema<T>(schema: z.ZodType<T>): AnalyzedField[] {
   const fields: AnalyzedField[] = [];
 
-  // Use public instanceof check instead of ._def.typeName
-  if (!(schema instanceof z.ZodObject)) {
+  if (describeNode(schema).kind !== "object") {
     return fields;
   }
 
-  // .shape is a public Zod v3 API (documented in the Zod README)
-  const shape = schema.shape;
+  // `.shape` is public on an object schema in both Zod 3 and Zod 4.
+  const shape = (schema as unknown as { shape: Record<string, unknown> }).shape;
 
-  for (const [name, rawField] of Object.entries(shape)) {
-    let field = rawField as z.ZodTypeAny;
+  for (const [name, field] of Object.entries(shape)) {
+    const outer = describeNode(field);
 
-    // Determine wrapper kind using public instanceof checks
-    const isOptional =
-      field instanceof z.ZodOptional || field instanceof z.ZodNullable;
-    const hasDefault = field instanceof z.ZodDefault;
+    const isOptional = outer.kind === "optional" || outer.kind === "nullable";
+    const hasDefault = outer.kind === "default";
     const isRequired = !isOptional && !hasDefault;
 
-    // Unwrap to the inner type using public Zod v3 APIs:
-    //   ZodOptional.unwrap()  — documented public API
-    //   ZodNullable.unwrap()  — documented public API
-    //   ZodDefault.removeDefault() — documented public API
-    let innerField: z.ZodTypeAny = field;
-    if (field instanceof z.ZodOptional) {
-      innerField = field.unwrap();
-    } else if (field instanceof z.ZodNullable) {
-      innerField = field.unwrap();
-    } else if (field instanceof z.ZodDefault) {
-      innerField = field.removeDefault();
-    }
+    // One level of wrapper is unwrapped, as before: the type reported for
+    // `z.string().optional()` is the string's.
+    const inner = isOptional || hasDefault ? describeNode(outer.inner) : outer;
 
-    // .description is a public property on ZodType (set by .describe())
-    // It lives on the *outer* type (the wrapper carries the description).
-    const description = field.description;
-
-    const typeName = zodTypeName(innerField);
+    // `.description` is set by `.describe()` and lives on the outer schema.
+    const description = (field as { description?: string }).description;
 
     // Calculate weight based on required/default status
     // Required fields without defaults are most important
@@ -130,7 +138,7 @@ export function analyzeSchema<T>(schema: z.ZodType<T>): AnalyzedField[] {
 
     fields.push({
       name,
-      type: typeName,
+      type: FIELD_TYPE_NAMES[inner.kind] ?? "unknown",
       description,
       isRequired,
       hasDefault,

@@ -1,5 +1,5 @@
 /**
- * Weft init command - scaffolds new Weft projects
+ * weft init command - scaffolds new Weft projects
  */
 
 import { spawn } from "node:child_process";
@@ -390,7 +390,7 @@ export function printSuccess(config: ProjectConfig): void {
   console.log();
   console.log(
     chalk.dim("Documentation: ") +
-      chalk.blue.underline("https://weft.dev/docs"),
+      chalk.blue.underline("https://github.com/wefthq/weft#readme"),
   );
   console.log();
 }

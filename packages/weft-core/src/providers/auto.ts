@@ -5,6 +5,7 @@
 
 import { WeftError } from "../errors";
 import { getGlobalConfig } from "../globalConfig";
+import { getEnvKeyForProvider, KNOWN_PROVIDERS } from "./known";
 import type { ProviderId } from "./interface";
 import { providerRegistry } from "./registry";
 
@@ -26,20 +27,27 @@ const PROVIDER_MODEL_DEFAULTS: Record<
   string,
   { high: string; fast: string; default: string }
 > = {
+  // Checked against each provider's own model and deprecation pages on
+  // 2026-10-13. A retired id fails the user's very first call, so re-check
+  // this table before every release.
   openai: {
+    // Still served, no shutdown announced. The GPT-6 family needs the
+    // Responses API for tool calls, which the adapter does not speak yet.
     high: "gpt-4o",
     fast: "gpt-4o-mini",
     default: "gpt-4o-mini",
   },
   anthropic: {
-    high: "claude-opus-4-5",
-    fast: "claude-haiku-3-5",
-    default: "claude-sonnet-4-5",
+    high: "claude-opus-5-5",
+    fast: "claude-haiku-5-5",
+    default: "claude-sonnet-5-5",
   },
   google: {
-    high: "gemini-1.5-pro",
-    fast: "gemini-2.0-flash",
-    default: "gemini-2.0-flash",
+    // No stable Pro-class Gemini is open to new users; 3.8 Flash is the
+    // strongest stable id, so it serves both the high and default tiers.
+    high: "gemini-3.8-flash",
+    fast: "gemini-3.5-flash-lite",
+    default: "gemini-3.8-flash",
   },
 };
 
@@ -86,24 +94,42 @@ export function detectProvider(): ProviderId {
     return defaultProvider.id as ProviderId;
   }
 
-  // Fall back to environment variable detection.
-  // OPENROUTER_API_KEY is intentionally excluded — no adapter exists yet.
-  // TODO(Wave 3 / Contract 2): restore OpenRouter once a base-URL-aware adapter exists.
-  const keys = {
-    openai: process.env.OPENAI_API_KEY,
-    anthropic: process.env.ANTHROPIC_API_KEY,
-    google: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-  };
+  // A provider chosen with configure() is the caller's decision. It is used
+  // even when its adapter could not be loaded (no key, SDK missing): the call
+  // then fails naming that provider, where falling through to another
+  // provider's environment key would send the request somewhere the caller
+  // never asked for.
+  const config = getGlobalConfig();
+  if (config.provider) {
+    return config.provider as ProviderId;
+  }
 
-  const foundKeys = Object.entries(keys).filter(([_, value]) => !!value);
+  // A key handed to configure() without a provider cannot be routed. Say so,
+  // whether or not some other provider's key is in the environment: using
+  // that one instead would silently drop the key the caller supplied.
+  if (config.apiKey) {
+    throw new WeftError({
+      code: "PROVIDER_ERROR",
+      why: "Weft.configure() was given an apiKey but no provider, so the key cannot be matched to a provider.",
+      fix: {
+        description: "Pass the provider alongside the key.",
+        docsUrl: "https://github.com/wefthq/weft#install",
+      },
+      example: `Weft.configure({ provider: "openai", apiKey: process.env.OPENAI_API_KEY })`,
+    });
+  }
 
-  if (foundKeys.length === 0) {
+  // Otherwise detect from the environment, in the priority order of
+  // KNOWN_PROVIDERS. OpenRouter is absent there: no adapter exists yet.
+  const found = KNOWN_PROVIDERS.filter((p) => getEnvKeyForProvider(p.id));
+
+  if (found.length === 0) {
     throw new WeftError({
       code: "PROVIDER_ERROR",
       why: "No AI provider API keys found in environment variables.",
       fix: {
         description: "Set at least one provider API key in your environment.",
-        docsUrl: "https://github.com/weft-ai/weft-core#provider-setup",
+        docsUrl: "https://github.com/wefthq/weft#install",
       },
       example: [
         "# .env",
@@ -114,20 +140,14 @@ export function detectProvider(): ProviderId {
     });
   }
 
-  if (process.env.NODE_ENV === "production" && foundKeys.length > 1) {
+  if (process.env.NODE_ENV === "production" && found.length > 1) {
     console.warn(
-      `[Weft] Multiple AI provider keys found: ${foundKeys.map(([k]) => k).join(", ")}. ` +
-        `Defaulting to priority: ${foundKeys[0][0]}.`,
+      `[Weft] Multiple AI provider keys found: ${found.map((p) => p.id).join(", ")}. ` +
+        `Defaulting to priority: ${found[0].id}.`,
     );
   }
 
-  // Priority logic
-  if (keys.openai) return "openai";
-  if (keys.anthropic) return "anthropic";
-  if (keys.google) return "google";
-
-  // Should not be reachable due to check above
-  return foundKeys[0][0] as ProviderId;
+  return found[0].id as ProviderId;
 }
 
 /**

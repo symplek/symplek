@@ -131,6 +131,13 @@ export interface ExecuteOptions {
   rehearsalPath?: string;
   onDeviation?: "fail" | "rollback" | "ask";
   onProgress?: (event: HarnessProgressEvent) => void;
+  /**
+   * Forward `allowShell: true` to the permission bridge so that shell tools
+   * declared in the plan's `requiredTools` are permitted. Off by default.
+   * Requires the plan to have declared the shell tool in `requiredTools` at
+   * verification time — this flag alone is not sufficient.
+   */
+  allowShell?: boolean;
 }
 
 // ─── Harness Interface ────────────────────────────────────────────────────────

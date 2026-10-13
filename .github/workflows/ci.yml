@@ -28,24 +28,33 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Lint packages
         run: pnpm --filter "weft-*" --filter "create-weft" run lint
+      # Each package's runtime VERSION constant must equal its package.json.
+      # `pnpm version-packages` keeps them in step; this catches a hand edit.
+      - name: Version constants match the manifests
+        run: pnpm check:versions
       # Packages resolve each other's types through the built `dist/` output,
       # so a clean runner must build before it can type check.
       - name: Build packages
         run: pnpm --filter "weft-*" --filter "create-weft" run build
       - name: Type check packages
         run: pnpm --filter "weft-*" --filter "create-weft" run typecheck
+      # Every import a README or doc shows must exist in the built packages.
+      - name: Docs name only real exports
+        run: pnpm check:docs
 
   tier-boundary:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Fail if @weft/core imports weft-pro
+      - name: Fail if weft-core imports weft-pro
         run: |
-          # Match only actual import/require statements, not comments or prose.
-          # Previous grep for bare 'weft-pro' false-positived on comment text.
-          matches=$(grep -rEl "from ['\"]weft-pro" packages/weft-core/src --include='*.ts' || true)
+          # Match import forms only, not comments or prose: `from "weft-pro"`,
+          # a bare side-effect `import "weft-pro"`, dynamic `import("weft-pro")`
+          # and `require("weft-pro")`. A grep for the bare name would
+          # false-positive on comment text.
+          matches=$(grep -rEl "(from|import|require)[[:space:]]*\(?[[:space:]]*['\"]weft-pro" packages/weft-core/src --include='*.ts' --include='*.tsx' || true)
           if [ -n "$matches" ]; then
-            echo "Error: @weft/core must not import weft-pro. Offending files:"
+            echo "Error: weft-core must not import weft-pro. Offending files:"
             echo "$matches"
             exit 1
           fi
@@ -65,46 +74,18 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build packages
         run: pnpm --filter "weft-*" --filter "create-weft" run build
-      - name: Check build artefacts present
-        run: |
-          for package in weft-core weft-convex weft-react weft-pro weft-mcp weft-harness weft-testing; do
-            if [ ! -d "packages/$package/dist" ]; then
-              echo "Error: packages/$package/dist not found"
-              exit 1
-            fi
-          done
-          # weft-cli builds via `tsc && copy-templates`; its entry is dist/index.js.
-          if [ ! -f "packages/weft-cli/dist/index.js" ]; then
-            echo "Error: packages/weft-cli/dist/index.js not found"
-            exit 1
-          fi
-          # create-weft builds to dist/index.js (CJS bundle).
-          if [ ! -f "packages/create-weft/dist/index.js" ]; then
-            echo "Error: packages/create-weft/dist/index.js not found"
-            exit 1
-          fi
-          echo "OK: all published packages emitted their build artefacts"
-      - name: Inspect packed weft-pro for unresolved workspace specifiers
-        working-directory: packages/weft-pro
-        run: |
-          # `peerDependencies.weft-core` is `workspace:*` in source; `pnpm pack`
-          # (and `changeset publish`) rewrites it to a real semver range. A raw
-          # `npm publish` would ship the unresolvable `workspace:` literal.
-          # Assert the rewrite worked. `pnpm pack` is non-recursive, so it must
-          # run from the package directory (no --filter).
-          set -euo pipefail
-          work_dir="$(mktemp -d)"
-          pnpm pack --pack-destination "$work_dir"
-          tarball="$(ls "$work_dir"/*.tgz)"
-          echo "Inspecting packed tarball: $tarball"
-          tar -xzf "$tarball" -C "$work_dir"
-          packed_pkg="$work_dir/package/package.json"
-          if grep -q 'workspace:' "$packed_pkg"; then
-            echo "Error: packed weft-pro package.json still contains a 'workspace:' specifier:"
-            grep -n 'workspace:' "$packed_pkg"
-            exit 1
-          fi
-          echo "OK: packed weft-pro package.json has no 'workspace:' specifiers"
+      # Packs every publishable package as `changeset publish` does, installs
+      # the tarballs into a fresh project and loads each entry point by
+      # `import` and `require`. This is the only check that sees the packages
+      # the way a user receives them: the unit tests run against source.
+      # Publishes nothing. See scripts/consumer-smoke.mjs for what it asserts.
+      - name: Packed packages install and load for a consumer
+        run: pnpm check:consumer
+      # Scaffolds a project from each template with the built CLI, installs
+      # it, and runs the project's own checks plus every CLI command the
+      # scaffold tells the user to run. See scripts/scaffold-e2e.mjs.
+      - name: Scaffolded projects work end to end
+        run: pnpm check:scaffold
 
   test:
     runs-on: ubuntu-latest

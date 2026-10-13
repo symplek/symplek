@@ -1,94 +1,58 @@
 ﻿/**
  * @module executor - Internal agent execution loop
  * @description Drives the generate → tool-call → respond cycle for executeAgent().
- * @rules Tool-parameter serialisation uses only public Zod v3 APIs (instanceof / .shape /
- *   .unwrap). When tool calling is fully wired, replace zodSchemaToJsonSchema() with
- *   the `zod-to-json-schema` package (zod-version-safe, handles every Zod type).
  */
-import { z } from "zod";
-import { WeftError } from "../errors";
+import type { z } from "zod";
+import { awaitInit } from "../globalConfig";
+import { toJsonSchema } from "../jsonSchema";
 import { DEFAULT_LOOP_OPTIONS, type LoopOptions, type StepInfo } from "../loop";
 import {
   type AIMessage,
-  detectProvider,
-  providerRegistry,
   selectModelForTask,
 } from "../providers";
+import { checkProviderAnswer, resolveProvider } from "../providers/call";
 import type { Tool } from "./tool";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Zod → JSON Schema conversion (public API only, Zod v3-safe)
+// Zod → JSON Schema conversion
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** JSON Schema representation of a single field type. Exported for unit testing. */
-export type JsonSchemaType =
-  | { type: "string" }
-  | { type: "number" }
-  | { type: "boolean" }
-  | { type: "object"; properties: Record<string, JsonSchemaType>; required: string[] };
-
 /**
- * Convert a single Zod leaf type to its JSON Schema representation.
- * Uses only public Zod v3 APIs: instanceof checks, ZodOptional.unwrap().
- * Returns `undefined` for unrecognised types rather than silently emitting
- * a broken schema — callers must guard on undefined.
- *
- * NOTE: This handles only the primitive types needed for the current
- * no-op tool-parameter path. When tool calling is fully wired, replace
- * with `zod-to-json-schema` (npm: zod-to-json-schema >=3.0.0) which
- * handles the full Zod type surface including unions, arrays, literals, etc.
+ * Loose JSON Schema object type that captures the full output of
+ * `zod-to-json-schema`. Exported for unit testing.
+ * @internal
  */
-function zodFieldToJsonSchema(field: z.ZodTypeAny): JsonSchemaType | undefined {
-  // Unwrap optional wrappers first (ZodOptional.unwrap() is public Zod v3 API)
-  const unwrapped =
-    field instanceof z.ZodOptional ? field.unwrap() : field;
-
-  if (unwrapped instanceof z.ZodString) return { type: "string" };
-  if (unwrapped instanceof z.ZodNumber) return { type: "number" };
-  if (unwrapped instanceof z.ZodBoolean) return { type: "boolean" };
-  if (unwrapped instanceof z.ZodObject) return zodObjectToJsonSchema(unwrapped);
-
-  return undefined;
-}
+export type JsonSchemaType = Record<string, unknown> & { type: "object" };
 
 /**
- * Convert a ZodObject schema to a JSON Schema `{ type: "object", ... }` node.
- * `schema.shape` is a public Zod v3 API (documented in the Zod README).
- */
-function zodObjectToJsonSchema(
-  schema: z.ZodObject<z.ZodRawShape>,
-): JsonSchemaType & { type: "object" } {
-  const properties: Record<string, JsonSchemaType> = {};
-  const required: string[] = [];
-
-  for (const [key, field] of Object.entries(schema.shape)) {
-    const converted = zodFieldToJsonSchema(field as z.ZodTypeAny);
-    if (converted !== undefined) {
-      properties[key] = converted;
-      // A field is required if it is NOT wrapped in ZodOptional
-      if (!(field instanceof z.ZodOptional)) {
-        required.push(key);
-      }
-    }
-  }
-
-  return { type: "object", properties, required };
-}
-
-/**
- * Top-level entry: convert a tool's Zod parameters schema to JSON Schema.
- * Returns `undefined` when the schema is not a ZodObject (unsupported root type).
+ * Convert a tool's Zod parameters schema (Zod 3 or Zod 4) to the JSON Schema
+ * object a provider expects as a tool's input schema.
  *
- * Exported for unit testing only — treat as internal API; do not import from
- * outside this package.
+ * Returns `undefined` when the root schema is not an object, which is the only
+ * shape a tool's parameters can take.
+ *
+ * `additionalProperties: false` is set when the schema does not say otherwise,
+ * so the result is usable as a strict tool contract.
+ *
+ * Exported for unit testing only: treat as internal API.
  */
 export function zodSchemaToJsonSchema(
   parameters: z.ZodTypeAny,
-): (JsonSchemaType & { type: "object" }) | undefined {
-  if (parameters instanceof z.ZodObject) {
-    return zodObjectToJsonSchema(parameters);
+): JsonSchemaType | undefined {
+  let schema: ReturnType<typeof toJsonSchema>;
+  try {
+    schema = toJsonSchema(parameters);
+  } catch {
+    // Not a schema the converter can describe (for example a plain object
+    // passed where a Zod schema belongs). The caller treats undefined as
+    // "no usable input schema".
+    return undefined;
   }
-  return undefined;
+  if (schema.type !== "object") return undefined;
+  if (!("additionalProperties" in schema)) {
+    schema.additionalProperties = false;
+  }
+  return schema as JsonSchemaType;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -141,18 +105,12 @@ export async function executeAgent(
   let totalTokens = 0;
   const toolCallCount = 0;
 
-  const providerId = detectProvider();
-  const provider = providerRegistry.get(providerId);
-  if (!provider) {
-    throw new WeftError({
-      code: "PROVIDER_ERROR",
-      message: `Provider "${providerId}" not found.`,
-      action: "Ensure the provider is registered and the API key is set.",
-    });
-  }
+  // Wait for a provider configured with Weft.configure(), then resolve one
+  // the same way ai() and stream() do.
+  await awaitInit();
+  const { provider, providerId } = await resolveProvider();
 
   // Map tools to provider format if supported.
-  // zodSchemaToJsonSchema() uses only public Zod v3 APIs — no ._def access.
   // The result is currently unused (tool calls are not yet wired into provider.generate);
   // this mapping is in place so that when the provider interface is extended the
   // correct JSON Schema is already available without further changes here.
@@ -169,7 +127,12 @@ export async function executeAgent(
 
   for (let stepNumber = 1; stepNumber <= maxSteps; stepNumber++) {
     const model =
-      config.model || selectModelForTask(messages[messages.length - 1].content);
+      config.model ||
+      selectModelForTask(
+        messages[messages.length - 1].content,
+        undefined,
+        providerId,
+      );
 
     // 1. Generate response
     const response = await provider.generate({
@@ -177,6 +140,14 @@ export async function executeAgent(
       messages,
       // tools: providerTools, // Provider interface might need update to support tools properly
     } as any);
+
+    // A refusal, or an output limit spent before any text, is not a step.
+    checkProviderAnswer(
+      response.finishReason,
+      Boolean(response.text),
+      providerId,
+      model,
+    );
 
     totalTokens += response.usage.totalTokens;
 

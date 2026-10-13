@@ -1,7 +1,10 @@
-# Weft MCP Server — Tool Reference
+# Weft MCP Server: Tool Reference
 
-The Weft MCP server exposes three Weft operators as MCP tool calls, making them available to
-Claude Code, Cursor, and any MCP-compatible LLM runtime.
+The Weft MCP server exposes three Weft operators as MCP tools, accessible from Claude Code,
+Cursor, and any MCP-compatible LLM runtime over stdio JSON-RPC 2.0.
+
+The entry point is `dist/bin.cjs` (compiled from `src/server/bin.ts`). The transport is a
+self-contained readline loop: `@modelcontextprotocol/sdk` is not required at runtime.
 
 ---
 
@@ -9,43 +12,58 @@ Claude Code, Cursor, and any MCP-compatible LLM runtime.
 
 ### `weft_debate`
 
-Run a structured multi-agent debate. Specialist agents review the prompt from their role
-perspectives; a synthesizer agent produces a final synthesis.
+**Fixture tool.** Exercises debate operator wiring with deterministic stub agents.
+Synthesis equals the input prompt: no LLM calls are made.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `prompt` | `string` | ✅ | The question or proposal to debate |
-| `roles` | `Array<{role: string, model: string}>` | ✅ | Specialist roles that will debate |
-| `rounds` | `number` | — | Debate rounds (default: 2) |
+| `roles` | `Array<{role: string, model: string}>` | ✅ | Specialist roles (stubs; model field is recorded but not called) |
+| `rounds` | `integer` |   | Debate rounds, integer (default: 2) |
+| `session_id` | `string` |   | Cache key for process-memory result reuse |
 
-**Output shape** (W3-B):
+**Output shape**:
+
 ```json
 {
-  "synthesis": "string — final synthesized answer",
-  "votes": [{ "role": "string", "position": "string", "confidence": 0.0 }],
+  "simulated": true,
+  "notice": "No debate took place. Every role is a fixed stub that returns the prompt unchanged, so `synthesis` is the prompt itself.",
+  "synthesis": "<original prompt>",
+  "votes": [],
   "rounds_completed": 2
 }
 ```
+
+Session cache is keyed by `(session_id, prompt, roles, rounds)`. A reused `session_id` with any
+different input evicts the stale entry and recomputes.
 
 ---
 
 ### `weft_consensus`
 
-Run a consensus vote across multiple agents. Each voter evaluates the prompt independently.
+**Fixture tool.** Exercises consensus operator wiring with stub voters that always approve at
+confidence 0.8. Quorum and veto rules are enforced by weft-core.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `prompt` | `string` | ✅ | The proposal to vote on |
-| `voters` | `string[]` | ✅ | Agent role names to vote |
+| `voters` | `string[]` | ✅ | Agent role names (stubs; always approve) |
 | `threshold` | `number` | ✅ | Approval threshold (0.0–1.0) |
-| `vetoers` | `string[]` | — | Roles with veto power |
+| `vetoers` | `string[]` |   | Roles with veto power (optional) |
 
-**Output shape** (W3-B):
+**Output shape**:
+
 ```json
 {
+  "simulated": true,
+  "notice": "No evaluation took place. Every voter is a fixed stub that approves, whatever the prompt says. Do not treat `approved` as a decision.",
   "approved": true,
-  "score": 0.85,
-  "votes": [{ "role": "string", "approved": true, "reason": "string" }],
+  "score": 1,
+  "votes": [
+    { "agentId": "voter_0", "decision": "approve", "confidence": 0.8, "weight": 1 },
+    { "agentId": "voter_1", "decision": "approve", "confidence": 0.8, "weight": 1 },
+    { "agentId": "voter_2", "decision": "approve", "confidence": 0.8, "weight": 1 }
+  ],
   "vetoed_by": null
 }
 ```
@@ -54,25 +72,30 @@ Run a consensus vote across multiple agents. Each voter evaluates the prompt ind
 
 ### `weft_tracked`
 
-Wrap a claim or value with source chain provenance. Records source URI, confidence score,
-and content hash for downstream verification.
+Record a claim with source URI, confidence, SHA-256 hash, and timestamp.
+Source and confidence are the caller's own assertions: nothing is verified externally.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `prompt` | `string` | ✅ | The agent prompt or claim to track |
-| `source` | `string` | ✅ | Source URI (file path or URL) |
-| `confidence` | `number` | ✅ | Confidence score (0.0–1.0) |
+| `prompt` | `string` | ✅ | The agent prompt or claim to record |
+| `source` | `string` | ✅ | Source URI: recorded as stated, not verified |
+| `confidence` | `number` | ✅ | Confidence score (0.0–1.0): recorded as stated |
 
-**Output shape** (W3-B):
+**Output shape**:
+
 ```json
 {
-  "value": "string — original prompt",
-  "source": "string — source URI",
-  "confidence": 0.9,
-  "hash": "sha256:abc123...",
-  "timestamp": "ISO-8601"
+  "value": "<original prompt>",
+  "source": "<source URI>",
+  "confidence": 0.95,
+  "hash": "sha256:<hex>",
+  "timestamp": "<ISO-8601>",
+  "notice": "Source and confidence are the caller's own claims, recorded verbatim. Nothing was verified or attested. The hash is tamper-evident for (prompt + source); it does not certify the source's trustworthiness."
 }
 ```
+
+Hash input is `JSON.stringify([prompt, source])`, so separator characters inside either field
+cannot cause collisions between different `(prompt, source)` pairs.
 
 ---
 
@@ -85,50 +108,25 @@ Add to `.claude/settings.json`:
   "mcpServers": {
     "weft": {
       "command": "node",
-      "args": ["./node_modules/weft-mcp/dist/server/index.js"],
-      "env": {}
+      "args": ["./node_modules/weft-mcp/dist/bin.cjs"]
     }
   }
 }
 ```
 
-Or via stdio transport (W3-B):
-```json
-{
-  "mcpServers": {
-    "weft": {
-      "command": "npx",
-      "args": ["weft-mcp"],
-      "env": {}
-    }
-  }
-}
-```
+> **Windows note**: `npx weft-mcp` requires `shell: true` to spawn (npx is a `.cmd` shim on
+> Windows). Claude Code does not set `shell: true` by default: use the `node dist/bin.cjs`
+> form above.
 
 ---
 
-## Open Design Question: Multi-Turn Operators and Stateless MCP
+## Protocol notes
 
-The `weft_debate` operator runs multiple rounds internally. MCP tool calls are stateless
-(one request → one response). Two options exist for mapping multi-turn operators:
-
-### Option A — Session-keyed server-side state
-
-The MCP server holds a session store keyed by `session_id`. The first call starts the debate
-and returns a `session_id`; the caller can poll `/status/{session_id}` or wait for the
-streamed final response. Rounds execute server-side.
-
-**Pros**: Simple client API, rounds are invisible to the caller.
-**Cons**: Requires persistent server process; statefulness is unusual for MCP.
-
-### Option B — Round-per-call with session_id threading
-
-Each call executes one round and returns partial results plus a `session_id`. The next call
-passes `session_id` to continue. The final round returns `done: true` with the synthesis.
-
-**Pros**: Fully stateless server; Claude Code can inspect intermediate round results.
-**Cons**: More complex client logic; round state must be passed by the caller.
-
-**Current decision**: Deferred to W3-B implementation. The schema stubs are round-agnostic
-and can accommodate either pattern. W3-B should resolve this via a design decision record
-before wiring the actual operator.
+- Transport: stdio, newline-delimited JSON (one JSON object per line).
+- Protocol version: `2024-11-05`.
+- `ping` returns `{}` (empty result object per MCP spec).
+- Notifications (`notifications/*`, `initialized`, `$/`) never get responses.
+- Invalid JSON → `-32700`. Null, array, or non-object parse result → `-32600`. Missing `jsonrpc:"2.0"`
+  → `-32600`. Object or array `id` on a request → `-32600`. A request with an `id` and no
+  `method` → `-32600`. Unknown tool → `-32602`. Missing params on
+  `tools/call` → `-32602`.

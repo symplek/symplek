@@ -7,7 +7,7 @@
  * sub-module without a valid license key will throw at module load time.
  *
  * @module weft-pro
- * @since 1.0.0-beta.2 — License-gated
+ * @since 1.0.0-beta.1 — License-gated
  *
  * @remarks
  * This package provides advanced features requiring a commercial license:
@@ -233,7 +233,10 @@ export { ContractError, defineContract } from "./contract";
 // CHANGE-KERNEL EXPORTS (Wave 3 — moved from weft-core)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export * from "./change-kernel";
+// Re-exported straight from the core package. Routing this star export through
+// the local ./change-kernel module made the ESM bundle drop every name in it:
+// `import { validatePatchSet } from "weft-pro"` failed while `require` worked.
+export * from "weft-core/change-kernel";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIDENCE PRESET TYPE (re-export from local)
@@ -284,4 +287,4 @@ export {
 /**
  * Package version.
  */
-export const VERSION = "1.0.0-beta.1";
+export { VERSION } from "./version";

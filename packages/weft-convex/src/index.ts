@@ -8,4 +8,4 @@ export * from "./streaming";
 export * from "./types";
 export * from "./withAI";
 
-export const version = "0.1.0";
+export { VERSION as version } from "./version";

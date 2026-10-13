@@ -4,6 +4,13 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { DEFAULT_MODEL } from "../models.js";
+
+// Read at runtime so it is always the version of the CLI that is running.
+// src/utils and dist/utils sit at the same depth below the package root.
+const { version: CLI_VERSION } = require("../../package.json") as {
+  version: string;
+};
 
 /** Available project template tiers */
 export type ProjectTier = "minimal" | "standard" | "full";
@@ -144,7 +151,10 @@ export function getDefaultVars(name: string): TemplateVars {
     version: "0.1.0",
     description: `${name} - Weft Agent Project`,
     author: "",
-    model: "gpt-4o",
+    model: DEFAULT_MODEL,
     agentName: "example",
+    // A scaffolded project depends on the CLI that created it, so that
+    // `weft generate` and `weft validate` run from inside the project.
+    cliVersion: CLI_VERSION,
   };
 }

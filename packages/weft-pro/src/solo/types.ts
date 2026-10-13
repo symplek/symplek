@@ -3,7 +3,7 @@
  * @description Type definitions for autonomous agent action with safety guarantees.
  *              Re-exports from weft-core to eliminate duplication.
  * @module weft-pro/solo/types
- * @since 2.2.1
+ * @since 1.0.0-beta.1
  */
 
 export type {

@@ -8,6 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import { debateTool } from "../tools/debate.tool";
 import {
   type JsonSchemaLike,
   ValidationError,
@@ -15,6 +16,9 @@ import {
 } from "../validateInput";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** The input schema weft_debate advertises, as the server validates against it. */
+const DEBATE_SCHEMA = debateTool.inputSchema as unknown as JsonSchemaLike;
 
 function expectReject(value: unknown, schema: JsonSchemaLike): void {
   expect(() => validateInput(value, schema)).toThrow(ValidationError);
@@ -279,6 +283,47 @@ describe("non-finite number rejection", () => {
   });
 });
 
+// ─── Integer type (Smaller: rounds: 1.5 accepted) ────────────────────────────
+// The standard JSON Schema "integer" type. An earlier version of the validator
+// spelled this as a non-standard `integer: true` keyword on a "number"; that
+// keyword is gone, and these cases now run against the standard type.
+
+describe("integer type (Smaller: fractional rounds accepted)", () => {
+  const schema: JsonSchemaLike = {
+    type: "integer",
+    minimum: 1,
+    maximum: 16,
+  };
+
+  it("passes an integer value (2)", () => expectPass(2, schema));
+  it("passes the minimum integer (1)", () => expectPass(1, schema));
+  it("passes the maximum integer (16)", () => expectPass(16, schema));
+
+  it("rejects a fractional value (1.5)", () => expectReject(1.5, schema));
+  it("rejects a fractional value (2.001)", () => expectReject(2.001, schema));
+  it("rejects a fractional value below minimum (0.5)", () =>
+    expectReject(0.5, schema));
+  it("rejects a string that looks like an integer", () =>
+    expectReject("2", schema));
+  it("rejects an integer outside the range (17)", () =>
+    expectReject(17, schema));
+
+  it("the number type allows fractional values", () => {
+    expectPass(1.5, { type: "number", minimum: 1, maximum: 16 });
+  });
+
+  it("says what was wrong when a fraction arrives where an integer is wanted", () => {
+    expect(() => validateInput(1.5, schema)).toThrow(/expected integer, got number 1\.5/);
+  });
+
+  it("the real weft_debate rounds schema rejects 1.5 and accepts 2", () => {
+    const rounds = (DEBATE_SCHEMA.properties as Record<string, JsonSchemaLike>)
+      .rounds;
+    expectReject(1.5, rounds);
+    expectPass(2, rounds);
+  });
+});
+
 // ─── Enum validation ──────────────────────────────────────────────────────────
 
 describe("enum validation", () => {
@@ -387,28 +432,16 @@ describe("array item validation", () => {
 // ─── Real-world tool schema smoke tests ──────────────────────────────────────
 
 describe("real tool input schema — weft_debate", () => {
-  // Mirrors the actual inputSchema from debate.tool.ts
-  const debateSchema: JsonSchemaLike = {
-    type: "object",
-    properties: {
-      prompt: { type: "string", maxLength: 16_384 },
-      roles: {
-        type: "array",
-        maxItems: 32,
-        items: {
-          type: "object",
-          properties: {
-            role: { type: "string", maxLength: 256 },
-            model: { type: "string", maxLength: 256 },
-          },
-          required: ["role", "model"],
-        },
-      },
-      rounds: { type: "number", minimum: 1, maximum: 16 },
-      session_id: { type: "string", maxLength: 128 },
-    },
-    required: ["prompt", "roles"],
-  };
+  // The schema the tool advertises, not a copy of it: a copy kept passing
+  // after the real one changed.
+  const debateSchema = DEBATE_SCHEMA;
+
+  it("rejects a fractional rounds value (1.5)", () => {
+    expectReject(
+      { prompt: "ok", roles: [{ role: "a", model: "b" }], rounds: 1.5 },
+      debateSchema,
+    );
+  });
 
   it("passes valid debate input", () => {
     expectPass(

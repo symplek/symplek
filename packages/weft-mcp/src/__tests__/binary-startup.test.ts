@@ -4,10 +4,14 @@
  *   startup guard, which is `undefined` in CJS (the published bin format), making
  *   the binary inert. These tests catch this class of packaging failure statically
  *   so it is caught before publish rather than by manual testing.
+ *
+ * M14 fix: the original suite only checked source strings in bin.ts; none of the
+ *   tests ran the built `dist/bin.cjs`. Added a suite that spawns the real binary
+ *   so regressions in the packaged output are caught before publish.
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { PassThrough } from "node:stream";
 import { describe, expect, it } from "vitest";
@@ -44,6 +48,48 @@ describe("bin.ts packaging contract (static)", () => {
 });
 
 // ─── Runtime smoke test ───────────────────────────────────────────────────────
+
+/**
+ * Feed the server these messages over a stand-in stdin and return the replies
+ * it wrote. Waits until `expected` replies have arrived, or two seconds.
+ */
+async function exchange(
+  messages: unknown[],
+  expected: number,
+): Promise<Array<Record<string, unknown>>> {
+  const { startWeftMcpServer } = await import("../server/index.js");
+
+  const fakeStdin = new PassThrough();
+  const fakeStdout = new PassThrough();
+  const chunks: string[] = [];
+  fakeStdout.on("data", (c: Buffer) => chunks.push(c.toString()));
+  const realStdin = process.stdin;
+  const realStdout = process.stdout;
+  Object.defineProperty(process, "stdin", { value: fakeStdin, configurable: true, writable: true });
+  Object.defineProperty(process, "stdout", { value: fakeStdout, configurable: true, writable: true });
+
+  const replies = () =>
+    chunks
+      .join("")
+      .split("\n")
+      .filter((line) => line.trim());
+  try {
+    const serverPromise = startWeftMcpServer();
+    for (const message of messages) {
+      fakeStdin.write(`${JSON.stringify(message)}\n`);
+    }
+    const deadline = Date.now() + 2000;
+    while (replies().length < expected && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    fakeStdin.end();
+    await serverPromise;
+  } finally {
+    Object.defineProperty(process, "stdin", { value: realStdin, configurable: true, writable: true });
+    Object.defineProperty(process, "stdout", { value: realStdout, configurable: true, writable: true });
+  }
+  return replies().map((line) => JSON.parse(line) as Record<string, unknown>);
+}
 
 describe("startWeftMcpServer() runtime contract", () => {
   it("resolves when stdin closes (no pending lines)", async () => {
@@ -136,5 +182,408 @@ describe("startWeftMcpServer() runtime contract", () => {
     expect(toolNames).toContain("weft_debate");
     expect(toolNames).toContain("weft_consensus");
     expect(toolNames).toContain("weft_tracked");
+  });
+
+  it("notifications/initialized produces no response (B11 protocol fix)", async () => {
+    // Before the fix, method:"notifications/initialized" bypassed the notification
+    // suppression check (which only tested for "initialized") and emitted a
+    // malformed JSON-RPC response with id:null and no result field.
+    const { startWeftMcpServer } = await import("../server/index.js");
+
+    const fakeStdin = new PassThrough();
+    const chunks: string[] = [];
+    const realStdout = process.stdout;
+    const fakeStdout = new PassThrough();
+    fakeStdout.on("data", (c: Buffer) => chunks.push(c.toString()));
+
+    const realStdin = process.stdin;
+    Object.defineProperty(process, "stdin", {
+      value: fakeStdin,
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(process, "stdout", {
+      value: fakeStdout,
+      configurable: true,
+      writable: true,
+    });
+
+    const serverPromise = startWeftMcpServer();
+
+    // Send the spec-compliant notification (no id — MCP notifications never have ids).
+    fakeStdin.write(
+      `${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`,
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Also send a tools/list so we can verify the server is otherwise working.
+    fakeStdin.write(
+      `${JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" })}\n`,
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    fakeStdin.end();
+    await serverPromise;
+
+    Object.defineProperty(process, "stdin", {
+      value: realStdin,
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(process, "stdout", {
+      value: realStdout,
+      configurable: true,
+      writable: true,
+    });
+
+    const lines = chunks.join("").split("\n").filter((l) => l.trim());
+    // There should be exactly ONE response (the tools/list). No response for the notification.
+    expect(lines).toHaveLength(1);
+    const response = JSON.parse(lines[0]) as {
+      id: number;
+      result: { tools: Array<{ name: string }> };
+    };
+    expect(response.id).toBe(2);
+    expect(response.result.tools.length).toBeGreaterThan(0);
+  });
+
+  it("notifications/cancelled produces no response (M5 fix)", async () => {
+    const { startWeftMcpServer } = await import("../server/index.js");
+
+    const fakeStdin = new PassThrough();
+    const chunks: string[] = [];
+    const realStdout = process.stdout;
+    const fakeStdout = new PassThrough();
+    fakeStdout.on("data", (c: Buffer) => chunks.push(c.toString()));
+    const realStdin = process.stdin;
+
+    Object.defineProperty(process, "stdin", { value: fakeStdin, configurable: true, writable: true });
+    Object.defineProperty(process, "stdout", { value: fakeStdout, configurable: true, writable: true });
+
+    const serverPromise = startWeftMcpServer();
+
+    // Send three notification methods; none should produce a response.
+    fakeStdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/cancelled", params: { requestId: 99 } })}\n`);
+    fakeStdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/progress", params: { progressToken: 1, progress: 50, total: 100 } })}\n`);
+    fakeStdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/roots/list_changed" })}\n`);
+    // One real request to confirm the server is still running.
+    fakeStdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 5, method: "tools/list" })}\n`);
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    fakeStdin.end();
+    await serverPromise;
+
+    Object.defineProperty(process, "stdin", { value: realStdin, configurable: true, writable: true });
+    Object.defineProperty(process, "stdout", { value: realStdout, configurable: true, writable: true });
+
+    const lines = chunks.join("").split("\n").filter((l) => l.trim());
+    // Exactly ONE response: the tools/list. No responses for the three notifications.
+    expect(lines).toHaveLength(1);
+    const parsed = JSON.parse(lines[0]) as { id: number };
+    expect(parsed.id).toBe(5);
+  });
+
+  it("ping responds with an empty result object (M6 fix)", async () => {
+    const { startWeftMcpServer } = await import("../server/index.js");
+
+    const fakeStdin = new PassThrough();
+    const chunks: string[] = [];
+    const realStdout = process.stdout;
+    const fakeStdout = new PassThrough();
+    fakeStdout.on("data", (c: Buffer) => chunks.push(c.toString()));
+    const realStdin = process.stdin;
+
+    Object.defineProperty(process, "stdin", { value: fakeStdin, configurable: true, writable: true });
+    Object.defineProperty(process, "stdout", { value: fakeStdout, configurable: true, writable: true });
+
+    const serverPromise = startWeftMcpServer();
+    fakeStdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 7, method: "ping" })}\n`);
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    fakeStdin.end();
+    await serverPromise;
+
+    Object.defineProperty(process, "stdin", { value: realStdin, configurable: true, writable: true });
+    Object.defineProperty(process, "stdout", { value: realStdout, configurable: true, writable: true });
+
+    const lines = chunks.join("").split("\n").filter((l) => l.trim());
+    expect(lines).toHaveLength(1);
+    const parsed = JSON.parse(lines[0]) as { id: number; result: unknown };
+    expect(parsed.id).toBe(7);
+    // MCP spec: ping must return an empty result object, not an error.
+    expect(parsed.result).toEqual({});
+  });
+
+  it("null input does not crash the server (M4 fix)", async () => {
+    const { startWeftMcpServer } = await import("../server/index.js");
+
+    const fakeStdin = new PassThrough();
+    const chunks: string[] = [];
+    const realStdout = process.stdout;
+    const fakeStdout = new PassThrough();
+    fakeStdout.on("data", (c: Buffer) => chunks.push(c.toString()));
+    const realStdin = process.stdin;
+
+    Object.defineProperty(process, "stdin", { value: fakeStdin, configurable: true, writable: true });
+    Object.defineProperty(process, "stdout", { value: fakeStdout, configurable: true, writable: true });
+
+    const serverPromise = startWeftMcpServer();
+    // "null" is valid JSON that parses to null — the pre-fix server crashed here.
+    fakeStdin.write("null\n");
+    // Verify the server is still running by sending a real request.
+    fakeStdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 9, method: "ping" })}\n`);
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    fakeStdin.end();
+    await serverPromise;
+
+    Object.defineProperty(process, "stdin", { value: realStdin, configurable: true, writable: true });
+    Object.defineProperty(process, "stdout", { value: realStdout, configurable: true, writable: true });
+
+    const lines = chunks.join("").split("\n").filter((l) => l.trim());
+    // Two responses: error for null, then success for ping.
+    expect(lines.length).toBeGreaterThanOrEqual(2);
+    // The ping must succeed (server still alive after null).
+    const pingLine = lines.find((l) => {
+      try { return (JSON.parse(l) as { id?: number }).id === 9; } catch { return false; }
+    });
+    expect(pingLine).toBeDefined();
+    const ping = JSON.parse(pingLine!) as { result: unknown };
+    expect(ping.result).toEqual({});
+  });
+
+  it("request with id but no method receives an invalid-request error response", async () => {
+    // A message shaped {jsonrpc:"2.0", id:N} has no method — the client is
+    // waiting for an answer. The server must reply with -32600, not silently drop
+    // the message and leave the caller hanging.
+    const { startWeftMcpServer } = await import("../server/index.js");
+
+    const fakeStdin = new PassThrough();
+    const chunks: string[] = [];
+    const realStdout = process.stdout;
+    const fakeStdout = new PassThrough();
+    fakeStdout.on("data", (c: Buffer) => chunks.push(c.toString()));
+    const realStdin = process.stdin;
+
+    Object.defineProperty(process, "stdin", { value: fakeStdin, configurable: true, writable: true });
+    Object.defineProperty(process, "stdout", { value: fakeStdout, configurable: true, writable: true });
+
+    const serverPromise = startWeftMcpServer();
+
+    // id present, no method, no result/error — this is an invalid request, not a
+    // client response. The server must reply rather than silently discard.
+    fakeStdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: 42 })}\n`);
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    fakeStdin.end();
+    await serverPromise;
+
+    Object.defineProperty(process, "stdin", { value: realStdin, configurable: true, writable: true });
+    Object.defineProperty(process, "stdout", { value: realStdout, configurable: true, writable: true });
+
+    const lines = chunks.join("").split("\n").filter((l) => l.trim());
+    expect(lines).toHaveLength(1);
+    const parsed = JSON.parse(lines[0]) as {
+      id: number;
+      error: { code: number; message: string };
+    };
+    expect(parsed.id).toBe(42);
+    expect(parsed.error.code).toBe(-32600);
+  });
+
+  it("a request with no method and an id that cannot be echoed gets -32600 with a null id", async () => {
+    const [reply] = await exchange([{ jsonrpc: "2.0", id: { nested: true } }], 1);
+
+    expect(reply.id).toBeNull();
+    expect((reply.error as { code: number }).code).toBe(-32600);
+  });
+
+  it("tools/call weft_debate accepts a whole number of rounds over the wire", async () => {
+    // The advertised schema says rounds is an integer. This goes through the
+    // same validation a real client's call does, which a direct call to the
+    // tool's execute() would skip.
+    const [reply] = await exchange(
+      [
+        {
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: {
+            name: "weft_debate",
+            arguments: {
+              prompt: "Should we ship?",
+              roles: [{ role: "dev", model: "any" }],
+              rounds: 2,
+            },
+          },
+        },
+      ],
+      1,
+    );
+
+    expect(reply.error).toBeUndefined();
+    expect(reply.result).toBeDefined();
+  });
+
+  it("tools/call weft_debate refuses a fractional number of rounds over the wire", async () => {
+    const [reply] = await exchange(
+      [
+        {
+          jsonrpc: "2.0",
+          id: 2,
+          method: "tools/call",
+          params: {
+            name: "weft_debate",
+            arguments: {
+              prompt: "Should we ship?",
+              roles: [{ role: "dev", model: "any" }],
+              rounds: 1.5,
+            },
+          },
+        },
+      ],
+      1,
+    );
+
+    expect((reply.error as { code: number }).code).toBe(-32602);
+  });
+
+  it("notification-named method with an id produces no response (one-mechanism rule)", async () => {
+    // isNotificationMethod is the single authority on what is a notification.
+    // Notification-named methods never produce a response, even if a misbehaving
+    // client attaches an id. The switch inside handleRequest no longer has
+    // notification cases — they are handled exclusively by the isNotif check.
+    const { startWeftMcpServer } = await import("../server/index.js");
+
+    const fakeStdin = new PassThrough();
+    const chunks: string[] = [];
+    const realStdout = process.stdout;
+    const fakeStdout = new PassThrough();
+    fakeStdout.on("data", (c: Buffer) => chunks.push(c.toString()));
+    const realStdin = process.stdin;
+
+    Object.defineProperty(process, "stdin", { value: fakeStdin, configurable: true, writable: true });
+    Object.defineProperty(process, "stdout", { value: fakeStdout, configurable: true, writable: true });
+
+    const serverPromise = startWeftMcpServer();
+
+    // Send a notification-named method WITH an id — misbehaving client.
+    fakeStdin.write(
+      `${JSON.stringify({ jsonrpc: "2.0", id: 77, method: "notifications/cancelled", params: { requestId: 1 } })}\n`,
+    );
+    // Follow with a normal ping so we know the server is alive.
+    fakeStdin.write(
+      `${JSON.stringify({ jsonrpc: "2.0", id: 78, method: "ping" })}\n`,
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    fakeStdin.end();
+    await serverPromise;
+
+    Object.defineProperty(process, "stdin", { value: realStdin, configurable: true, writable: true });
+    Object.defineProperty(process, "stdout", { value: realStdout, configurable: true, writable: true });
+
+    const lines = chunks.join("").split("\n").filter((l) => l.trim());
+    // Only ONE response: the ping. No response for the notification, even with id:77.
+    expect(lines).toHaveLength(1);
+    const parsed = JSON.parse(lines[0]) as { id: number };
+    expect(parsed.id).toBe(78);
+  });
+}); // end startWeftMcpServer() runtime contract
+
+// ─── M14: Built binary integration (dist/bin.cjs) ────────────────────────────
+// M14 fix: the original suite never ran the actual built binary. This suite
+// spawns dist/bin.cjs to catch packaging failures that source-level tests miss.
+
+const DIST_BIN = resolve(__dirname, "../../dist/bin.cjs");
+const binaryExists = existsSync(DIST_BIN);
+
+describe("dist/bin.cjs integration (M14)", () => {
+  it.skipIf(!binaryExists)(
+    "starts, responds to initialize, and exits cleanly when stdin closes",
+    async () => {
+      const { spawn } = await import("node:child_process");
+
+      const proc = spawn(process.execPath, [DIST_BIN], {
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+
+      const responses: string[] = [];
+      let buffer = "";
+      proc.stdout.on("data", (chunk: Buffer) => {
+        buffer += chunk.toString();
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const l of lines) {
+          if (l.trim()) responses.push(l);
+        }
+      });
+
+      const stderrLines: string[] = [];
+      proc.stderr.on("data", (d: Buffer) => stderrLines.push(d.toString()));
+
+      const exitCode = new Promise<number | null>((res) =>
+        proc.on("exit", res),
+      );
+
+      // Send initialize + ping
+      proc.stdin.write(
+        `${JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "test", version: "0" } },
+        })}\n`,
+      );
+      proc.stdin.write(
+        `${JSON.stringify({ jsonrpc: "2.0", id: 2, method: "ping" })}\n`,
+      );
+
+      await new Promise((res) => setTimeout(res, 200));
+      proc.stdin.end();
+
+      const code = await Promise.race([
+        exitCode,
+        new Promise<number | null>((_, rej) =>
+          setTimeout(() => rej(new Error("binary did not exit in 5s")), 5000),
+        ),
+      ]);
+
+      // Must exit cleanly (0 or null for SIGTERM from stdin close, not 1)
+      expect(code).not.toBe(1);
+
+      // Must have responded to initialize
+      const initResponse = responses.find((r) => {
+        try { return (JSON.parse(r) as { id?: number }).id === 1; } catch { return false; }
+      });
+      expect(initResponse).toBeDefined();
+      const init = JSON.parse(initResponse!) as {
+        result?: { protocolVersion?: string; serverInfo?: { name: string } };
+      };
+      expect(init.result?.protocolVersion).toBe("2024-11-05");
+      expect(init.result?.serverInfo?.name).toBe("weft");
+
+      // Must have responded to ping with empty result
+      const pingResponse = responses.find((r) => {
+        try { return (JSON.parse(r) as { id?: number }).id === 2; } catch { return false; }
+      });
+      expect(pingResponse).toBeDefined();
+      const ping = JSON.parse(pingResponse!) as { result: unknown };
+      expect(ping.result).toEqual({});
+
+      // No deprecation warnings in stderr
+      const deprecationWarning = stderrLines.join("").includes("deprecated");
+      expect(deprecationWarning).toBe(false);
+    },
+    10_000,
+  );
+
+  it("dist/bin.cjs file exists (binary was built before test)", () => {
+    // This test intentionally fails — not skips — when the binary is missing,
+    // because the binary must be built before tests. If it's missing, the
+    // build step was skipped, which is a packaging error.
+    expect(binaryExists, `dist/bin.cjs not found at ${DIST_BIN} — run pnpm build first`).toBe(true);
   });
 });

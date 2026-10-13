@@ -2,7 +2,7 @@
  * @fileoverview Solo Mechanism Types
  * @description Type definitions for autonomous agent action with safety guarantees
  * @module weft-core/solo/types
- * @since 2.2.0
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[STORY-01.01]: Solo types definition
  *

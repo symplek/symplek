@@ -7,10 +7,14 @@
   "scripts": {
     "build": "pnpm --filter \"weft-*\" --filter \"create-weft\" run build",
     "test": "pnpm --filter \"weft-*\" run test",
-    "lint": "pnpm --filter \"weft-*\" run lint",
-    "typecheck": "pnpm --filter \"weft-*\" run typecheck",
+    "lint": "pnpm --filter \"weft-*\" --filter \"create-weft\" run lint",
+    "typecheck": "pnpm --filter \"weft-*\" --filter \"create-weft\" run typecheck",
+    "check:versions": "node scripts/sync-versions.mjs --check",
+    "check:docs": "node scripts/check-readme-imports.mjs",
+    "check:consumer": "node scripts/consumer-smoke.mjs",
+    "check:scaffold": "node scripts/scaffold-e2e.mjs",
     "changeset": "changeset",
-    "version-packages": "changeset version",
+    "version-packages": "changeset version && node scripts/sync-versions.mjs",
     "release": "pnpm build && changeset publish"
   },
   "devDependencies": {

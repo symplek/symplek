@@ -30,7 +30,7 @@ provider is configured at runtime.
 │   ├── weft.config.ts    # Weft runtime configuration (provider, API key)
 │   └── tools/index.ts    # composable helpers (resilient, withProvenance)
 ├── agents/
-│   └── {{agentName}}.yaml   # declarative agent — `Weft generate` compiles it
+│   └── {{agentName}}.yaml   # declarative agent — `weft generate` compiles it
 └── tests/
     └── example.test.ts   # vitest unit tests
 ```
@@ -44,8 +44,8 @@ provider is configured at runtime.
 - **`src/tools/index.ts`** — your project's local helpers. Compose `AgentUnit`
   operators into project-specific patterns here so the rest of your code stays
   readable.
-- **`agents/`** — YAML agent definitions. Run `Weft generate` to compile them
-  into typed TypeScript wrappers under `src/agents/`.
+- **`agents/`** — YAML agent definitions. Run `weft generate` to compile them
+  into typed TypeScript wrappers next to them, as `agents/<name>.ts`.
 
 ---
 
@@ -65,7 +65,7 @@ provider is configured at runtime.
 ## Next steps
 
 - Replace the example in `src/index.ts` with your real agent.
-- Edit `agents/{{agentName}}.yaml`, then run `Weft generate` to add typed wrappers.
+- Edit `agents/{{agentName}}.yaml`, then run `weft generate` to add typed wrappers.
 - Add more agents in `agents/`; the CLI handles wiring.
 - See [github.com/wefthq/weft](https://github.com/wefthq/weft) for the operator
   reference (consensus, debate, dialectic, rehearse, replay, supervised, etc.).

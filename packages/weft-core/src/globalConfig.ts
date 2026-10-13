@@ -62,7 +62,9 @@ export function resetGlobalConfig(): void {
 // Init-promise slot (OQ-1 resolution from wave-0-design.md)
 //
 // configure() stays void/synchronous by storing async bootstrap work here.
-// ai() reads and awaits before executing, then clears the slot.
+// awaitInit() reads and awaits before executing, then clears the slot.
+// Concurrent callers all await the same promise so a bootstrap failure
+// reaches every caller that was waiting, not just the first.
 // Both facade.ts and ai.ts import from this module — no circular dependency.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -76,9 +78,39 @@ export function getInitPromise(): Promise<void> | null {
 /** Store a new init promise (set by configure()). */
 export function setInitPromise(p: Promise<void>): void {
   _initPromise = p;
+  // The failure is delivered to whichever call awaits it (awaitInit below).
+  // Without a handler here, a failed bootstrap that no call ever awaits
+  // would end the process as an unhandled rejection.
+  p.catch(() => {});
 }
 
-/** Clear the init promise after ai() has awaited it. */
+/**
+ * Wait for the provider bootstrap that configure() started, if one is
+ * pending. All concurrent callers await the same promise so a bootstrap
+ * failure is reported to every caller that was waiting. The slot is cleared
+ * in a finally block, but only when it still holds the promise that settled
+ * here — a newer configure() call may have already replaced it with a
+ * different bootstrap.
+ */
+export async function awaitInit(): Promise<void> {
+  const p = _initPromise;
+  if (!p) return;
+  try {
+    await p;
+  } finally {
+    // Only clear the slot if no newer configure() has replaced it.
+    if (_initPromise === p) {
+      _initPromise = null;
+    }
+  }
+}
+
+/**
+ * Clear the init promise slot. In production, awaitInit() clears the slot
+ * automatically after the promise settles. This function is kept for tests
+ * that drain the promise via getInitPromise() directly rather than going
+ * through an execution path.
+ */
 export function clearInitPromise(): void {
   _initPromise = null;
 }

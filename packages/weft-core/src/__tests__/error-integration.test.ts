@@ -172,7 +172,7 @@ describe("AgentUnit Error Integration (Story 01.03)", () => {
         expect(WeftError.code).toBe("E201");
         expect(WeftError.message).toContain("[E201]");
         expect(WeftError.fix).toBeDefined();
-        expect(WeftError.fix.docsUrl).toContain("Weft.ai");
+        expect(WeftError.fix.docsUrl).toContain("github.com/wefthq/weft");
         expect(WeftError.originalMessage).toBe("Timeout error");
         expect(WeftError.timestamp).toBeGreaterThan(0);
       }
@@ -245,7 +245,7 @@ describe("AgentUnit Error Integration (Story 01.03)", () => {
 
       // Check for docs link
       expect(output).toContain("Docs:");
-      expect(output).toContain("Weft.ai");
+      expect(output).toContain("github.com/wefthq/weft");
     });
 
     it("includes code snippet in output when available", async () => {

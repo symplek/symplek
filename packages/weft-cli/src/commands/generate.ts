@@ -1,5 +1,5 @@
 /**
- * `Weft generate` command - generates TypeScript from YAML agent definitions
+ * `weft generate` command - generates TypeScript from YAML agent definitions
  * @description Converts YAML agent definitions to type-safe TypeScript code
  */
 
@@ -10,21 +10,12 @@ import { watch } from "chokidar";
 import { Command } from "commander";
 import { glob } from "glob";
 import yaml from "js-yaml";
+import { DEFAULT_MODEL, isModelId, MODEL_ID_HINT } from "../models.js";
+import { isReservedWord, KEBAB_CASE_REGEX, kebabToCamel } from "../naming.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
 // ─────────────────────────────────────────────────────────────────────────────
-// Model IDs mirror the canonical table in weft-core/src/providers/auto.ts.
-// Update here whenever weft-core's provider defaults change.
-
-type SupportedModel =
-  | "gpt-4o"
-  | "gpt-4o-mini"
-  | "claude-opus-4-5"
-  | "claude-sonnet-4-5"
-  | "claude-haiku-3-5"
-  | "gemini-1.5-pro"
-  | "gemini-2.0-flash";
 
 interface ToolConfig {
   name: string;
@@ -58,7 +49,7 @@ interface OperatorsConfig {
 
 interface YamlAgentConfig {
   name: string;
-  model: SupportedModel;
+  model: string;
   systemPrompt: string;
   description?: string;
   version?: string;
@@ -87,38 +78,29 @@ interface GenerateOptions {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MODEL LIST
-// ─────────────────────────────────────────────────────────────────────────────
-// Canonical IDs matching weft-core/src/providers/auto.ts PROVIDER_MODEL_DEFAULTS.
-
-const SUPPORTED_MODELS: readonly SupportedModel[] = [
-  "gpt-4o",
-  "gpt-4o-mini",
-  "claude-opus-4-5",
-  "claude-sonnet-4-5",
-  "claude-haiku-3-5",
-  "gemini-1.5-pro",
-  "gemini-2.0-flash",
-];
-
-// ─────────────────────────────────────────────────────────────────────────────
 // HELPER FUNCTIONS
 // ─────────────────────────────────────────────────────────────────────────────
-
-function isSupportedModel(value: string): value is SupportedModel {
-  return SUPPORTED_MODELS.includes(value as SupportedModel);
-}
 
 function isToolConfig(tool: ToolReference): tool is ToolConfig {
   return typeof tool === "object" && "name" in tool;
 }
 
-function toCamelCase(str: string): string {
-  return str.replace(/-([a-z])/g, (_, char: string) => char.toUpperCase());
+/** First characters of every file this command writes. */
+const GENERATED_HEADER = "// Generated from";
+
+/**
+ * True when a file is at `filePath` and this command did not write it. Such a
+ * file is somebody's work, so nothing here may replace it.
+ */
+export function isHandWritten(filePath: string): boolean {
+  return (
+    existsSync(filePath) &&
+    !readFileSync(filePath, "utf-8").startsWith(GENERATED_HEADER)
+  );
 }
 
 function toPascalCase(str: string): string {
-  const camel = toCamelCase(str);
+  const camel = kebabToCamel(str);
   return camel.charAt(0).toUpperCase() + camel.slice(1);
 }
 
@@ -169,6 +151,11 @@ function emitIdentifier(value: string, field: string): string {
       `Field "${field}" is not a valid JavaScript identifier: "${value}"`,
     );
   }
+  if (isReservedWord(value)) {
+    throw new Error(
+      `Field "${field}" is a JavaScript reserved word and cannot name an export: "${value}"`,
+    );
+  }
   return value;
 }
 
@@ -203,8 +190,8 @@ function parseYamlFile(filePath: string): ParseResult {
 
   if (!parsed.model || typeof parsed.model !== "string") {
     errors.push("Missing required field: model");
-  } else if (!isSupportedModel(parsed.model as string)) {
-    errors.push(`Unsupported model: ${parsed.model}`);
+  } else if (!isModelId(parsed.model)) {
+    errors.push(`Invalid model id: ${parsed.model}. ${MODEL_ID_HINT}`);
   }
 
   if (!parsed.systemPrompt || typeof parsed.systemPrompt !== "string") {
@@ -212,7 +199,7 @@ function parseYamlFile(filePath: string): ParseResult {
   }
 
   // Validate name pattern
-  if (parsed.name && !/^[a-z][a-z0-9-]*$/.test(parsed.name as string)) {
+  if (parsed.name && !KEBAB_CASE_REGEX.test(parsed.name as string)) {
     errors.push(`Invalid agent name: ${parsed.name}. Use kebab-case.`);
   }
 
@@ -236,7 +223,7 @@ function parseYamlFile(filePath: string): ParseResult {
 
   const config: YamlAgentConfig = {
     name: (parsed.name as string) || "unknown",
-    model: (parsed.model as SupportedModel) || "gpt-4o",
+    model: (parsed.model as string) || DEFAULT_MODEL,
     systemPrompt: (parsed.systemPrompt as string) || "",
     description: parsed.description as string | undefined,
     version: parsed.version as string | undefined,
@@ -260,7 +247,7 @@ function generateTypeScript(
   config: YamlAgentConfig,
   sourceFile: string,
 ): string {
-  const exportName = toCamelCase(config.name);
+  const exportName = kebabToCamel(config.name);
   const lines: string[] = [];
 
   // Validate identifiers up-front so failures surface before any code is emitted.
@@ -331,7 +318,7 @@ function generateTypeScript(
         // intent (retry with a different model) is preserved.
         const fallbackModule = config.operators.fallback.agent;
         const fallbackAgent = emitIdentifier(
-          toCamelCase(fallbackModule),
+          kebabToCamel(fallbackModule),
           "operators.fallback.agent",
         );
         // Import the fallback agent from its module (assumed same directory).
@@ -358,8 +345,8 @@ function generateTypeScript(
   // ── Emit ───────────────────────────────────────────────────────────────────
 
   // Header
-  lines.push(`// Generated from ${emitString(sourceFile)}`);
-  lines.push("// Do not edit directly - regenerate with: npx Weft generate");
+  lines.push(`${GENERATED_HEADER} ${emitString(sourceFile)}`);
+  lines.push("// Do not edit directly - regenerate with: weft generate");
   lines.push("");
   // Imports: AgentUnit from the public weft-core root; ai() from the server
   // subpath (requires "weft-core" in the consuming project's dependencies).
@@ -371,7 +358,13 @@ function generateTypeScript(
   lines.push("");
 
   if (config.description !== undefined) {
-    lines.push(`/** ${emitString(config.description).slice(1, -1)} */`);
+    // The description lands inside a block comment. JSON escaping leaves
+    // `*/` intact, which would end the comment and turn the rest of the
+    // description into code, so the closing sequence is broken up.
+    const description = emitString(config.description)
+      .slice(1, -1)
+      .replace(/\*\//g, "*\\/");
+    lines.push(`/** ${description} */`);
   }
 
   // The agent is a factory function that binds the static config (model,
@@ -454,6 +447,17 @@ export function generateFile(
 
     // Generate TypeScript
     const typescript = generateTypeScript(config, inputPath);
+
+    // The output sits next to the YAML under the same name, where a
+    // hand-written agent could already be.
+    if (isHandWritten(outputPath)) {
+      return {
+        inputFile: inputPath,
+        outputFile: outputPath,
+        success: false,
+        error: `${outputPath} already exists and was not generated by this command. Move or delete it, or pass --output to write somewhere else.`,
+      };
+    }
 
     // Ensure output directory exists
     const outputDirPath = path.dirname(outputPath);

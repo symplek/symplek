@@ -2,7 +2,7 @@
  * @fileoverview Coherence Module Barrel Export
  * @description Public API for ensemble coherence measurement
  * @module weft-core/coherence
- * @since 2.1.0
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[STORY-01.05]: Main barrel export for coherence module
  *

@@ -2,7 +2,7 @@
  * @fileoverview Solo Module Barrel Export
  * @description Public API for autonomous agent action mechanism
  * @module weft-core/solo
- * @since 2.2.0
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[STORY-01.10]: Barrel exports for solo module
  *

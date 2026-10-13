@@ -8,21 +8,21 @@ Weft's maintainers develop Weft inside a private monorepo alongside the applicat
 
 This mirror exists so that:
 
-1. The npm-published `@weft/*` packages have a public source-of-truth that users, security researchers, and external contributors can read.
+1. The `weft-*` npm packages have a public source-of-truth that users, security researchers, and external contributors can read.
 2. External contributions have somewhere to land.
 3. Issues, discussions, and releases live in one public place.
 
 ## How sync works
 
-There is **no automation**. Sync is a manual act, performed by a maintainer, at release time.
+There is **no automation for the sync itself**. Copying code between the two repos is a manual act, performed by a maintainer, at release time. Publishing is automated by CI once changes land on `main` here.
 
 ### Upstream → mirror (the common direction)
 
 1. A maintainer cuts a release tag in the upstream private monorepo.
 2. The relevant `packages/weft-*` subtrees are copied into this repo.
-3. The maintainer runs `pnpm changeset version` here to generate the version bump and CHANGELOG entries.
-4. The maintainer pushes the release commit to `main` here.
-5. The maintainer tags the release and `pnpm changeset publish` pushes to npm.
+3. The maintainer adds changesets for the change and pushes to `main` here.
+4. The `release` job in `.github/workflows/ci.yml` opens or updates a "Version Packages" pull request. That pull request runs `changeset version`: the version bumps and CHANGELOG entries.
+5. Merging that pull request makes the same job run `pnpm release`, which builds the packages and runs `changeset publish`. That pushes to npm and creates the git tags.
 
 ### Mirror → upstream (external contributions)
 
@@ -35,15 +35,17 @@ This means a merged PR may appear here under one commit hash and ship to npm und
 
 ## Drift detection
 
-`packages/weft-core/src/__tests__/canonicalMirrorContract.test.ts` (in this repo and upstream) asserts behavioural and structural equivalence on four shared concepts: `AgentUnit`, `WeftError`, `WeftBuilder`, `RetryOptions`. If these tests fail in CI, sync has drifted and a maintainer must reconcile before the next release.
+`packages/weft-core/src/__tests__/canonicalMirrorContract.test.ts` (in this repo and upstream) asserts behavioural and structural equivalence on four shared concepts: `AgentUnit`, `WeftError`, `WeftBuilder`, `RetryOptions`. It reads the upstream source from a path that only exists in the upstream monorepo. In this repo every suite in the file skips itself, so CI here cannot detect drift. Drift is only caught when the test runs upstream, and a maintainer must reconcile it before the next release.
 
-Some asymmetries are **deliberate** and documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Do not "fix" them.
+Some asymmetries are **deliberate** and documented in [`docs/ARCHITECTURE-FULL.md`](docs/ARCHITECTURE-FULL.md). Do not "fix" them.
 
 ## Release cadence
 
-- Patch releases: as needed, typically within 14 days of a confirmed bug.
-- Minor releases: every 2–4 weeks while in 0.x.
-- Major release (1.0): held until the operator API has accumulated 3–6 months of real external usage without breaking-change pressure.
+Nothing has been released yet, so this is the intended cadence, not a track record.
+
+- Patch releases: as needed, aiming for within 14 days of a confirmed bug.
+- Beta releases: every 2–4 weeks while in beta.
+- Stable 1.0: held until the operator API has accumulated 3–6 months of real external usage without breaking-change pressure.
 
 ## Questions
 

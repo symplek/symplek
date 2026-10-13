@@ -1,44 +1,35 @@
 # create-weft
 
-Scaffolds a Weft agent in 30 seconds.
+Scaffolds a Weft agent project. It is a thin wrapper around `weft init` from
+[`weft-cli`](../weft-cli): it runs the copy of the CLI it depends on and hands
+every argument straight through.
 
-```bash
-npm create weft@latest
-```
-
-That's it. The command drops you into an interactive setup and generates a
-ready-to-run Weft agent project — complete with retry, fallback, and testing.
-
-## What it does
-
-`create-weft` is a thin wrapper. It forwards everything you pass to the Weft
-CLI's `init` command, so any flag the CLI understands works here too:
-
-```bash
-# Pick a template up front (minimal | standard | full)
-npm create weft@latest -- --template minimal
-
-# Name the project directory
-npm create weft@latest my-agent
-```
-
-Equivalent to running the CLI directly:
+> **Not on npm under this name.** The npm name `create-weft` belongs to an
+> unrelated project, so `npm create weft` does not run this package. Until this
+> wrapper is published under a name of our own, scaffold with the CLI directly.
 
 ```bash
 npx -p weft-cli weft init
 ```
 
-## Other package managers
+## Options
+
+Everything `weft init` accepts:
 
 ```bash
-pnpm create weft
-yarn create weft
-bun create weft
+# Pick a template up front (minimal | standard | full)
+npx -p weft-cli weft init --template minimal
+
+# Name the project
+npx -p weft-cli weft init --name my-agent
+
+# Choose the package manager and skip the prompts
+npx -p weft-cli weft init --name my-agent --pm pnpm --yes
 ```
 
 ## Requirements
 
-- Node.js >= 20
+- Node.js >= 20.19
 
 ## License
 

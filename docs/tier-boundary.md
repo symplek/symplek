@@ -24,22 +24,22 @@ without any commercial license.
 | Conduct | `.conduct(handlers)` | Execute a pending interview |
 | Rehearse | `.rehearse(options?)` | Record execution trace for deterministic replay |
 | Replay | `.replay(trace, options?)` | Replay a recorded trace deterministically |
-| Retry | `.retry(options)` | Resilience: exponential backoff retry |
-| Timeout | `.timeout(ms)` | Resilience: hard deadline |
-| Fallback | `.fallback(fn)` | Resilience: value on failure |
-| Track | `.track(options?)` | Source-tracking wrapper |
-| Transform | `.map(fn)`, `.pipe(fn)` | Pure functional transformations |
-| Parallel | `.race()`, `.all()`, etc. | Parallel execution primitives |
+| Retry | `.retry(maxAttempts?, options?)` | Resilience: exponential backoff retry |
+| Timeout | `.timeout(ms)` | Resilience: fail if not finished in time (the work underneath is not cancelled) |
+| Fallback | `.fallback(unit)`, `.orElse(value)` | Resilience: backup unit or static value on failure |
+| Track | `.tracked(options)` | Label a result with a source and confidence you supply |
+| Transform | `.map(fn)`, `.flatMap(fn)`, `.branch(...)`, `.tap(fn)` | Functional transformations |
+| Parallel | `AgentUnit.race(units)`, `AgentUnit.zipAll(units)`, `.zip(other)` | Parallel execution primitives |
 
 ### Observability primitives (free)
 
 | Function | Purpose |
 |---|---|
-| `observable(unit, options?)` | Wrap an `AgentUnit` so its results emit trace entries |
+| `observable(unit, options?)` | Wrap an `AgentUnit` so a successful run records one trace entry (no timing; failures are not recorded) |
 | `createOperatorSpan(type, name, parentSpanId?)` | Create a manually-timed span with `.end()` |
 | `getTraces()` | Read the in-memory trace store |
 | `clearTraces()` | Clear the in-memory trace store |
-| `configureObservability(options)` | Set verbosity, cost/error tracking, and optional collector |
+| `configureObservability(options)` | Set verbosity and an optional collector. The `trackCosts` and `trackErrors` flags are stored but nothing reads them yet |
 | `getObservabilityConfig()` | Read the current observability configuration |
 | `trackCost(span, tokens, model?)` | Record token cost on a span |
 | `trackError(span, error)` | Record error metadata on a span |
@@ -58,7 +58,8 @@ in `weft-pro` when added.
 - Interview module (`interview/`) — full Q&A engine
 - Solo module (`solo/`) — decision, lock, transaction log
 - Rehearsal module (`rehearsal/`) — recorder, replayer, trace storage
-- Observability module (`observability/`) — in-memory trace store, span instrumentation, collector hook
+- Observability module (`observability.ts`): in-memory trace store, span instrumentation, collector hook
+- Teams (`Team`, `TeamRegistry`), the change-kernel (`weft-core/change-kernel`), and the coherence and confidence libraries (`weft-core/coherence`, `weft-core/confidence`)
 
 ---
 
@@ -76,6 +77,12 @@ Features that serve **team coordination, governance, and observability at organi
 | **Change-kernel** | Approval workflows, escalation, merge, classification |
 | **Coherence/Confidence modules** | Standalone calculation libraries (variance, entropy, composite) |
 
+> **Where the code stands today**: the table above is the intended tier line, and the code has not caught up with it.
+> `weft-core` (MIT) exports `Team` and `TeamRegistry`, the change-kernel (`weft-core/change-kernel`) and the coherence and
+> confidence libraries (`weft-core/coherence`, `weft-core/confidence`). `weft-pro` re-exports those same modules from
+> `weft-core` behind its licence gate. The code that exists only in `weft-pro` is TaCo consensus, stigmergy, antibodies
+> and the trust registry. Importing `weft-pro` throws unless the `WEFT_PRO_LICENSE_KEY` environment variable holds a key.
+
 > **Note on observability**: Basic observability (span recording, trace store, cost/error
 > tracking, manual span instrumentation, collector hook) moved to `weft-core` in the opencore
 > release. `weft-pro` will add advanced observability features (multi-agent trace aggregation,
@@ -85,8 +92,10 @@ Features that serve **team coordination, governance, and observability at organi
 >
 > `dialectic`, `debate`, `solo`, and `coherence` are **free-tier `AgentUnit` instance methods**
 > (e.g. `agent.dialectic(leader, advisors, options?)`). They are available on every `AgentUnit`
-> via prototype augmentation and require no commercial license. `weft-pro` does **not** shadow
-> or re-export these operators.
+> via prototype augmentation and require no commercial license. `weft-pro` adds no operator of its
+> own to `AgentUnit`. It does re-export the computation factories behind these operators
+> (`createDebateComputation`, `createDialecticComputation`, `createSoloComputation`,
+> `createCoherenceComputation`) from `weft-core`.
 >
 > What `weft-pro` adds are **standalone computation factory functions** (e.g. `tacoConsensus`)
 > that wrap multi-round coordination patterns targeting team workflows. `tacoConsensus` is not
@@ -113,8 +122,9 @@ configuration that targets team workflows, not individual agent composition.
 ## Verification
 
 ```bash
-# Confirm no weft-pro imports in weft-core source
-rg "weft-pro" packages/weft-core/src --glob "*.ts" -l
+# Confirm no weft-pro imports in weft-core source (prints nothing when the boundary holds).
+# Searching for the bare string "weft-pro" also matches comments, so match import forms only.
+grep -rEl "(from|import|require)[[:space:]]*\(?[[:space:]]*['\"]weft-pro" packages/weft-core/src --include='*.ts' --include='*.tsx'
 
 # Run tier boundary tests
 cd packages/weft-core && pnpm vitest run src/__tests__/tierBoundary.test.ts

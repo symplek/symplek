@@ -12,6 +12,7 @@ import {
   RecordingLLMInterceptor,
   ReplayLLMInterceptor,
 } from "../interceptor";
+import { TraceReplayer } from "../replayer";
 
 // Mock recorder for testing
 function createMockRecorder(): InterceptorRecorder & {
@@ -345,5 +346,35 @@ describe("ReplayLLMInterceptor", () => {
       interceptor.reset();
       expect(interceptor.getRemainingCalls()).toBe(2);
     });
+  });
+});
+
+describe("a recorded call replays against its own trace without a mismatch", () => {
+  it("records the hash that replay compares against", async () => {
+    const recording = new RecordingLLMInterceptor();
+    const recorder = createMockRecorder();
+    recording.install(recorder);
+    const config: LLMCallConfig = {
+      model: "gpt-4",
+      prompt: "Summarise the report",
+      systemPrompt: "Be brief",
+      temperature: 0.2,
+    };
+    await recording.recordCall(config, async () => ({ response: "Done." }));
+
+    // Rebuild the calls from the trace events, as TraceReplayer.replay() does.
+    // The step is a private method that reads only the trace it is given.
+    const { extractLLMCalls } = TraceReplayer.prototype as unknown as {
+      extractLLMCalls(trace: { events: unknown[] }): RecordedLLMCall[];
+    };
+    const calls = extractLLMCalls.call(null, { events: recorder.events });
+    expect(calls).toHaveLength(1);
+
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const replayed = await new ReplayLLMInterceptor(calls).replayCall(config);
+
+    expect(replayed.response).toBe("Done.");
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

@@ -30,7 +30,7 @@ export function emitDeprecationWarning(cls: {
   if (!alreadyWarned) {
     console.warn(
       '[Weft] trustMode: "legacy" is deprecated and will be removed in v3.0.\n' +
-        "  Migration guide: https://Weft.ai/docs/migration/zero-trust",
+        "  Use the default mode instead: unit.run(ctx) returns { value, source, confidence }.",
     );
   }
 }

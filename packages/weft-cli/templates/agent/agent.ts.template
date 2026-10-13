@@ -1,10 +1,11 @@
 /**
  * {{name}} Agent
  * TypeScript agent definition
- * Created with: weft add agent {{name}} --type typescript
+ * Created with: weft add agent {{name}}
  *
- * Call Weft.configure({ apiKey, model }) before using this agent.
- * See: https://weft.dev/docs/configuration
+ * Before using this agent, set a provider key in the environment (for
+ * example OPENAI_API_KEY), or call
+ * Weft.configure({ provider, apiKey }) from weft-core/server.
  */
 import { AgentUnit, createContext } from "weft-core";
 import { ai } from "weft-core/server";

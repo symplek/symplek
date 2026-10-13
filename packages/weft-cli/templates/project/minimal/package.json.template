@@ -12,14 +12,16 @@
   },
   "dependencies": {
     "weft-core": "^1.0.0-beta.1",
+    "zod": "^3.25.76",
     "openai": "^4.104.0"
   },
   "devDependencies": {
+    "weft-cli": "^{{cliVersion}}",
     "@types/node": "^22.14.0",
     "tsx": "^4.19.0",
     "typescript": "^5.9.0"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.19"
   }
 }

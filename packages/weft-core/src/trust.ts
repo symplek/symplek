@@ -9,7 +9,7 @@
  *   through createTrackedResult(). Objects constructed manually — even with
  *   a leaked marker Symbol — will NOT be in the WeakSet and will be rejected.
  *
- * @since 2.1.0 — Hardened against forgery (Codex FATAL #1, 2026-07-07)
+ * @since 1.0.0-beta.1 — Hardened against forgery (Codex FATAL #1, 2026-07-07)
  */
 import type { ObjectiveConfidence } from "./confidence";
 import type { ResultSource, TrackedResult } from "./types";

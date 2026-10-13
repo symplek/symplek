@@ -43,110 +43,110 @@ export const FIX_SUGGESTIONS: Record<
   E000: {
     description:
       "An unknown error occurred. Check the error message and stack trace for details.",
-    docsUrl: "https://Weft.ai/docs/errors",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E001: {
     description:
       "Ensure the value matches the expected type. Check your input data.",
-    docsUrl: "https://Weft.ai/docs/errors/type",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E002: {
     description: "Add the required field to your configuration or input.",
-    docsUrl: "https://Weft.ai/docs/errors/type",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E003: {
     description: "Change the property to a valid value type.",
-    docsUrl: "https://Weft.ai/docs/errors/type",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E004: {
     description:
       "Review the schema requirements and ensure your input conforms.",
-    docsUrl: "https://Weft.ai/docs/errors/type",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E005: {
     description: "Provide a non-null value or add null handling.",
-    docsUrl: "https://Weft.ai/docs/errors/type",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E101: {
     description:
       "Use buildContext() to create the required context before calling the agent.",
     codeSnippet: "const context = buildContext(ctx).withUser(userId).build();",
-    docsUrl: "https://Weft.ai/docs/errors/context",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E102: {
     description: "Verify the context structure matches the expected schema.",
-    docsUrl: "https://Weft.ai/docs/errors/context",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E103: {
     description:
       "Create a fresh context. Consider increasing timeout for long-running operations.",
-    docsUrl: "https://Weft.ai/docs/errors/context",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E104: {
     description: "Ensure the user/agent has the required permissions.",
-    docsUrl: "https://Weft.ai/docs/errors/context",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E201: {
     description:
       "Increase the timeout or optimize the operation to complete faster.",
     codeSnippet: ".timeout(60000) // Increase to 60 seconds",
-    docsUrl: "https://Weft.ai/docs/errors/execution",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E202: {
     description: "Lower the confidence threshold or improve agent quality.",
     codeSnippet: ".requireConfidence(0.7) // Lower threshold",
-    docsUrl: "https://Weft.ai/docs/errors/execution",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E203: {
     description: "Implement retry with exponential backoff.",
     codeSnippet: ".retry(3, { baseDelayMs: 1000 })",
-    docsUrl: "https://Weft.ai/docs/errors/execution",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E204: {
     description:
       "Check tool configuration and ensure tools are properly registered.",
-    docsUrl: "https://Weft.ai/docs/errors/execution",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E205: {
     description:
       "Increase maxSteps or redesign agent to complete in fewer steps.",
-    docsUrl: "https://Weft.ai/docs/errors/execution",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E301: {
     description: "Increase quorum threshold or add more voters.",
     codeSnippet: ".consensus(voters, { quorum: 0.51 })",
-    docsUrl: "https://Weft.ai/docs/errors/coordination",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E302: {
     description:
       "Review challenge configuration and ensure valid thesis/antithesis.",
-    docsUrl: "https://Weft.ai/docs/errors/coordination",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E303: {
     description:
       "Restructure agent dependencies to eliminate circular references.",
-    docsUrl: "https://Weft.ai/docs/errors/coordination",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E304: {
     description: "Lower coherence threshold or improve agent alignment.",
     codeSnippet: ".coherence({ threshold: 0.70 }) // Lower threshold",
-    docsUrl: "https://Weft.ai/docs/errors/coordination",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E401: {
     description: "Sanitize inputs before passing to agents.",
     codeSnippet: ".scanned({ maxLength: 1000, allowedPatterns: [...] })",
-    docsUrl: "https://Weft.ai/docs/errors/security",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E402: {
     description: "Add source tracking to verify result provenance.",
     codeSnippet: ".tracked({ source: 'agent', confidence: 0.9 })",
-    docsUrl: "https://Weft.ai/docs/errors/security",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
   E403: {
     description:
       "Only use TrackedResult created through official .tracked() method.",
     codeSnippet: ".tracked({ source: 'agent', confidence: 0.9 })",
-    docsUrl: "https://Weft.ai/docs/errors/security",
+    docsUrl: "https://github.com/wefthq/weft#readme",
   },
 };
 

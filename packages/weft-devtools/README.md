@@ -49,7 +49,7 @@ The panel only shows traces your app emits. Turn observability on:
 ```typescript
 import { configureObservability } from "weft-core";
 
-configureObservability({ enabled: true });
+configureObservability({ verbosity: "detailed" });
 ```
 
 For production you'd typically gate this behind a flag.

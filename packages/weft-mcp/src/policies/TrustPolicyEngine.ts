@@ -12,7 +12,6 @@ import type { MCPEvidence, MCPPolicyVerdict, MCPTrustPolicy } from "../types";
 import { allowTrustedOnly } from "./allowTrustedOnly";
 import { degradeToReadOnly } from "./degradeToReadOnly";
 import { requireAttestation } from "./requireAttestation";
-import { requireTwoSources } from "./requireTwoSources";
 
 // ---------------------------------------------------------------------------
 // Result type
@@ -50,16 +49,31 @@ function verdictSeverity(v: MCPPolicyVerdict): number {
 // ---------------------------------------------------------------------------
 
 export class TrustPolicyEngine {
-  private readonly policies: MCPTrustPolicy[] = [];
+  private readonly _policies: MCPTrustPolicy[] = [];
 
   constructor(policies?: MCPTrustPolicy[]) {
     if (policies) {
-      this.policies = [...policies];
+      this._policies = [...policies];
     }
   }
 
+  /**
+   * Read-only view of the configured policies.
+   *
+   * Useful for extending the default set without accessing private internals:
+   * ```ts
+   * MCPUnit.create({
+   *   transport: ...,
+   *   policies: [...createDefaultPolicyEngine().policies, requireTwoSources],
+   * })
+   * ```
+   */
+  get policies(): readonly MCPTrustPolicy[] {
+    return this._policies;
+  }
+
   addPolicy(policy: MCPTrustPolicy): this {
-    this.policies.push(policy);
+    this._policies.push(policy);
     return this;
   }
 
@@ -72,7 +86,7 @@ export class TrustPolicyEngine {
     const policyResults: PolicyEvaluationResult["policyResults"] = [];
     let worstVerdict: MCPPolicyVerdict = "allow";
 
-    for (const policy of this.policies) {
+    for (const policy of this._policies) {
       const verdict = policy.evaluate(evidence);
       policyResults.push({ policy: policy.name, verdict });
 
@@ -93,7 +107,7 @@ export class TrustPolicyEngine {
   }
 
   get policyCount(): number {
-    return this.policies.length;
+    return this._policies.length;
   }
 }
 
@@ -102,14 +116,27 @@ export class TrustPolicyEngine {
 // ---------------------------------------------------------------------------
 
 /**
- * Create a TrustPolicyEngine pre-loaded with all 4 built-in policies
- * in recommended evaluation order.
+ * Create a TrustPolicyEngine pre-loaded with the 3 built-in policies that
+ * a fresh MCPUnit call can satisfy.
+ *
+ * `requireTwoSources` is intentionally excluded: it requires two entries in
+ * `mcp.corroboratedBy` and no mechanism to populate that field ships today.
+ * Including it would make every call throw `MCPPolicyDegradedError` regardless
+ * of the server. Callers who have a corroboration infrastructure can add it:
+ *
+ * ```ts
+ * MCPUnit.create({
+ *   transport: ...,
+ *   policies: [...createDefaultPolicyEngine().policies, requireTwoSources],
+ * })
+ * ```
+ *
+ * Evaluation order: allowTrustedOnly → requireAttestation → degradeToReadOnly.
  */
 export function createDefaultPolicyEngine(): TrustPolicyEngine {
   return new TrustPolicyEngine([
     allowTrustedOnly,
     requireAttestation,
-    requireTwoSources,
     degradeToReadOnly,
   ]);
 }

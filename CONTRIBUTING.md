@@ -16,7 +16,7 @@ What this means for contributors:
 - **We cannot accept PRs that touch internal concerns.** Anything that depends on Convex-specific types (`AgentContext` from Convex, `ctx.scheduler`, etc.) belongs in the upstream app, not here.
 - **Turnaround is slower than a single-codebase OSS project.** Changes land in the packages here after they've been validated against the canonical source. We aim for two-week release cycles.
 
-If you want to understand which concepts are shared between the canonical source and this mirror, and where they intentionally diverge, read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+If you want to understand which concepts are shared between the canonical source and this mirror, and where they intentionally diverge, read [docs/ARCHITECTURE-FULL.md](docs/ARCHITECTURE-FULL.md).
 
 ---
 
@@ -58,20 +58,23 @@ Features out of scope for this repo: anything that requires the upstream applica
 
 ## Code style
 
-We use [Biome](https://biomejs.dev/) for formatting and linting. No ESLint, no Prettier.
+We use [Biome](https://biomejs.dev/) for linting. No ESLint, no Prettier.
 
 ```
-pnpm --filter "weft-*" run lint
-pnpm --filter "weft-*" run typecheck
+pnpm lint
+pnpm build
+pnpm typecheck
 ```
 
-Match the style of the surrounding code. We are not prescriptive about every micro-preference, but the formatter is non-negotiable — CI will fail on format violations.
+Build before you type check: packages resolve each other's types through the built `dist/` output.
+
+Match the style of the surrounding code. Biome's formatter is switched off in `biome.json`, so CI does not check formatting. CI fails on lint errors. A handful of rules are downgraded to warnings in `biome.json`, and warnings do not fail the build.
 
 ---
 
 ## Commit conventions
 
-We use [Conventional Commits](https://www.conventionalcommits.org/):
+We ask for [Conventional Commits](https://www.conventionalcommits.org/) on pull requests:
 
 ```
 feat(core): add .tap() operator
@@ -100,7 +103,7 @@ pnpm --filter "weft-*" run build
 pnpm --filter "weft-*" test
 ```
 
-The test suite includes canonical ↔ mirror contract tests that read source files from a relative path (`../../../../convex/lib/agent_framework/`). When running in this mirror repo without the upstream canonical source present, those structural fallback tests will fail. That is expected — they exist to guard against drift in the ProSentinel monorepo context. The runtime behaviour tests (which do not read canonical source files) will pass.
+The test suite includes canonical ↔ mirror contract tests (`packages/weft-core/src/__tests__/canonicalMirrorContract.test.ts`) that read source files from a relative path (`../../../../convex/lib/agent_framework/`). That source is not in this repo, so the whole file skips itself here: `weft-core` reports one skipped test file. Nothing fails. It also means nothing in this repo checks for drift against the upstream source. Every other test should pass.
 
 If you are writing a new test, add it to the appropriate package under `src/__tests__/`. Follow the existing pattern: runtime behaviour tests first, structural fallback tests where live import is impossible due to Convex-specific types.
 
@@ -110,7 +113,7 @@ If you are writing a new test, add it to the appropriate package under `src/__te
 
 - PRs that add dependencies on `convex`, `@convex-dev/*`, or any Convex-specific runtime type. Those belong upstream.
 - PRs that modify `weft-pro` in a way that weakens the tier boundary. The boundary between free and commercial is a deliberate product decision, not an implementation accident.
-- PRs against the `dev` branch. Target `main`.
+- PRs against any branch other than `main`.
 - Large refactors without prior Discussion agreement. Refactors that touch the core algebra are high-risk and require careful review against the canonical source.
 
 ---

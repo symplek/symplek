@@ -24,6 +24,8 @@ import {
   resetAll,
   setInitPromise,
 } from "./globalConfig";
+import { createProviderAdapter } from "./providers/bootstrap";
+import { getEnvKeyForProvider, KNOWN_PROVIDERS } from "./providers/known";
 import { providerRegistry } from "./providers/registry";
 import type { StreamOptions } from "./streaming";
 import { stream } from "./streaming";
@@ -123,9 +125,10 @@ export interface WeftFunction {
 // _globalConfig is now held in ./globalConfig.ts to avoid circular imports.
 // facade.ts writes via mergeGlobalConfig(); providers/auto.ts reads via getGlobalConfig().
 
-// _initPromise slot lives in ./globalConfig.ts (setInitPromise / getInitPromise / clearInitPromise).
-// Keeping it there prevents the facade.ts → ai.ts → facade.ts circular import that would arise
-// if ai.ts imported _initPromise directly from here.
+// _initPromise slot lives in ./globalConfig.ts; awaitInit() drains it before execution
+// and clears the slot after it settles. getInitPromise() and clearInitPromise() are
+// also exported from that module for tests that drain the promise directly.
+// Keeping the slot there prevents the facade.ts → ai.ts → facade.ts circular import.
 
 /**
  * The supported provider names. Unknown names produce a `PROVIDER_ERROR`.
@@ -137,8 +140,7 @@ export interface WeftFunction {
  * configure({ provider: "openrouter" }) throws a clear PROVIDER_ERROR so callers
  * get an actionable message instead of a silent mis-route.
  */
-const SUPPORTED_PROVIDERS = ["openai", "anthropic", "google"] as const;
-type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number];
+const SUPPORTED_PROVIDERS: readonly string[] = KNOWN_PROVIDERS.map((p) => p.id);
 
 /**
  * Monotonically increasing counter that advances on every `configure()` call.
@@ -165,46 +167,9 @@ async function _bootstrapProvider(
   apiKey: string,
   generation: number,
 ): Promise<void> {
-  switch (provider as SupportedProvider) {
-    case "openai": {
-      const { createOpenAIProvider } = await import("./providers/openai");
-      const p = await createOpenAIProvider(apiKey);
-      if (generation === _bootstrapGeneration) {
-        providerRegistry.register(p, true);
-      }
-      break;
-    }
-    case "anthropic": {
-      const { createAnthropicProvider } = await import(
-        "./providers/anthropic"
-      );
-      const p = await createAnthropicProvider(apiKey);
-      if (generation === _bootstrapGeneration) {
-        providerRegistry.register(p, true);
-      }
-      break;
-    }
-    case "google": {
-      const { createGoogleProvider } = await import("./providers/google");
-      const p = await createGoogleProvider(apiKey);
-      if (generation === _bootstrapGeneration) {
-        providerRegistry.register(p, true);
-      }
-      break;
-    }
-    default: {
-      // Unreachable: provider was validated synchronously in _configure().
-      // Retained as a defensive guard.
-      throw new WeftError({
-        code: "PROVIDER_ERROR",
-        why: `Unknown provider "${String(provider)}". Supported providers: ${SUPPORTED_PROVIDERS.join(", ")}.`,
-        fix: {
-          description: `Use one of the supported provider identifiers.`,
-          docsUrl: "https://github.com/weft-ai/weft-core#provider-setup",
-        },
-        example: `Weft.configure({ provider: "openai", apiKey: process.env.OPENAI_API_KEY })`,
-      });
-    }
+  const adapter = await createProviderAdapter(provider, apiKey);
+  if (generation === _bootstrapGeneration) {
+    providerRegistry.register(adapter, true);
   }
 }
 
@@ -252,14 +217,14 @@ function _configure(options: WeftConfigOptions): void {
   // even though the bootstrap itself is deferred.
   if (
     options.provider !== undefined &&
-    !SUPPORTED_PROVIDERS.includes(options.provider as SupportedProvider)
+    !SUPPORTED_PROVIDERS.includes(options.provider)
   ) {
     throw new WeftError({
       code: "PROVIDER_ERROR",
       why: `Unknown provider "${options.provider}". Supported providers: ${SUPPORTED_PROVIDERS.join(", ")}.`,
       fix: {
         description: `Use one of the supported provider identifiers.`,
-        docsUrl: "https://github.com/weft-ai/weft-core#provider-setup",
+        docsUrl: "https://github.com/wefthq/weft#install",
       },
       example: `Weft.configure({ provider: "openai", apiKey: process.env.OPENAI_API_KEY })`,
     });
@@ -283,9 +248,11 @@ function _configure(options: WeftConfigOptions): void {
   // that finishes after this one will discard its result rather than overwriting
   // the newer provider registration.
   const merged = getGlobalConfig();
+  // Fall back to the conventional env-var for this provider, so configure({ provider })
+  // without an explicit apiKey still enqueues a bootstrap.
   const resolvedKey =
     merged.apiKey ??
-    (merged.provider ? _apiKeyFromEnv(merged.provider) : undefined);
+    (merged.provider ? getEnvKeyForProvider(merged.provider) : undefined);
   if (merged.provider) {
     // Always increment the generation when a provider is specified, regardless
     // of whether we can resolve a key. This invalidates any pending bootstrap
@@ -299,30 +266,6 @@ function _configure(options: WeftConfigOptions): void {
     }
   }
 }
-
-/**
- * Resolve a provider's key from its conventional environment variable when
- * configure() was called without an explicit apiKey. Every provider SDK in
- * this ecosystem reads its key from the environment by default, and the
- * documented quick-start relies on it — without this, configure({ provider })
- * enqueues no bootstrap and the first call fails on an unregistered provider.
- */
-function _apiKeyFromEnv(provider: string): string | undefined {
-  const envKey = KNOWN_PROVIDERS.find((p) => p.id === provider)?.envKey;
-  return envKey ? process.env[envKey] : undefined;
-}
-
-
-const KNOWN_PROVIDERS: ReadonlyArray<{
-  id: string;
-  name: string;
-  envKey: string;
-}> = [
-  { id: "openai", name: "OpenAI", envKey: "OPENAI_API_KEY" },
-  { id: "anthropic", name: "Anthropic", envKey: "ANTHROPIC_API_KEY" },
-  { id: "google", name: "Google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY" },
-  // openrouter omitted — not yet supported via configure(); see SUPPORTED_PROVIDERS note above.
-];
 
 function _providers(): ProviderInfo[] {
   const registered = providerRegistry.getAll();
@@ -392,7 +335,7 @@ function _weftFn<T = string>(
  * const result = await Weft.agent({ model: 'gpt-4o' }).prompt('Summarize').run();
  *
  * // One-time config
- * Weft.configure({ provider: 'anthropic', model: 'claude-sonnet-4-20250514' });
+ * Weft.configure({ provider: 'anthropic', model: 'claude-sonnet-5-5' });
  *
  * // Provider list
  * const providers = Weft.providers();

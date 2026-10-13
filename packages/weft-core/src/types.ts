@@ -69,7 +69,7 @@ export interface TrackedResult<T> {
    * based on agreement rate, entropy, variance, and behavioral signals.
    * This is more reliable than the `confidence` field which may be
    * subjectively reported by agents.
-   * @since 2.0.0
+   * @since 1.0.0-beta.1
    */
   objectiveConfidence?: import("./confidence").ObjectiveConfidence;
 }
@@ -162,7 +162,7 @@ export interface ConsensusResult {
    * @remarks
    * This replaces subjective LLM confidence with mathematically computed
    * values based on agreement rate, entropy, variance, and behavioral signals.
-   * @since 2.0.0
+   * @since 1.0.0-beta.1
    */
   objectiveConfidence?: import("./confidence").ObjectiveConfidence;
 }
@@ -454,7 +454,7 @@ export interface AgentContext {
  * - `'zero-trust'`: Returns `TrackedResult<T>` with source tracking metadata (DEFAULT)
  * - `'legacy'`: Returns raw `T` (backward compatible, no tracking)
  *
- * @since 2.0.0
+ * @since 1.0.0-beta.1
  * @see {@link RunOptionsWithTrust} for usage in run options
  * @see {@link TrackedResult} for the zero-trust return type
  *
@@ -477,7 +477,7 @@ export type TrustMode = "zero-trust" | "legacy";
 /**
  * Extended run options with trust mode configuration.
  *
- * @since 2.0.0
+ * @since 1.0.0-beta.1
  * @see {@link TrustMode} for available modes
  *
  * 📝 BUILD[01.04]: RunOptionsWithTrust for type-safe trust mode selection
@@ -487,7 +487,7 @@ export type TrustMode = "zero-trust" | "legacy";
  * ```typescript
  * // Zero-trust mode (default) returns TrackedResult<T>
  * const tracked = await unit.run(ctx);
- * console.log(tracked.confidence); // 0.95
+ * console.log(tracked.confidence); // 0.85 (base confidence; adjusts per operator chain)
  *
  * // Legacy mode returns raw T (deprecated)
  * const raw = await unit.run(ctx, { trustMode: 'legacy' });
@@ -683,7 +683,7 @@ export interface DebateResult<T> {
    * @remarks
    * This replaces subjective LLM confidence with mathematically computed
    * values based on agreement rate, entropy, variance, and behavioral signals.
-   * @since 2.0.0
+   * @since 1.0.0-beta.1
    */
   objectiveConfidence?: import("./confidence").ObjectiveConfidence;
 }
@@ -867,7 +867,7 @@ export interface DialecticResult<T> {
    * This replaces subjective LLM confidence with mathematically computed
    * values based on agreement rate, entropy, variance, and behavioral signals.
    * Only populated when terminationMode uses voting (consensus/majority).
-   * @since 2.0.0
+   * @since 1.0.0-beta.1
    */
   objectiveConfidence?: import("./confidence").ObjectiveConfidence;
 }

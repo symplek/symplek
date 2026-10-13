@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * @module bin - weft-mcp binary entry point
  * @description Unconditional startup shim for the weft-mcp stdio server.

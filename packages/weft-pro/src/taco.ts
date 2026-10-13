@@ -1,6 +1,6 @@
 /**
  * @fileoverview TaCo Iterative Consensus
- * @description Multi-round voting that reduces error amplification by 17.2×
+ * @description Multi-round voting: agents see each other's rationale and revote
  * @module weft-pro/taco
  * @since 1.0.0-beta.1
  *
@@ -8,9 +8,9 @@
  *
  * @remarks
  * TaCo (Trajectory-Adjusted Collective Operations) implements iterative
- * consensus voting that dramatically reduces error rates compared to
- * single-round voting. Agents vote, see each other's rationales, revise,
- * and converge to stable agreement.
+ * consensus voting. Agents vote, see each other's rationales, revise, and
+ * stop when agreement reaches the convergence threshold or the round limit.
+ * No error-rate comparison against single-round voting has been measured.
  *
  * Requires weft-core as peer dependency.
  */
@@ -36,13 +36,12 @@ import type {
  * import { AgentUnit } from 'weft-core';
  * import { tacoConsensus } from 'weft-pro';
  *
- * const result = await AgentUnit.fromAgent(proposer, messages)
- *   .pipe(tacoConsensus([voter1, voter2, voter3], {
- *     maxRounds: 3,
- *     showRationales: true,
- *     convergenceThreshold: 0.8,
- *   }))
- *   .run(ctx);
+ * const proposal = AgentUnit.from(async () => "Adopt an async job queue");
+ * const result = await tacoConsensus([voter1, voter2, voter3], {
+ *   maxRounds: 3,
+ *   showRationales: true,
+ *   convergenceThreshold: 0.8,
+ * })(proposal).run(ctx);
  * ```
  */
 export function tacoConsensus<T>(

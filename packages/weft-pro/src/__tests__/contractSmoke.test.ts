@@ -8,6 +8,7 @@
  * Packed-install verification lives in the root packed-proof harness.
  */
 
+import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import {
   AntibodyRegistry,
@@ -20,6 +21,11 @@ import {
   tacoConsensus,
   VERSION,
 } from "../index";
+
+// The manifest is the source of truth for the version; the constant must match it.
+const packageJson = createRequire(import.meta.url)("../../package.json") as {
+  version: string;
+};
 
 describe("weft-pro — Package Contract Smoke", () => {
   // ─── TaCo Consensus ───────────────────────────────────────────────────────
@@ -189,7 +195,7 @@ describe("weft-pro — Package Contract Smoke", () => {
   describe("Version export", () => {
     it("exports VERSION matching package.json", () => {
       expect(typeof VERSION).toBe("string");
-      expect(VERSION).toBe("1.0.0-beta.1");
+      expect(VERSION).toBe(packageJson.version);
     });
   });
 

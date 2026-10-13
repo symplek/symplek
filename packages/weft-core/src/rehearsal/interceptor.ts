@@ -191,6 +191,7 @@ export class RecordingLLMInterceptor implements InterceptorProvider {
         model: config.model,
         prompt: this.includePrompts ? this.redact(config.prompt) : undefined,
         promptHash: this.hash(config.prompt),
+        configHash: this.hash(JSON.stringify(config)),
         temperature: config.temperature,
         maxTokens: config.maxTokens,
         systemPrompt: this.includePrompts

@@ -2,7 +2,7 @@
  * @fileoverview Interview module exports for weft-core
  * @description Re-exports Interview, types, and utilities
  * @module weft-core/interview
- * @since 1.0.0-beta.3
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[Weft-interview]: Interview barrel exports
  *

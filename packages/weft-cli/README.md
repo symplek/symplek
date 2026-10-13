@@ -51,7 +51,7 @@ weft generate
 
 ## Requirements
 
-- Node.js >= 18.0.0
+- Node.js >= 20.19
 - npm, pnpm, yarn, or bun
 
 ## Development

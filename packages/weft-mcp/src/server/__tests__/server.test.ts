@@ -12,18 +12,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // vi.mock is hoisted to top of file — use vi.hoisted() for variables that the
 // factory closure references, so they're initialized before the mock runs.
 
-const { mockRun, mockDebate, mockConsensus, mockTracked, mockOf } = vi.hoisted(
+const { mockRun, mockDebate, mockConsensus, mockOf } = vi.hoisted(
   () => {
     const mockRun = vi.fn();
     const mockDebate = vi.fn(() => ({ run: mockRun }));
     const mockConsensus = vi.fn(() => ({ run: mockRun }));
+    // mockTracked kept in closure so AgentUnit.of().tracked is available on the mock,
+    // but is not exported — tracked.tool.ts no longer calls AgentUnit.of().tracked().
     const mockTracked = vi.fn(() => ({ run: mockRun }));
     const mockOf = vi.fn(() => ({
       debate: mockDebate,
       consensus: mockConsensus,
       tracked: mockTracked,
     }));
-    return { mockRun, mockDebate, mockConsensus, mockTracked, mockOf };
+    return { mockRun, mockDebate, mockConsensus, mockOf };
   },
 );
 
@@ -83,23 +85,31 @@ describe("weft_debate handler", () => {
     expect(mockRun).toHaveBeenCalledOnce();
 
     expect(result).toEqual({
+      simulated: true,
+      notice: expect.stringContaining("No debate took place"),
       synthesis: "Test synthesis result",
       votes: expect.any(Array),
       rounds_completed: 2,
     });
   });
 
-  it("returns cached result when session_id already exists", async () => {
-    // Pre-populate the session store.
+  it("returns cached result when session_id and prompt match", async () => {
+    // M8 fix: the cache is keyed by session_id AND prompt. Pre-populate with
+    // the same prompt that will be used in the call.
     sessionStore.set("sess-abc", {
+      simulated: true,
+      notice: "fixture",
       synthesis: "Cached synthesis",
       votes: [],
       rounds_completed: 1,
       created_at: Date.now(),
+      prompt: "Same prompt",
+      roles: [{ role: "Architect", model: "claude-3" }],
+      rounds: undefined,
     });
 
     const result = await debateTool.execute({
-      prompt: "New prompt",
+      prompt: "Same prompt",
       roles: [{ role: "Architect", model: "claude-3" }],
       session_id: "sess-abc",
     });
@@ -107,6 +117,46 @@ describe("weft_debate handler", () => {
     // Should return cached without calling AgentUnit.
     expect(mockOf).not.toHaveBeenCalled();
     expect(result.synthesis).toBe("Cached synthesis");
+  });
+
+  it("does NOT return cached result when session_id matches but prompt differs (M8 fix)", async () => {
+    // M8 fix: a reused session_id with a different prompt is a new debate.
+    // The old code returned the stale synthesis from the first prompt.
+    mockRun.mockResolvedValueOnce({
+      value: {
+        finalState: "New prompt synthesis",
+        votes: [],
+        rounds: 1,
+        outcome: "consensus",
+        contributions: [],
+        attempts: 1,
+        converged: true,
+      },
+    });
+
+    // Pre-populate with the FIRST prompt's result.
+    sessionStore.set("sess-mismatch", {
+      simulated: true,
+      notice: "fixture",
+      synthesis: "First prompt synthesis",
+      votes: [],
+      rounds_completed: 1,
+      created_at: Date.now(),
+      prompt: "First prompt",
+      roles: [{ role: "Reviewer", model: "gpt-4" }],
+      rounds: undefined,
+    });
+
+    const result = await debateTool.execute({
+      prompt: "Different prompt",
+      roles: [{ role: "Reviewer", model: "gpt-4" }],
+      session_id: "sess-mismatch",
+    });
+
+    // Must NOT return the cached "First prompt synthesis".
+    expect(result.synthesis).not.toBe("First prompt synthesis");
+    // Must compute a new result for the new prompt.
+    expect(mockOf).toHaveBeenCalledWith("Different prompt");
   });
 
   it("caches result when session_id is provided on first call", async () => {
@@ -132,6 +182,8 @@ describe("weft_debate handler", () => {
     expect(sessionStore.get("new-session")?.synthesis).toBe(
       "Cached on first call",
     );
+    // M8 fix: the prompt must be stored in the cache entry.
+    expect(sessionStore.get("new-session")?.prompt).toBe("Cache me");
   });
 
   // N52 regression guard: agents must be fixture stubs (no LLM calls).
@@ -225,7 +277,11 @@ describe("weft_consensus handler", () => {
       expect.objectContaining({ quorum: 0.6 }),
     );
 
+    // A stub approval must not be readable as a decision: the result itself
+    // says no evaluation took place.
     expect(result).toEqual({
+      simulated: true,
+      notice: expect.stringContaining("No evaluation took place"),
       approved: true,
       score: 0.85,
       votes: expect.arrayContaining([
@@ -263,53 +319,37 @@ describe("weft_consensus handler", () => {
 });
 
 // ─── Tracked Handler ──────────────────────────────────────────────────────────
+// Note: weft_tracked no longer uses weft-core (AgentUnit). It computes the
+// hash and records the caller's claims directly. Tests assert the output
+// contract without mocking weft-core.
 
 describe("weft_tracked handler", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("returns { value, sourceChain } with source URI and SHA-256 hash", async () => {
-    mockRun.mockResolvedValueOnce({
-      value: "The prompt text",
-      source: "agent",
-      confidence: 0.9,
-      sourceChain: ["agent"],
-    });
-
+  it("returns value, source, confidence, sha256 hash, timestamp, and notice", async () => {
     const result = await trackedTool.execute({
       prompt: "The prompt text",
       source: "file:///path/to/source.ts",
       confidence: 0.9,
     });
 
-    expect(mockOf).toHaveBeenCalledWith("The prompt text");
-    expect(mockTracked).toHaveBeenCalledWith(
-      expect.objectContaining({ source: "agent", confidence: 0.9 }),
-    );
+    // The tool must not call weft-core (no side-effect on the mock).
+    expect(mockOf).not.toHaveBeenCalled();
 
     expect(result.value).toBe("The prompt text");
     expect(result.source).toBe("file:///path/to/source.ts");
     expect(result.confidence).toBe(0.9);
     expect(result.hash).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(result.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    // M7 fix: result must carry a notice that source/confidence are unverified.
+    expect(result.notice).toBeTruthy();
+    expect(result.notice.toLowerCase()).toMatch(/claim|assert|verif/);
   });
 
   it("hash is deterministic for the same prompt and source URI", async () => {
-    // N57 fix: hash now covers both prompt and source URI.
     // Same prompt + same source → same hash.
-    mockRun
-      .mockResolvedValueOnce({
-        value: "hello",
-        source: "agent",
-        confidence: 0.8,
-      })
-      .mockResolvedValueOnce({
-        value: "hello",
-        source: "agent",
-        confidence: 0.8,
-      });
-
     const [r1, r2] = await Promise.all([
       trackedTool.execute({
         prompt: "hello",
@@ -326,14 +366,19 @@ describe("weft_tracked handler", () => {
     expect(r1.hash).toBe(r2.hash);
   });
 
-  it("hash differs when source URI differs (N57 source-binding)", async () => {
-    // N57 fix: before the fix, only the prompt was hashed, so callers could
-    // substitute any source URI without breaking the hash. Now the source URI
-    // is bound into the hash — different sources must produce different hashes.
-    mockRun
-      .mockResolvedValueOnce({ value: "hello", source: "agent", confidence: 0.8 })
-      .mockResolvedValueOnce({ value: "hello", source: "agent", confidence: 0.8 });
+  it("hash differs when source URI differs (M7 collision fix)", async () => {
+    // M7 fix: before, prompt 'a|b' + source 'c' collided with prompt 'a' +
+    // source 'b|c'. Now JSON.stringify([prompt, source]) is used, which is
+    // unambiguous.
+    const [r1, r2] = await Promise.all([
+      trackedTool.execute({ prompt: "a|b", source: "c", confidence: 0.8 }),
+      trackedTool.execute({ prompt: "a", source: "b|c", confidence: 0.8 }),
+    ]);
 
+    expect(r1.hash).not.toBe(r2.hash);
+  });
+
+  it("hash differs when prompt differs (different sources)", async () => {
     const [r1, r2] = await Promise.all([
       trackedTool.execute({ prompt: "hello", source: "file://a.ts", confidence: 0.8 }),
       trackedTool.execute({ prompt: "hello", source: "file://b.ts", confidence: 0.8 }),
@@ -367,5 +412,132 @@ describe("WEFT_MCP_TOOLS registry", () => {
     const tool = WEFT_MCP_TOOLS.find((t) => t.name === "weft_debate");
     expect(tool).toBeDefined();
     expect(tool!.description.toLowerCase()).toMatch(/fixture|simul|stub/);
+  });
+
+  // Schema correctness: rounds must be standard JSON Schema type "integer", not
+  // the non-standard { type:"number", integer:true } form. A client that reads
+  // "number" sends 1.5 and is refused at runtime; the schema and the validation
+  // must agree on what is legal.
+  it("debate tool rounds field uses standard type:integer schema (not number+integer:true)", () => {
+    const tool = WEFT_MCP_TOOLS.find((t) => t.name === "weft_debate");
+    expect(tool).toBeDefined();
+    const roundsSchema = (
+      tool!.inputSchema.properties as Record<string, Record<string, unknown>>
+    ).rounds;
+    expect(roundsSchema).toBeDefined();
+    expect(roundsSchema.type).toBe("integer");
+    // The non-standard key must not be present.
+    expect(roundsSchema).not.toHaveProperty("integer");
+  });
+});
+
+// ─── Debate cache: roles and rounds are part of the key ───────────────────────
+
+describe("weft_debate cache key includes roles and rounds", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStore.clear();
+  });
+
+  it("does NOT return cached result when roles differ (cache-key fix)", async () => {
+    mockRun.mockResolvedValue({
+      value: {
+        finalState: "synthesis",
+        votes: [],
+        rounds: 2,
+        outcome: "consensus",
+        contributions: [],
+        attempts: 1,
+        converged: true,
+      },
+    });
+
+    // Prime cache with role set A.
+    sessionStore.set("sess-roles", {
+      simulated: true,
+      notice: "fixture",
+      synthesis: "cached for role-A",
+      votes: [],
+      rounds_completed: 2,
+      created_at: Date.now(),
+      prompt: "Same prompt",
+      roles: [{ role: "Architect", model: "m1" }],
+      rounds: undefined,
+    });
+
+    // Call with the same session_id and prompt but a different role set.
+    const result = await debateTool.execute({
+      prompt: "Same prompt",
+      roles: [{ role: "Developer", model: "m2" }],
+      session_id: "sess-roles",
+    });
+
+    // Must NOT serve the stale "cached for role-A" synthesis.
+    expect(result.synthesis).not.toBe("cached for role-A");
+    // Must have gone through AgentUnit for the new roles.
+    expect(mockOf).toHaveBeenCalledWith("Same prompt");
+  });
+
+  it("does NOT return cached result when rounds differ (cache-key fix)", async () => {
+    mockRun.mockResolvedValue({
+      value: {
+        finalState: "synthesis for 4 rounds",
+        votes: [],
+        rounds: 4,
+        outcome: "consensus",
+        contributions: [],
+        attempts: 1,
+        converged: true,
+      },
+    });
+
+    // Prime cache with rounds:2.
+    sessionStore.set("sess-rounds", {
+      simulated: true,
+      notice: "fixture",
+      synthesis: "cached for 2 rounds",
+      votes: [],
+      rounds_completed: 2,
+      created_at: Date.now(),
+      prompt: "Same prompt",
+      roles: [{ role: "Architect", model: "m1" }],
+      rounds: 2,
+    });
+
+    // Same session_id, same prompt, same roles — but rounds changed to 4.
+    const result = await debateTool.execute({
+      prompt: "Same prompt",
+      roles: [{ role: "Architect", model: "m1" }],
+      rounds: 4,
+      session_id: "sess-rounds",
+    });
+
+    expect(result.synthesis).not.toBe("cached for 2 rounds");
+    expect(mockOf).toHaveBeenCalledWith("Same prompt");
+  });
+
+  it("returns cached result when prompt, roles, and rounds all match", async () => {
+    sessionStore.set("sess-full-match", {
+      simulated: true,
+      notice: "fixture",
+      synthesis: "cached full match",
+      votes: [],
+      rounds_completed: 3,
+      created_at: Date.now(),
+      prompt: "Same prompt",
+      roles: [{ role: "Architect", model: "m1" }],
+      rounds: 3,
+    });
+
+    const result = await debateTool.execute({
+      prompt: "Same prompt",
+      roles: [{ role: "Architect", model: "m1" }],
+      rounds: 3,
+      session_id: "sess-full-match",
+    });
+
+    // Must return cached result without calling AgentUnit.
+    expect(mockOf).not.toHaveBeenCalled();
+    expect(result.synthesis).toBe("cached full match");
   });
 });

@@ -9,16 +9,16 @@
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */
 
-import { execute as executeOperator } from "../operators/execute";
-import { makePlanUnit } from "../operators/plan";
-import { session as sessionOperator } from "../operators/session";
+import { execute as executeOperator } from "../operators/execute.js";
+import { makePlanUnit } from "../operators/plan.js";
+import { session as sessionOperator } from "../operators/session.js";
 import type {
   ExecuteOptions,
   Harness,
   HarnessConfig,
   PlanOptions,
   VerifiedPlan,
-} from "../types";
+} from "../types.js";
 
 // ─── OpenAI Agents SDK interface stub ─────────────────────────────────────────
 // @openai/agents is NOT a direct dependency. Declared locally so this file compiles
@@ -139,7 +139,8 @@ export function createOpenAIHarness(config: HarnessConfig): Harness {
           return effective.run(runOptions);
         },
       };
-      return sessionOperator(sdkSession, prompt);
+      // openai-agents is always a stub (not wired) — source must be "synthesized".
+      return sessionOperator(sdkSession, prompt, { isStub: true });
     },
   };
 }

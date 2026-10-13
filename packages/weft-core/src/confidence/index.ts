@@ -2,7 +2,7 @@
  * @fileoverview Objective Confidence Module
  * @description Mathematically computed confidence scoring for multi-agent AI
  * @module weft-core/confidence
- * @since 2.0.0
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[01.10]: Barrel exports for confidence module
  *

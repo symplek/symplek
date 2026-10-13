@@ -1,15 +1,14 @@
 # Research-focused agent
-# Created with: keen add agent {{name}} --type researcher
+# Created with: weft add agent {{name}} --type researcher
 
 name: {{name}}
 version: "1.0.0"
-type: researcher
 
-model: {{model}}
+model: "{{model}}"
 
-system_prompt: |
+systemPrompt: |
   You are {{name}}, an expert research assistant.
-  
+
   Your responsibilities:
   - Conduct thorough research on given topics
   - Synthesize information from multiple sources
@@ -31,47 +30,13 @@ system_prompt: |
   - Suggest areas for further research
 
 temperature: 0.5
-max_tokens: 4096
+maxTokens: 4096
 
 tools:
-  - name: search
-    description: Search for information on a topic
-  - name: fetch_url
-    description: Retrieve content from a URL
+  - search
+  - fetch_url
 
-memory:
-  type: buffer
-  max_messages: 20
-
-# Structured output for research reports
-output_format: json
-output_schema:
-  type: object
-  properties:
-    summary:
-      type: string
-      description: Executive summary of findings
-    findings:
-      type: array
-      items:
-        type: object
-        properties:
-          claim:
-            type: string
-          evidence:
-            type: string
-          confidence:
-            type: string
-            enum: [high, medium, low]
-    sources:
-      type: array
-      items:
-        type: string
-    limitations:
-      type: array
-      items:
-        type: string
-    further_research:
-      type: array
-      items:
-        type: string
+# Optional: episodic memory to track research threads across turns.
+# memory:
+#   episodic: true
+#   maxEpisodes: 20

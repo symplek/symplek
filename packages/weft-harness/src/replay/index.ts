@@ -8,7 +8,7 @@
  */
 
 import { readFile } from "node:fs/promises";
-import type { SdkEvent, SdkSession } from "../operators/execute";
+import type { SdkEvent, SdkSession } from "../operators/execute.js";
 
 // ─── Trace Types ──────────────────────────────────────────────────────────────
 
@@ -90,14 +90,65 @@ export class ReplayMismatchError extends Error {
   }
 }
 
+/** Thrown when a trace does not end with a completed run. */
+export class ReplayIncompleteError extends Error {
+  constructor(public readonly tracePath: string) {
+    super(
+      `ReplayIncomplete: "${tracePath}" does not end with a SessionEnd line. ` +
+        "It is empty, or the last run recorded there did not complete, " +
+        "so there is no outcome to replay. Record the run again.",
+    );
+    this.name = "ReplayIncompleteError";
+  }
+}
+
+// ─── The run that closes a trace ──────────────────────────────────────────────
+
+/**
+ * The run a trace ends with: its tool entries and the SessionEnd line that
+ * closes it. Undefined when the trace does not end with a SessionEnd line,
+ * whatever came earlier in the file.
+ *
+ * A trace file is appended to, so it can hold several runs, and a run that
+ * failed leaves its tool entries behind with no SessionEnd line. The run to
+ * replay is the one the final SessionEnd closes: the entries after the
+ * previous SessionEnd, cut down to the step count the final one records, which
+ * drops the leftovers of a failed run that came just before it.
+ */
+function closingRun(
+  entries: readonly TraceEntry[],
+): { tools: ToolUseEntry[]; end: SessionEndEntry } | undefined {
+  const end = entries[entries.length - 1];
+  if (end === undefined || !isSessionEnd(end)) return undefined;
+
+  let start = entries.length - 1;
+  while (start > 0 && !isSessionEnd(entries[start - 1])) start--;
+  const sincePreviousEnd = entries
+    .slice(start, -1)
+    .filter((entry): entry is ToolUseEntry => !isSessionEnd(entry));
+
+  const steps = end.total_steps;
+  const count =
+    Number.isInteger(steps) && steps >= 0 && steps <= sincePreviousEnd.length
+      ? steps
+      : sincePreviousEnd.length;
+  return {
+    tools: sincePreviousEnd.slice(sincePreviousEnd.length - count),
+    end,
+  };
+}
+
 // ─── Replay Adapter ───────────────────────────────────────────────────────────
 
 /**
  * Implements SdkSession by serving recorded tool results from a JSONL trace.
  *
- * Walk through tool_use entries in order, validate permissions via canUseTool,
- * then fire onEvent with the recorded result. The final message comes from the
- * SessionEnd sentinel. No real API calls are made.
+ * Walk through the tool_use entries of the run the trace ends with, in order,
+ * validate permissions via canUseTool, then fire onEvent with the recorded
+ * result. The final message comes from that run's SessionEnd line. No real API
+ * calls are made. A trace that does not end with a SessionEnd line, because it
+ * is empty or its last run failed, is refused with
+ * {@link ReplayIncompleteError}: there is no outcome to hand back.
  *
  * @example
  * ```typescript
@@ -126,10 +177,9 @@ export class ReplayAdapter implements SdkSession {
       this.options.tracePath,
       this.options.reader,
     );
-    const toolEntries = entries.filter(
-      (e): e is ToolUseEntry => !isSessionEnd(e),
-    );
-    const sentinel = entries.find(isSessionEnd);
+    const run = closingRun(entries);
+    if (!run) throw new ReplayIncompleteError(this.options.tracePath);
+    const toolEntries = run.tools;
 
     for (const entry of toolEntries) {
       // Hash-based lookup: verify this tool+args combo exists in the trace.
@@ -165,7 +215,7 @@ export class ReplayAdapter implements SdkSession {
       }
     }
 
-    return { finalMessage: sentinel?.final_output ?? "" };
+    return { finalMessage: run.end.final_output };
   }
 }
 
@@ -175,4 +225,4 @@ export class ReplayAdapter implements SdkSession {
 export {
   assertDeterministic,
   DeterminismViolationError,
-} from "./assert-deterministic";
+} from "./assert-deterministic.js";

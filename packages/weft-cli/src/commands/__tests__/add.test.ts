@@ -3,10 +3,16 @@
  * Story: 03.03
  */
 
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createAddCommand,
   generateAgentTest,
@@ -15,6 +21,8 @@ import {
   kebabToCamel,
   validateAgentName,
 } from "../add.js";
+import { generateFile } from "../generate.js";
+import { validateFile } from "../validate.js";
 
 describe("add command", () => {
   describe("validateAgentName", () => {
@@ -54,20 +62,24 @@ describe("add command", () => {
       });
 
       expect(yaml).toContain("name: my-agent");
-      expect(yaml).toContain("model: gpt-4o");
-      expect(yaml).toContain("type: general");
+      expect(yaml).toContain('model: "gpt-4o"');
+      // 'type' is not a valid schema field — templates must not emit it.
+      expect(yaml).not.toContain("type: general");
+      expect(yaml).toContain("systemPrompt:");
       expect(yaml).toContain("You are my-agent");
     });
 
     it("generates YAML for researcher type", () => {
       const yaml = generateAgentYaml("research-bot", {
         type: "researcher",
-        model: "claude-3-sonnet",
+        model: "gpt-4o",
       });
 
       expect(yaml).toContain("name: research-bot");
-      expect(yaml).toContain("model: claude-3-sonnet");
-      expect(yaml).toContain("type: researcher");
+      expect(yaml).toContain('model: "gpt-4o"');
+      // 'type' is not a valid schema field — templates must not emit it.
+      expect(yaml).not.toContain("type: researcher");
+      expect(yaml).toContain("systemPrompt:");
       expect(yaml).toContain("research");
     });
 
@@ -78,7 +90,9 @@ describe("add command", () => {
       });
 
       expect(yaml).toContain("name: code-reviewer");
-      expect(yaml).toContain("type: reviewer");
+      // 'type' is not a valid schema field — templates must not emit it.
+      expect(yaml).not.toContain("type: reviewer");
+      expect(yaml).toContain("systemPrompt:");
       expect(yaml).toContain("code review");
     });
 
@@ -90,8 +104,10 @@ describe("add command", () => {
       });
 
       expect(yaml).toContain("name: custom-agent");
-      expect(yaml).toContain("type: custom");
-      expect(yaml).toContain("model: gpt-4o-mini");
+      // 'type' is not a valid schema field — templates must not emit it.
+      expect(yaml).not.toContain("type: custom");
+      expect(yaml).toContain("systemPrompt:");
+      expect(yaml).toContain('model: "gpt-4o-mini"');
       expect(yaml).toContain("- name: search");
       expect(yaml).toContain("- name: fetch_url");
     });
@@ -130,13 +146,14 @@ describe("add command", () => {
     it("generates test file with correct structure", () => {
       const test = generateAgentTest("my-agent");
 
-      expect(test).toContain("Tests for my-agent agent");
+      expect(test).toContain("Tests for the my-agent agent");
       expect(test).toContain('describe("my-agent agent"');
-      expect(test).toContain("myAgent"); // Used in mock and import
-      expect(test).toContain("../agents/my-agent");
-      expect(test).toContain("should be defined");
-      expect(test).toContain("should have a run function");
+      expect(test).toContain('import { myAgent } from "../agents/my-agent";');
       expect(test).toContain("vitest");
+      // The generated test must exercise the user's real agent: only the
+      // model call may be replaced, never the agent module itself.
+      expect(test).toContain('vi.mock("weft-core/server"');
+      expect(test).not.toContain('vi.mock("../agents/');
     });
   });
 
@@ -170,41 +187,162 @@ describe("add command", () => {
   });
 });
 
-describe("add command integration", () => {
+describe("weft add agent, run for real in a temp project", () => {
   let testDir: string;
+  let originalCwd: string;
 
   beforeEach(() => {
-    // Create a unique temp directory for each test
+    originalCwd = process.cwd();
     testDir = join(
       tmpdir(),
-      `Weft-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      `weft-add-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     );
     mkdirSync(testDir, { recursive: true });
+    writeFileSync(
+      join(testDir, "package.json"),
+      JSON.stringify({ name: "tmp", devDependencies: { vitest: "^2.1.0" } }),
+    );
+    process.chdir(testDir);
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code})`);
+    }) as never);
   });
 
   afterEach(() => {
-    // Clean up temp directory
-    if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true });
-    }
+    vi.restoreAllMocks();
+    process.chdir(originalCwd);
+    rmSync(testDir, { recursive: true, force: true });
   });
 
-  it("detects existing files", () => {
-    // Create agents directory and existing file
-    const agentsDir = join(testDir, "agents");
-    mkdirSync(agentsDir, { recursive: true });
-    writeFileSync(join(agentsDir, "existing-agent.yaml"), "existing content");
+  const add = (...args: string[]) =>
+    createAddCommand().parseAsync(["agent", ...args], { from: "user" });
+  const written = (...parts: string[]) => existsSync(join(testDir, ...parts));
 
-    // Verify file exists
-    expect(existsSync(join(agentsDir, "existing-agent.yaml"))).toBe(true);
+  it.each(["general", "researcher", "reviewer", "custom"])(
+    "--type %s writes a YAML definition that the CLI's own validate accepts",
+    async (type) => {
+      await add("helper", "--type", type, "--model", "gpt-4o");
+
+      expect(written("agents", "helper.yaml")).toBe(true);
+      expect(written("agents", "helper.ts")).toBe(true);
+      expect(written("tests", "helper.test.ts")).toBe(true);
+      const result = validateFile(join(testDir, "agents", "helper.yaml"));
+      expect(result.errors).toEqual([]);
+    },
+  );
+
+  it("--type typescript writes the TypeScript agent and no YAML file", async () => {
+    await add("helper", "--type", "typescript", "--model", "gpt-4o");
+
+    expect(written("agents", "helper.ts")).toBe(true);
+    expect(written("agents", "helper.yaml")).toBe(false);
+    expect(
+      readFileSync(join(testDir, "agents", "helper.ts"), "utf-8"),
+    ).toContain("export function helper(");
   });
 
-  it("creates agents directory if needed", () => {
-    const agentsDir = join(testDir, "agents");
-    expect(existsSync(agentsDir)).toBe(false);
+  it("rejects an unknown --type and writes nothing", async () => {
+    await expect(
+      add("helper", "--type", "wizard", "--model", "gpt-4o"),
+    ).rejects.toThrow("process.exit(1)");
+    expect(written("agents")).toBe(false);
+  });
 
-    // Would be created by writeFile in actual command execution
-    mkdirSync(agentsDir, { recursive: true });
-    expect(existsSync(agentsDir)).toBe(true);
+  it("rejects a malformed --model and writes nothing", async () => {
+    await expect(
+      add("helper", "--type", "general", "--model", "gpt 4o; rm -rf"),
+    ).rejects.toThrow("process.exit(1)");
+    expect(written("agents")).toBe(false);
+  });
+
+  it("generates the TypeScript for a YAML agent from its YAML", async () => {
+    await add("helper", "--type", "general", "--model", "gpt-4o");
+
+    const ts = readFileSync(join(testDir, "agents", "helper.ts"), "utf-8");
+    expect(ts.startsWith("// Generated from")).toBe(true);
+    // Running generate again is a no-op on content, not a clobber of hand edits.
+    const again = generateFile(join(testDir, "agents", "helper.yaml"), undefined, true);
+    expect(again.success).toBe(true);
+    expect(readFileSync(join(testDir, "agents", "helper.ts"), "utf-8")).toBe(ts);
+  });
+
+  it("a name with a numeric segment yields files that validate and generate", async () => {
+    await add("agent-2", "--type", "general", "--model", "gpt-4o");
+
+    expect(validateFile(join(testDir, "agents", "agent-2.yaml")).errors).toEqual([]);
+    expect(
+      readFileSync(join(testDir, "agents", "agent-2.ts"), "utf-8"),
+    ).toContain("export function agent2(");
+    expect(
+      readFileSync(join(testDir, "tests", "agent-2.test.ts"), "utf-8"),
+    ).toContain('import { agent2 } from "../agents/agent-2";');
+  });
+
+  it("rejects a name that would become a reserved word", async () => {
+    await expect(
+      add("default", "--type", "typescript", "--model", "gpt-4o"),
+    ).rejects.toThrow("process.exit(1)");
+    expect(written("agents")).toBe(false);
+  });
+
+  it("--type on its own is enough: the model takes its default", async () => {
+    await add("helper", "--type", "researcher");
+
+    expect(
+      readFileSync(join(testDir, "agents", "helper.yaml"), "utf-8"),
+    ).toContain('model: "gpt-4o"');
+  });
+
+  it("rejects --yaml-only together with --ts-only", async () => {
+    await expect(
+      add("helper", "--type", "general", "--yaml-only", "--ts-only"),
+    ).rejects.toThrow("process.exit(1)");
+    expect(written("agents")).toBe(false);
+  });
+
+  it("writes no test file into a project that has no test runner", async () => {
+    writeFileSync(join(testDir, "package.json"), JSON.stringify({ name: "tmp" }));
+
+    await add("helper", "--type", "general", "--model", "gpt-4o");
+
+    expect(written("agents", "helper.ts")).toBe(true);
+    expect(written("tests", "helper.test.ts")).toBe(false);
+  });
+
+  it("a model id YAML would read as a number or boolean still validates", async () => {
+    await add("helper", "--type", "general", "--model", "123");
+
+    expect(validateFile(join(testDir, "agents", "helper.yaml")).errors).toEqual([]);
+  });
+
+  it("refuses before writing anything when a hand-written agent already has the name", async () => {
+    const handWritten = "export const mine = 1;\n";
+    mkdirSync(join(testDir, "agents"), { recursive: true });
+    writeFileSync(join(testDir, "agents", "helper.ts"), handWritten);
+
+    await expect(
+      add("helper", "--type", "general", "--model", "gpt-4o"),
+    ).rejects.toThrow("process.exit(1)");
+
+    expect(written("agents", "helper.yaml")).toBe(false);
+    expect(written("tests", "helper.test.ts")).toBe(false);
+    expect(readFileSync(join(testDir, "agents", "helper.ts"), "utf-8")).toBe(
+      handWritten,
+    );
+  });
+
+  it("--yaml-only points at weft generate, not at a file it did not write", async () => {
+    await add("helper", "--type", "general", "--yaml-only");
+
+    expect(written("agents", "helper.ts")).toBe(false);
+    const printed = vi
+      .mocked(console.log)
+      .mock.calls.map((call) => String(call[0]))
+      .join("\n");
+    expect(printed).not.toContain("Import helper");
+    expect(printed).toMatch(/1\. Edit .*helper\.yaml/);
+    expect(printed).toMatch(/2\. Run "weft generate" to write .*helper\.ts/);
   });
 });

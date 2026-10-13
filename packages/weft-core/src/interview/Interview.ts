@@ -2,7 +2,7 @@
  * @fileoverview Interview - Lazy configuration holder for interview operator
  * @description Validates configuration and holds interview setup until execution
  * @module weft-core/interview/Interview
- * @since 1.0.0-beta.3
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[Weft-interview]: Interview class for human-in-the-loop Q&A
  */

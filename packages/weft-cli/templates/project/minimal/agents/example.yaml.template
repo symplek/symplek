@@ -1,26 +1,16 @@
 # Weft agent definition — declarative form.
 #
 # Compile to TypeScript with:
-#   pnpm exec Weft generate
+#   pnpm exec weft generate
 #
-# This produces `src/agents/{{agentName}}.ts` that you can import and call
+# This produces `agents/{{agentName}}.ts` that you can import and call
 # from your application code. YAML lets non-engineers tune prompts without
 # touching the source.
 
 name: {{agentName}}
 description: Summarises text in one clear sentence.
-model: {{model}}
+model: "{{model}}"
 
-system: |
+systemPrompt: |
   You summarise the user's input in exactly one clear sentence.
   Never embellish. Never editorialise. Faithful to the input only.
-
-inputs:
-  - name: text
-    type: string
-    description: The text to summarise
-    required: true
-
-output:
-  type: string
-  description: One-sentence summary of the input.

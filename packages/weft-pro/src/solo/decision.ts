@@ -3,7 +3,7 @@
  * @description Core decision logic for autonomous agent action.
  *              Re-exports from weft-core to eliminate duplication.
  * @module weft-pro/solo/decision
- * @since 2.2.1
+ * @since 1.0.0-beta.1
  */
 
 export {

@@ -4,13 +4,13 @@
  */
 
 import { WeftError } from "./errors";
-import { clearInitPromise, getInitPromise } from "./globalConfig";
+import { awaitInit } from "./globalConfig";
 import {
   type AIMessage,
-  detectProvider,
-  providerRegistry,
   selectModelForTask,
 } from "./providers";
+import { checkProviderAnswer, resolveProvider } from "./providers/call";
+import type { AIResponse } from "./providers/interface";
 import { redactErrorMessage, safeCause } from "./providers/redact";
 
 /**
@@ -49,11 +49,7 @@ export async function* stream(
   // who does `Weft.configure({ provider, apiKey }); Weft.stream(...)` will
   // call detectProvider() before the configured adapter is registered and fail
   // with "provider not found".
-  const initP = getInitPromise();
-  if (initP) {
-    await initP;
-    clearInitPromise();
-  }
+  await awaitInit();
 
   const signal = options?.signal;
 
@@ -68,18 +64,8 @@ export async function* stream(
   }
 
   try {
-    // 1. Detect provider
-    const providerId = options?.provider || detectProvider();
-    const provider = providerRegistry.get(providerId);
-
-    if (!provider) {
-      throw new WeftError({
-        code: "PROVIDER_ERROR",
-        message: `Provider "${providerId}" not found in registry.`,
-        action: "Ensure the provider is registered and the API key is set.",
-        context: { providerId },
-      });
-    }
+    // 1. Resolve the provider: the one asked for, or the detected one.
+    const { provider, providerId } = await resolveProvider(options?.provider);
 
     // 2. Select model — thread the already-resolved providerId so quality heuristics
     // key off the same provider that will execute the request (H6 fix).
@@ -112,6 +98,8 @@ export async function* stream(
     // to callers — the public AsyncGenerator<string> contract is unchanged.
     let _accPromptTokens = 0;
     let _accCompletionTokens = 0;
+    let finishReason: AIResponse["finishReason"] | undefined;
+    let yieldedText = false;
 
     for await (const chunk of chunkStream) {
       // Check for abort signal during iteration
@@ -131,8 +119,14 @@ export async function* stream(
         }
       }
 
+      // The finish reason arrives on the last chunk that carries one.
+      if (chunk.finishReason) {
+        finishReason = chunk.finishReason;
+      }
+
       // Only yield text to external callers — usage chunks have empty textDelta.
       if (chunk.textDelta) {
+        yieldedText = true;
         yield chunk.textDelta;
       }
     }
@@ -141,6 +135,12 @@ export async function* stream(
     // usage totals. Surfacing them externally is deferred to a later wave
     // (requires a new API shape); they are retained here to make the
     // accumulation logic testable and to avoid silent discard.
+
+    // A stream that ends refused throws here, after whatever text it had
+    // already yielded: that text cannot be taken back, but the caller must not
+    // read the stream as complete. A stream that reached the output limit
+    // throws only when it yielded nothing.
+    checkProviderAnswer(finishReason, yieldedText, providerId, model);
 
     if (signal?.aborted) {
       throw new WeftError({

@@ -9,6 +9,7 @@
  */
 
 import type { MCPConnectionStatus, MCPTransport } from "../types";
+import { VERSION } from "../version";
 
 // ---------------------------------------------------------------------------
 // Transport limits (M1/M3 caps)
@@ -197,7 +198,7 @@ export class StdioMCPTransport extends MCPTransportClient {
         this.rpc("initialize", {
           protocolVersion: "2024-11-05",
           capabilities: {},
-          clientInfo: { name: "weft-mcp", version: "0.1.0" },
+          clientInfo: { name: "weft-mcp", version: VERSION },
         }),
         new Promise<never>((_, rej) =>
           setTimeout(
@@ -280,7 +281,21 @@ export class StdioMCPTransport extends MCPTransportClient {
         this.pending.delete(String(msg.id));
 
         if (msg.error) {
+          // JSON-RPC-level error: the server rejected the request entirely.
           req.resolve({ content: null, isError: true, meta: msg.error });
+        } else if (
+          // M3 fix: MCP tool-level error — the call succeeded at the transport
+          // level but the tool returned result.isError:true. The spec allows
+          // servers to signal tool failure this way instead of a JSON-RPC error.
+          // Previously drainBuffer ignored result.isError and resolved with
+          // isError:false, so MCPUnit.call created evidence instead of throwing.
+          (msg.result as { isError?: boolean } | null | undefined)?.isError
+        ) {
+          req.resolve({
+            content: (msg.result as { content?: unknown }).content ?? null,
+            isError: true,
+            meta: msg.result as Record<string, unknown>,
+          });
         } else {
           req.resolve({ content: msg.result, isError: false });
         }

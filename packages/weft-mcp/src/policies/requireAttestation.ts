@@ -7,9 +7,15 @@
 import type { MCPEvidence, MCPPolicyVerdict, MCPTrustPolicy } from "../types";
 
 /**
- * Requires evidence to have a non-empty provenance chain proving origin.
- * Empty provenance means the data appeared from nowhere — quarantine it
- * until origin can be established.
+ * Structural provenance-chain check.
+ *
+ * Quarantines evidence with an empty `provenanceChain`. In practice
+ * `createMCPEvidence` always adds a self-generated entry, so this policy
+ * returns "allow" for every fresh call.
+ *
+ * **What this does NOT do:** it does not verify the origin recorded in the
+ * chain against any external registry or signature. It only confirms that the
+ * chain is structurally present.
  */
 export const requireAttestation: MCPTrustPolicy = {
   name: "requireAttestation",

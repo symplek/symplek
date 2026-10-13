@@ -166,7 +166,7 @@ export function createDebateComputation<T>(
               const unit = result as import("../AgentUnit").AgentUnit<
                 ConvergeContribution<T>
               >;
-              return unit.run(ctx, { trustMode: "legacy" });
+              return (await unit.run(ctx)).value;
             }
             if (result instanceof Promise) {
               return result;

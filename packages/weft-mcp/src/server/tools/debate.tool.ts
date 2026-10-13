@@ -14,10 +14,21 @@ import type { DebateAgent } from "../weft-core-ops";
 // See DESIGN-NOTES.md for trade-offs and production guidance.
 
 interface DebateSessionEntry {
+  simulated: true;
+  notice: string;
   synthesis: string;
   votes: unknown[];
   rounds_completed: number;
   created_at: number;
+  /** M8 fix: the prompt this entry was computed for. A new prompt with the
+   *  same session_id is a different debate — return the cached entry only when
+   *  the prompt matches. */
+  prompt: string;
+  /** Cache-key fix: roles and rounds are part of the inputs that determine the
+   *  result. A caller reusing the same session_id with different roles or a
+   *  different round count must get a fresh result, not the cached one. */
+  roles: Array<{ role: string; model: string }>;
+  rounds: number | undefined;
 }
 
 /**
@@ -73,16 +84,16 @@ export const debateTool = {
         description: "Specialist roles that will debate the prompt",
       },
       rounds: {
-        type: "number",
+        type: "integer",
         minimum: 1,
         maximum: 16,
-        description: "Number of debate rounds (default: 2)",
+        description: "Number of debate rounds, integer (default: 2)",
       },
       session_id: {
         type: "string",
         maxLength: 128,
         description:
-          "Optional: reuse an ongoing debate session across multiple calls. When provided, results are cached in process-memory and returned on subsequent calls with the same session_id.",
+          "Optional: reuse an ongoing debate session across multiple calls. When provided, results are cached in process-memory and returned on subsequent calls with the same session_id, prompt, roles and rounds.",
       },
     },
     required: ["prompt", "roles"],
@@ -93,16 +104,29 @@ export const debateTool = {
     rounds?: number;
     session_id?: string;
   }): Promise<{
+    simulated: true;
+    notice: string;
     synthesis: string;
     votes: unknown[];
     rounds_completed: number;
   }> => {
-    // Return cached result when session already exists.
+    // M8 fix: return the cached result only when the session_id and every
+    // input that shapes the result (prompt, roles, rounds) match. A reused
+    // session_id with any of them changed is a new debate — clear the stale
+    // entry and compute a fresh result rather than returning the wrong
+    // synthesis.
     if (input.session_id) {
       const cached = sessionStore.get(input.session_id);
       if (cached) {
-        const { created_at: _ts, ...rest } = cached;
-        return rest;
+        const rolesMatch =
+          JSON.stringify(cached.roles) === JSON.stringify(input.roles);
+        const roundsMatch = cached.rounds === input.rounds;
+        if (cached.prompt === input.prompt && rolesMatch && roundsMatch) {
+          const { created_at: _ts, prompt: _p, roles: _r, rounds: _rn, ...rest } = cached;
+          return rest;
+        }
+        // Different inputs: stale session — evict and recompute.
+        sessionStore.delete(input.session_id);
       }
     }
 
@@ -123,14 +147,26 @@ export const debateTool = {
       .run(ctx);
 
     const output = {
+      // The result says so itself, because a calling agent may act on the
+      // payload without re-reading the tool description.
+      simulated: true as const,
+      notice:
+        "No debate took place. Every role is a fixed stub that returns the prompt unchanged, so `synthesis` is the prompt itself.",
       synthesis: result.value.finalState,
       votes: result.value.votes ?? [],
       rounds_completed: result.value.rounds,
     };
 
     // Cache result when session_id was provided (capped LRU-style; see setSessionEntry).
+    // Include prompt, roles, and rounds so retrieval can verify all inputs match.
     if (input.session_id) {
-      setSessionEntry(input.session_id, { ...output, created_at: Date.now() });
+      setSessionEntry(input.session_id, {
+        ...output,
+        created_at: Date.now(),
+        prompt: input.prompt,
+        roles: input.roles,
+        rounds: input.rounds,
+      });
     }
 
     return output;

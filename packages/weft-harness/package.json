@@ -1,9 +1,17 @@
 {
   "name": "weft-harness",
   "version": "0.1.0-alpha.1",
-  "description": "Algebraic trust layer for Claude Agent SDK and OpenAI Agents SDK",
+  "description": "Plan, permission-gate and execute operators for agent sessions. Pre-alpha and ESM only: no agent SDK is wired yet, so every result is a stand-in",
   "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wefthq/weft.git",
+    "directory": "packages/weft-harness"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -22,17 +30,9 @@
   },
   "peerDependencies": {
     "weft-core": "^1.0.0-beta",
-    "@anthropic-ai/claude-agent-sdk": ">=0.2.0",
-    "openai": "^4.0.0",
     "react": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
-    "@anthropic-ai/claude-agent-sdk": {
-      "optional": true
-    },
-    "openai": {
-      "optional": true
-    },
     "react": {
       "optional": true
     }
@@ -49,6 +49,8 @@
   ],
   "scripts": {
     "build": "tsc",
+    "lint": "biome check .",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run"
   }
 }

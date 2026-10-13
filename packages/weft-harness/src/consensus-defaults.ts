@@ -1,6 +1,6 @@
 /** @module ConsensusDefaults - Per-tier threshold and minimum-veto config for weft-harness */
 
-import type { ImpactTier } from "./types";
+import type { ImpactTier } from "./types.js";
 
 export interface ConsensusDefaults {
   readonly threshold: number;

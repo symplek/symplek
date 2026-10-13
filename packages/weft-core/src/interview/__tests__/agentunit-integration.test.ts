@@ -2,7 +2,7 @@
  * @fileoverview AgentUnit Integration Tests
  * @description Tests for interview operators integration with AgentUnit infrastructure
  * @module weft-core/interview/__tests__/agentunit-integration.test
- * @since 1.0.0-beta.3
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[Weft-interview-operator]: Story 03-06 - Integration Tests
  */

@@ -34,6 +34,20 @@ export class ProviderRegistry {
   }
 
   /**
+   * Make a provider reachable by id without making it the default.
+   *
+   * Used when an adapter is loaded on demand from an environment key. Which
+   * provider a call with no `provider` option uses stays decided by
+   * `configure()` or, failing that, by the documented key order. It must not
+   * depend on which provider happened to be reached for first.
+   *
+   * @param provider - The provider instance to make available
+   */
+  makeAvailable(provider: Provider): void {
+    this.providers.set(provider.id, provider);
+  }
+
+  /**
    * Get a provider by its ID.
    *
    * @param id - The provider identifier

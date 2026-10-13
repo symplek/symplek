@@ -2,7 +2,7 @@
  * @fileoverview Transaction Log for Solo Mechanism (re-export from weft-core)
  * @description Re-exports transaction log functions and classes from weft-core.
  * @module weft-pro/solo/transactionLog
- * @since 2.2.1
+ * @since 1.0.0-beta.1
  */
 
 export {

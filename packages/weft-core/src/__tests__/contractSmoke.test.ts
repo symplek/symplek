@@ -10,6 +10,8 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { createRequire } from "node:module";
+import { resolve } from "node:path";
 import * as entrypoint from "../index";
 import {
   AgentUnit,
@@ -86,9 +88,15 @@ describe("weft-core — Package Contract Smoke", () => {
       expect(ctx).toBeDefined();
     });
 
-    it("exports VERSION string", () => {
+    it("exports VERSION string that matches package.json", () => {
+      // B14 fix: compare against the live package.json version rather than a
+      // pinned literal so the test fails when the version constant is not updated
+      // alongside the manifest.
+      const pkgPath = resolve(__dirname, "../../package.json");
+      const _require = createRequire(import.meta.url);
+      const pkg = _require(pkgPath) as { version: string };
       expect(typeof VERSION).toBe("string");
-      expect(VERSION).toBe("1.0.0-beta.1");
+      expect(VERSION).toBe(pkg.version);
     });
   });
 

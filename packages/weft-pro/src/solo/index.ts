@@ -3,7 +3,7 @@
  * @description Public API for autonomous agent action mechanism.
  *              Re-exports from weft-core to eliminate duplication.
  * @module weft-pro/solo
- * @since 2.2.1
+ * @since 1.0.0-beta.1
  *
  * @remarks
  * The Solo mechanism enables agents to act autonomously when:

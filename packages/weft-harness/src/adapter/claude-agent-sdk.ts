@@ -8,17 +8,17 @@
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */
 
-import { execute as executeOperator } from "../operators/execute";
-import { makePlanUnit } from "../operators/plan";
-import { session as sessionOperator } from "../operators/session";
+import { execute as executeOperator } from "../operators/execute.js";
+import { makePlanUnit } from "../operators/plan.js";
+import { session as sessionOperator } from "../operators/session.js";
 import type {
   ExecuteOptions,
   Harness,
   HarnessConfig,
   PlanOptions,
   VerifiedPlan,
-} from "../types";
-import { createOpenAIHarness } from "./openai-agents";
+} from "../types.js";
+import { createOpenAIHarness } from "./openai-agents.js";
 
 // ─── Claude Agent SDK interface stub ─────────────────────────────────────────
 // @anthropic-ai/claude-agent-sdk is NOT a direct dependency. Declared locally
@@ -112,10 +112,9 @@ export function createHarness(config: HarnessConfig): Harness {
     },
 
     session(prompt: string) {
-      const sdkSession =
-        tryLoadSession(config, prompt) ??
-        buildStubSession(`session:${prompt.slice(0, 40)}`);
-      return sessionOperator(sdkSession, prompt);
+      const realSession = tryLoadSession(config, prompt);
+      const sdkSession = realSession ?? buildStubSession(`session:${prompt.slice(0, 40)}`);
+      return sessionOperator(sdkSession, prompt, { isStub: !realSession });
     },
   };
 }

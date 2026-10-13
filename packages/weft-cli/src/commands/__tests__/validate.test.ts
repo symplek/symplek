@@ -32,7 +32,7 @@ describe("Weft validate command", () => {
       const filePath = join(TEST_DIR, "agents", "valid.yaml");
       const content = `
 name: my-agent
-model: claude-3-sonnet
+model: claude-sonnet-4-5
 systemPrompt: You are a helpful assistant.
 `;
       writeFileSync(filePath, content);
@@ -46,7 +46,7 @@ systemPrompt: You are a helpful assistant.
     it("should detect missing required field: name", () => {
       const filePath = join(TEST_DIR, "agents", "missing-name.yaml");
       const content = `
-model: claude-3-sonnet
+model: claude-sonnet-4-5
 systemPrompt: You are a helpful assistant.
 `;
       writeFileSync(filePath, content);
@@ -78,7 +78,7 @@ systemPrompt: You are a helpful assistant.
       const filePath = join(TEST_DIR, "agents", "missing-prompt.yaml");
       const content = `
 name: my-agent
-model: claude-3-sonnet
+model: claude-sonnet-4-5
 `;
       writeFileSync(filePath, content);
 
@@ -92,11 +92,11 @@ model: claude-3-sonnet
       ).toBe(true);
     });
 
-    it("should detect invalid model", () => {
+    it("should detect a malformed model id", () => {
       const filePath = join(TEST_DIR, "agents", "invalid-model.yaml");
       const content = `
 name: my-agent
-model: invalid-model-name
+model: "gpt 4o; rm -rf"
 systemPrompt: You are a helpful assistant.
 `;
       writeFileSync(filePath, content);
@@ -105,15 +105,27 @@ systemPrompt: You are a helpful assistant.
 
       expect(result.valid).toBe(false);
       expect(
-        result.errors.some((e) => e.message.toLowerCase().includes("allowed")),
+        result.errors.some((e) => e.suggestion?.includes("provider model id")),
       ).toBe(true);
+    });
+
+    it("should accept a well-formed model id it has never heard of", () => {
+      const filePath = join(TEST_DIR, "agents", "new-model.yaml");
+      const content = `
+name: my-agent
+model: vendor/some-model-9.1:preview
+systemPrompt: You are a helpful assistant.
+`;
+      writeFileSync(filePath, content);
+
+      expect(validateFile(filePath).valid).toBe(true);
     });
 
     it("should detect invalid name format (not kebab-case)", () => {
       const filePath = join(TEST_DIR, "agents", "invalid-name.yaml");
       const content = `
 name: MyAgent
-model: claude-3-sonnet
+model: claude-sonnet-4-5
 systemPrompt: You are a helpful assistant.
 `;
       writeFileSync(filePath, content);
@@ -172,7 +184,7 @@ metadata:
       const filePath = join(TEST_DIR, "agents", "extra-props.yaml");
       const content = `
 name: my-agent
-model: claude-3-sonnet
+model: claude-sonnet-4-5
 systemPrompt: You are a helpful assistant.
 unknownField: should not be here
 `;
@@ -189,7 +201,7 @@ unknownField: should not be here
     it("should provide line numbers in errors", () => {
       const filePath = join(TEST_DIR, "agents", "with-line.yaml");
       const content = `name: my-agent
-model: invalid-model
+model: "not a model id"
 systemPrompt: Test
 `;
       writeFileSync(filePath, content);
@@ -212,7 +224,7 @@ systemPrompt: Test
       const filePath = join(TEST_DIR, "agents", "invalid-syntax.yaml");
       const content = `
 name: my-agent
-  model: claude-3-sonnet
+  model: claude-sonnet-4-5
     systemPrompt: Bad indentation
 `;
       writeFileSync(filePath, content);
@@ -228,7 +240,7 @@ name: my-agent
       const filePath = join(TEST_DIR, "agents", "temp-out-of-range.yaml");
       const content = `
 name: my-agent
-model: claude-3-sonnet
+model: claude-sonnet-4-5
 systemPrompt: Test
 temperature: 5
 `;
@@ -245,7 +257,7 @@ temperature: 5
     it("should provide suggestions for common errors", () => {
       const filePath = join(TEST_DIR, "agents", "needs-suggestion.yaml");
       const content = `
-model: claude-3-sonnet
+model: claude-sonnet-4-5
 systemPrompt: Test
 `;
       writeFileSync(filePath, content);
@@ -261,7 +273,7 @@ systemPrompt: Test
       const filePath = join(TEST_DIR, "agents", "tracking.yaml");
       const content = `
 name: my-agent
-model: claude-3-sonnet
+model: claude-sonnet-4-5
 systemPrompt: Test
 tracking:
   enabled: true
@@ -279,7 +291,7 @@ tracking:
       const filePath = join(TEST_DIR, "agents", "operators.yaml");
       const content = `
 name: my-agent
-model: claude-3-sonnet
+model: claude-sonnet-4-5
 systemPrompt: Test
 operators:
   retry:
@@ -321,7 +333,7 @@ operators:
     it("should include file path in errors", () => {
       const filePath = join(TEST_DIR, "agents", "test.yaml");
       const content = `
-model: claude-3-sonnet
+model: claude-sonnet-4-5
 systemPrompt: Test
 `;
       writeFileSync(filePath, content);
@@ -336,7 +348,7 @@ systemPrompt: Test
       const filePath = join(TEST_DIR, "agents", "test.yaml");
       const content = `
 name: my-agent
-model: invalid
+model: "not a model id"
 systemPrompt: Test
 `;
       writeFileSync(filePath, content);

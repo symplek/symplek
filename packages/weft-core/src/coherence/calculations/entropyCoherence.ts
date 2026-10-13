@@ -2,7 +2,7 @@
  * @fileoverview Entropy-Based Coherence Calculation
  * @description Measures coherence from decision distribution entropy
  * @module weft-core/coherence/calculations/entropyCoherence
- * @since 2.1.0
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[STORY-01.04]: Entropy coherence implementation
  *

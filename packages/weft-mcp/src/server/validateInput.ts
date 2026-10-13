@@ -13,7 +13,13 @@
  * @surface internal
  */
 
-type JsonSchemaType = "object" | "array" | "string" | "number" | "boolean";
+type JsonSchemaType =
+  | "object"
+  | "array"
+  | "string"
+  | "number"
+  | "integer"
+  | "boolean";
 
 interface JsonSchema {
   type?: JsonSchemaType | readonly JsonSchemaType[];
@@ -48,7 +54,10 @@ export class ValidationError extends Error {
   }
 }
 
-function jsTypeOf(value: unknown): JsonSchemaType | "null" | "undefined" {
+/** What a value is, in the words the error messages use. */
+function jsTypeOf(
+  value: unknown,
+): "object" | "array" | "string" | "number" | "boolean" | "null" | "undefined" {
   if (value === null) return "null";
   if (value === undefined) return "undefined";
   if (Array.isArray(value)) return "array";
@@ -64,9 +73,13 @@ function matchesType(
   expected: JsonSchemaType | readonly JsonSchemaType[],
 ): boolean {
   const actual = jsTypeOf(value);
-  const types = Array.isArray(expected) ? expected : [expected];
-  return (types as readonly JsonSchemaType[]).includes(
-    actual as JsonSchemaType,
+  const types: readonly JsonSchemaType[] =
+    typeof expected === "string" ? [expected] : expected;
+  return types.some((type) =>
+    // JSON has one number type; "integer" is a number with no fraction.
+    type === "integer"
+      ? actual === "number" && Number.isInteger(value)
+      : type === actual,
   );
 }
 
@@ -83,8 +96,13 @@ function validateAt(
   }
 
   if (schema.type && !matchesType(value, schema.type)) {
+    // A fraction where an integer is wanted is still a number, so say which.
+    const got =
+      typeof value === "number" && Number.isFinite(value)
+        ? `number ${value}`
+        : jsTypeOf(value);
     throw new ValidationError(
-      `${path}: expected ${String(schema.type)}, got ${jsTypeOf(value)}`,
+      `${path}: expected ${String(schema.type)}, got ${got}`,
     );
   }
 

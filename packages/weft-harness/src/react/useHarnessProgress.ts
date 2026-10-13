@@ -11,7 +11,7 @@ import type {
   ConsensusVote,
   HarnessPhase,
   HarnessProgressEvent,
-} from "../types";
+} from "../types.js";
 
 export interface UseHarnessProgressResult {
   events: HarnessProgressEvent[];

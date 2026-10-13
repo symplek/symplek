@@ -33,13 +33,14 @@ The Convex runtime uses a custom module resolver that cannot be consumed by stan
 |---|---|---|
 | `weft-core` | MIT | Core `AgentUnit`, composition operators, and basic observability — free forever |
 | `weft-pro` | BSL 1.1 | Organisational features: TaCo, trust registry, antibodies |
-| `weft-react` | MIT | React hooks (`useSwarmConsensus`, `useWeftStream`, `AIErrorBoundary`) |
+| `weft-react` | MIT | React bindings (`useAgent`, `useConsensus`, `useSwarm`, `AIProvider`, `useAIConfig`, `AIErrorBoundary`) |
 | `weft-convex` | MIT | Convex bindings — wraps `weft-core/server` for Convex actions |
-| `weft-cli` | MIT | Developer CLI for scaffolding and agent debugging |
-| `weft-mcp` | MIT | MCP server exposing Weft operations as tool calls |
-| `weft-harness` | MIT | Testing harness for unit-testing AgentUnit compositions |
-| `weft-devtools` | MIT | Chrome DevTools extension bridge for agent observability |
-| `weft-testing` | MIT | Vitest utilities and mock factories for Weft agents |
+| `weft-cli` | MIT | The `weft` command: `init`, `add`, `validate`, `generate`, `migrate` |
+| `create-weft` | MIT | Wrapper that runs `weft init`. Held back from release |
+| `weft-mcp` | MIT | MCP client with trust policies, plus a stdio demo server whose debate and consensus tools run on stub agents |
+| `weft-harness` | MIT | Plan, permission-gate and execute operators for agent sessions. Pre-alpha: no agent SDK is wired yet |
+| `weft-devtools` | MIT | Chrome DevTools extension bridge for agent observability (private, not published) |
+| `weft-testing` | MIT | Re-exports the record and replay engine from `weft-core/rehearsal` |
 
 ## Shared concepts
 
@@ -50,7 +51,7 @@ These concepts exist in both the canonical source and the distribution mirror. W
 | AgentUnit | `algebra/core/AgentUnit.ts` | `weft-core/src/AgentUnit.ts` | Core shared contract. See asymmetries below. |
 | AgentUnitMetadata | `algebra/core/types/agent.types.ts` | `weft-core/src/AgentUnit.ts` | Metadata interface — paths differ; keep field shapes aligned. |
 | WeftError | `core/weftErrors.ts` | `weft-core/src/errors.ts` | **Error codes diverge intentionally.** Only `TIMEOUT` is shared. Canonical codes are Convex-oriented (`CIRCUIT_OPEN`, `IDEMPOTENCY_CONFLICT`, etc.); mirror codes are package-oriented (`AUTH_FAILED`, `NETWORK_ERROR`, etc.). Constructor signatures also differ — canonical requires `{ code, why, fix }`; mirror accepts a richer optional object. |
-| WeftBuilder | `weft/facades/shared.ts` | `weft-core/src/facade.ts` | **Nearly unrelated.** Canonical is a production Convex facade with `.prompt()`, `.withFallback()`, `.withBudget()`, `.runStream()`, `.structured()`; mirror is a simple lazy wrapper with only `.toUnit()`, `.run()`, `.then()` (PromiseLike). Only `.toUnit()` is aligned across the two. |
+| WeftBuilder | `weft/facades/shared.ts` | `weft-core/src/builder.ts` | **Nearly unrelated.** Canonical is a production Convex facade with `.prompt()`, `.withFallback()`, `.withBudget()`, `.runStream()`, `.structured()`; mirror is a simple lazy wrapper with `.coordinate()`, its deprecated alias `.toUnit()`, `.run()` and `.then()` (PromiseLike). Only `.toUnit()` is aligned across the two. |
 | RetryOptions | `weft/core/validation.ts` | `weft-core/src/types.ts` | **Distinct types serving different mechanisms.** Canonical: `{ maxRetries?, baseDelayMs?, originalPrompt? }` for LLM schema-validation retry-with-feedback. Mirror: `{ maxAttempts?, baseDelayMs?, maxDelayMs?, jitter?, retryIf? }` for the AgentUnit `.retry()` operator. `maxRetries` vs `maxAttempts` is the easiest copy-paste trap during manual sync. |
 
 ### Known asymmetries (not shared — per-side only)
@@ -65,7 +66,7 @@ These concepts exist in both the canonical source and the distribution mirror. W
 | `facadeMethodRegistry`, `registerFacadeMethods`, `getFacadeMethodMetadata` | Canonical only | Convex-internal observability hooks. |
 | `WeftError.sanitizeContext()` static | Mirror only | Redacts api keys / tokens / passwords from context objects. No canonical equivalent. |
 
-Equivalence between the two sides is guarded by the canonical ↔ mirror contract tests at `packages/weft-core/src/__tests__/canonicalMirrorContract.test.ts`.
+Equivalence between the two sides is guarded by the canonical ↔ mirror contract tests at `packages/weft-core/src/__tests__/canonicalMirrorContract.test.ts`. Those tests need the canonical source on disk, so they run upstream only. In this repo the whole file skips itself.
 
 ## Sync and backport process
 
@@ -103,7 +104,7 @@ import { AIErrorBoundary } from "weft-react";
 import type { WeftErrorDetail } from "weft-core";
 ```
 
-The tier-boundary CI job enforces this rule inside the monorepo: it blocks `weft-core` imports from `convex/` files.
+Nothing in this repo enforces that rule: there is no `convex/` directory here. The `tier-boundary` CI job in this repo checks something else, that `packages/weft-core/src` does not import `weft-pro`.
 
 ## Which API to use
 

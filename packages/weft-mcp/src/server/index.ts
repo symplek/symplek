@@ -12,6 +12,7 @@ import { debateTool } from "./tools/debate.tool";
 import { trackedTool } from "./tools/tracked.tool";
 import type { JsonSchemaLike } from "./validateInput";
 import { ValidationError, validateInput } from "./validateInput";
+import { VERSION } from "../version";
 
 export { debateTool, consensusTool, trackedTool };
 
@@ -47,8 +48,11 @@ type JsonRpcResponse = JsonRpcSuccess | JsonRpcError;
 async function dispatchTool(name: string, args: unknown): Promise<unknown> {
   const tool = WEFT_MCP_TOOLS.find((t) => t.name === name);
   if (!tool) {
+    // MCP spec: unknown tool name is an invalid-params error (-32602), not
+    // method-not-found (-32601). The method "tools/call" exists; the tool name is
+    // the invalid parameter.
     const err = new Error(`Unknown tool: ${name}`) as Error & { code: number };
-    err.code = -32601;
+    err.code = -32602;
     throw err;
   }
   // Validate at the JSON-RPC boundary — the tool's TypeScript shape is not
@@ -67,13 +71,12 @@ async function handleRequest(request: JsonRpcRequest): Promise<unknown> {
       return {
         protocolVersion: "2024-11-05",
         capabilities: { tools: {} },
-        serverInfo: { name: "weft", version: "0.1.0" },
+        serverInfo: { name: "weft", version: VERSION },
       };
 
-    case "notifications/initialized":
-    case "initialized": // backward-compat: some clients omit the "notifications/" prefix
-      // Notification — no response needed.
-      return undefined;
+    case "ping":
+      // MCP spec requires an empty result object for ping.
+      return {};
 
     case "tools/list":
       return {
@@ -85,8 +88,27 @@ async function handleRequest(request: JsonRpcRequest): Promise<unknown> {
       };
 
     case "tools/call": {
-      const params = request.params as { name: string; arguments?: unknown };
-      const output = await dispatchTool(params.name, params.arguments ?? {});
+      // Validate params before accessing — missing or non-object params would
+      // otherwise cause a TypeError (-32603 Internal error) instead of the
+      // correct -32602 Invalid params.
+      const params = request.params;
+      if (
+        params == null ||
+        typeof params !== "object" ||
+        Array.isArray(params)
+      ) {
+        throw new ValidationError(
+          "tools/call: params must be an object with a 'name' field",
+        );
+      }
+      const { name, arguments: args } = params as {
+        name?: unknown;
+        arguments?: unknown;
+      };
+      if (typeof name !== "string") {
+        throw new ValidationError("tools/call: params.name must be a string");
+      }
+      const output = await dispatchTool(name, args ?? {});
       return {
         content: [{ type: "text", text: JSON.stringify(output, null, 2) }],
       };
@@ -110,13 +132,26 @@ function writeResponse(response: JsonRpcResponse): void {
 }
 
 /**
+ * True when a JSON-RPC method is inherently a notification and must never
+ * receive a response, even if a misbehaving client attaches an id to it.
+ * The MCP spec treats every "notifications/*" method as notification-only.
+ */
+function isNotificationMethod(method: string): boolean {
+  return (
+    method === "initialized" ||
+    method.startsWith("notifications/") ||
+    method.startsWith("$/")
+  );
+}
+
+/**
  * Start the Weft MCP server.
  * Exposes Weft operators as MCP tools for Claude Code / Cursor / Codex CLI.
  *
  * Uses a minimal stdio JSON-RPC 2.0 transport (newline-delimited JSON).
  * Add to your .claude/settings.json:
  * ```json
- * { "mcpServers": { "weft": { "command": "node", "args": ["./dist/server/index.js"] } } }
+ * { "mcpServers": { "weft": { "command": "node", "args": ["./node_modules/weft-mcp/dist/bin.cjs"] } } }
  * ```
  */
 export async function startWeftMcpServer(): Promise<void> {
@@ -130,9 +165,10 @@ export async function startWeftMcpServer(): Promise<void> {
     const trimmed = line.trim();
     if (!trimmed) return;
 
-    let request: JsonRpcRequest;
+    // ── Parse ──────────────────────────────────────────────────────────────
+    let parsed: unknown;
     try {
-      request = JSON.parse(trimmed) as JsonRpcRequest;
+      parsed = JSON.parse(trimmed);
     } catch {
       writeResponse({
         jsonrpc: "2.0",
@@ -142,14 +178,101 @@ export async function startWeftMcpServer(): Promise<void> {
       return;
     }
 
-    const id = request.id ?? null;
+    // ── Validate message shape ─────────────────────────────────────────────
+    // M4/Smaller: JSON.parse("null") returns null; JSON.parse("[1]") returns an
+    // array. Both crash on `parsed.method`. Guard before any property access.
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      writeResponse({
+        jsonrpc: "2.0",
+        id: null,
+        error: { code: -32600, message: "Invalid Request" },
+      });
+      return;
+    }
+
+    const raw = parsed as Record<string, unknown>;
+
+    // Smaller: messages without jsonrpc:"2.0" must be rejected.
+    if (raw.jsonrpc !== "2.0") {
+      writeResponse({
+        jsonrpc: "2.0",
+        id: null,
+        error: {
+          code: -32600,
+          message: "Invalid Request: jsonrpc must be \"2.0\"",
+        },
+      });
+      return;
+    }
+
+    // A client's response to us carries `result` or `error` and no `method`.
+    // There is nothing to say back: answering a response is not valid JSON-RPC.
+    if (
+      typeof raw.method !== "string" &&
+      ("result" in raw || "error" in raw)
+    ) {
+      return;
+    }
+
+    // Smaller: id must be string, number, null, or absent. Object/array ids are
+    // invalid per JSON-RPC 2.0 §4 and must be rejected.
+    const rawId = raw.id;
+    if (
+      rawId !== undefined &&
+      rawId !== null &&
+      typeof rawId !== "string" &&
+      typeof rawId !== "number"
+    ) {
+      writeResponse({
+        jsonrpc: "2.0",
+        id: null,
+        error: {
+          code: -32600,
+          message: "Invalid Request: id must be string, number, or null",
+        },
+      });
+      return;
+    }
+
+    const id = rawId === undefined ? null : (rawId as string | number | null);
+
+    // A request that lost its method. With an id, the client is waiting on
+    // that id for an answer, so it gets one.
+    if (typeof raw.method !== "string") {
+      if (rawId !== undefined) {
+        writeResponse({
+          jsonrpc: "2.0",
+          id,
+          error: {
+            code: -32600,
+            message: "Invalid Request: method must be a string",
+          },
+        });
+      }
+      return;
+    }
+
+    // M5/Smaller: a message is a notification when it has no `id` field (id is
+    // undefined in the raw object). Notification-only methods must also never
+    // get a response even if a misbehaving client attaches an id.
+    // JSON-RPC 2.0 §4.1: "A Notification is a Request object without an 'id'."
+    const hasId = rawId !== undefined;
+    // A notification gets no response, on success or on error, so it is not
+    // dispatched at all. This is the one place that decides what counts.
+    if (!hasId || isNotificationMethod(raw.method)) return;
+
+    const request: JsonRpcRequest = {
+      jsonrpc: "2.0",
+      id: rawId as string | number | null | undefined,
+      method: raw.method,
+      params: raw.params,
+    };
 
     handleRequest(request).then(
       (result) => {
-        // Notifications (id undefined/null, method "initialized") have no response.
-        if (request.id === undefined && request.method === "initialized")
-          return;
-        writeResponse({ jsonrpc: "2.0", id, result });
+        // Ensure the `result` field is always present (not undefined) so the
+        // JSON serialiser includes it. JSON.stringify omits undefined fields.
+        writeResponse({ jsonrpc: "2.0", id, result: result ?? null });
       },
       (error: unknown) => {
         // Sanitise the error surface for MCP callers. We expose:

@@ -8,9 +8,17 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wefthq/weft.git",
+    "directory": "packages/weft-testing"
   },
   "files": [
     "dist",
@@ -20,10 +28,11 @@
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "biome check src"
   },
   "peerDependencies": {
-    "weft-core": "workspace:*"
+    "weft-core": "workspace:^"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

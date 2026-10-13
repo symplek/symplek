@@ -9,10 +9,12 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+      "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
     }
+  },
+  "engines": {
+    "node": ">=20"
   },
   "files": [
     "dist",
@@ -29,9 +31,9 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "weft-core": "workspace:*",
+    "weft-core": "workspace:^",
     "convex": "^1.19.0",
-    "zod": "^3.0.0"
+    "zod": "^3.25.28 || ^4.0.0"
   },
   "peerDependenciesMeta": {
     "zod": {
