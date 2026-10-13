@@ -81,7 +81,10 @@ for (const dir of readdirSync(packagesDir)) {
 }
 const tarballs = readdirSync(tarDir).filter((f) => f.endsWith(".tgz"));
 const tarballFor = (name) => {
-  const hit = tarballs.find((f) => f.startsWith(`${name}-`) && /^\d/.test(f.slice(name.length + 1)));
+  // A scoped package packs without its "@" and with "-" for the "/":
+  // @scope/name becomes scope-name-1.0.0.tgz.
+  const prefix = `${name.replace(/^@/, "").replace("/", "-")}-`;
+  const hit = tarballs.find((f) => f.startsWith(prefix) && /^\d/.test(f.slice(prefix.length)));
   if (!hit) throw new Error(`no tarball was produced for ${name}`);
   return `file:${path.join(tarDir, hit).replace(/\\/g, "/")}`;
 };

@@ -37,15 +37,18 @@ mkdirSync(tarDir, { recursive: true });
 
 // The scaffolded project needs the library and the CLI that created it.
 const local = {};
-for (const dir of ["@symplek/core", "@symplek/cli"]) {
+for (const dir of ["symplek-core", "symplek-cli"]) {
   const pkgDir = path.join(repo, "packages", dir);
   const { name } = JSON.parse(readFileSync(path.join(pkgDir, "package.json"), "utf8"));
   run("pnpm", ["pack", "--pack-destination", arg(tarDir)], pkgDir);
-  const tarball = readdirSync(tarDir).find((f) => f.startsWith(`${name}-`) && f.endsWith(".tgz"));
+  // A scoped package packs without its "@" and with "-" for the "/".
+  const prefix = `${name.replace(/^@/, "").replace("/", "-")}-`;
+  const tarball = readdirSync(tarDir).find((f) => f.startsWith(prefix) && f.endsWith(".tgz"));
+  if (!tarball) throw new Error(`no tarball was produced for ${name}`);
   local[name] = `file:${path.join(tarDir, tarball).replace(/\\/g, "/")}`;
 }
 
-const cliDir = path.join(repo, "packages", "@symplek/cli");
+const cliDir = path.join(repo, "packages", "symplek-cli");
 const cli = createRequire(path.join(cliDir, "package.json"))(".");
 const AGENT_TYPES = ["general", "researcher", "reviewer", "custom", "typescript"];
 const failures = [];

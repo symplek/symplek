@@ -52,7 +52,8 @@ if (existsSync(docsDir)) {
  * package is a stale name (an old scope, a renamed package), which is the
  * most likely way for a doc to rot.
  */
-const LOOKS_LIKE_OURS = /^(@symplek\/|symplek$|symplek[-/]|create-symplek($|\/))/;
+// The old Weft names stay in the pattern: a rename leaves stale imports behind, and those must still be caught.
+const LOOKS_LIKE_OURS = /^(@symplek\/|symplek$|symplek[-/]|create-symplek($|\/)|@weft\/|weft$|weft[-/]|create-weft($|\/))/;
 
 /** Split a specifier into the workspace package it names and the subpath. */
 function splitSpecifier(spec) {
