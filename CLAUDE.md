@@ -1,22 +1,22 @@
-# Weft
+# Symplek
 
-> Composable AI agents for TypeScript. A pnpm monorepo of `weft-*` packages (Node ≥20, changesets for releases).
+> Composable AI agents for TypeScript. A pnpm monorepo of `@symplek/*` packages (Node ≥20, changesets for releases).
 
 This project uses the shared Claude Code framework. Framework files (.claude/hooks, rules, skills,
 agents, commands, docs, scripts) are symlinked from the central clone. Project-specific configuration
 lives here.
 
-See `.claude/config.json` for project-specific feature toggles (Convex, Weft, WorkOS, BMAD, etc.).
+See `.claude/config.json` for project-specific feature toggles (Convex, Symplek, WorkOS, BMAD, etc.).
 
 ## Monorepo layout
 
 Packages live under `packages/`:
 
-- `weft-core` — provider integration + streaming primitives (Anthropic, OpenAI, Google, auto)
-- `weft-pro` — operators, solo locks, convergence/merge strategies
-- `weft-cli`, `weft-convex`, `weft-devtools`, `weft-harness`, `weft-mcp`, `weft-react`, `weft-testing`
+- `@symplek/core` — provider integration + streaming primitives (Anthropic, OpenAI, Google, auto)
+- `@symplek/pro` — operators, solo locks, convergence/merge strategies
+- `@symplek/cli`, `@symplek/convex`, `@symplek/devtools`, `@symplek/harness`, `@symplek/mcp`, `@symplek/react`, `@symplek/testing`
 
-Workspace scripts (run from root): `pnpm build`, `pnpm test`, `pnpm lint`, `pnpm typecheck`. Filter is `weft-*`. Releases go through `pnpm changeset` → `version-packages` → `release`.
+Workspace scripts (run from root): `pnpm build`, `pnpm test`, `pnpm lint`, `pnpm typecheck`. Filter is `@symplek/*`. Releases go through `pnpm changeset` → `version-packages` → `release`.
 
 ---
 
