@@ -5,11 +5,11 @@ Names only. Values live in the deployment environment and untracked local env fi
 
 4 names.
 
-2 read(s) compute the variable name (`process.env[expr]`) in `packages/weft-core/src/facade.ts`: those names cannot be derived and are not in this table. List them under `env.extra` in the generator config.
+2 read(s) compute the variable name (`process.env[expr]`) in `packages/symplek-core/src/facade.ts`: those names cannot be derived and are not in this table. List them under `env.extra` in the generator config.
 
 | Name | Scope | In .env.example | Referenced by (files) |
 |---|---|---|---|
-| ANTHROPIC_API_KEY | server | no | packages/weft-core/src (2) |
-| GOOGLE_GENERATIVE_AI_API_KEY | server | no | packages/weft-core/src (2) |
-| OPENAI_API_KEY | server | no | packages/weft-core/src (4) |
-| WEFT_PRO_LICENSE_KEY | server | no | packages/weft-pro/src (1) |
+| ANTHROPIC_API_KEY | server | no | packages/symplek-core/src (2) |
+| GOOGLE_GENERATIVE_AI_API_KEY | server | no | packages/symplek-core/src (2) |
+| OPENAI_API_KEY | server | no | packages/symplek-core/src (4) |
+| SYMPLEK_PRO_LICENSE_KEY | server | no | packages/symplek-pro/src (1) |

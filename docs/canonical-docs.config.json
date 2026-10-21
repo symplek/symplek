@@ -1,6 +1,6 @@
 {
   "design": {
-    "tokenDirs": ["packages/weft-devtools/src/panel/styles"],
-    "surfaceSelector": "^[.](Weft-devtools-panel)$"
+    "tokenDirs": ["packages/symplek-devtools/src/panel/styles"],
+    "surfaceSelector": "^[.](Symplek-devtools-panel)$"
   }
 }
