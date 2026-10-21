@@ -17,7 +17,7 @@ outputs/
 .vscode/
 
 # Private planning / strategy — kept locally, not published.
-WEFT-RELEASE-PLAN.md
+SYMPLEK-RELEASE-PLAN.md
 .claude/logs/
 .claude/agent-memory/
 .claude/.allow-director-research

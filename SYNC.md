@@ -1,14 +1,14 @@
 # Sync model
 
-This repo is the **public distribution mirror** for Weft. It is not where Weft is developed day-to-day.
+This repo is the **public distribution mirror** for Symplek. It is not where Symplek is developed day-to-day.
 
 ## Why two repos
 
-Weft's maintainers develop Weft inside a private monorepo alongside the application that originally consumed it. That application is not open-sourced and won't be. Keeping Weft's source in that monorepo lets the maintainers move fast on internal-facing changes without leaking application code into the public history.
+Symplek's maintainers develop Symplek inside a private monorepo alongside the application that originally consumed it. That application is not open-sourced and won't be. Keeping Symplek's source in that monorepo lets the maintainers move fast on internal-facing changes without leaking application code into the public history.
 
 This mirror exists so that:
 
-1. The npm-published `@weft/*` packages have a public source-of-truth that users, security researchers, and external contributors can read.
+1. The npm-published `@symplek/*` packages have a public source-of-truth that users, security researchers, and external contributors can read.
 2. External contributions have somewhere to land.
 3. Issues, discussions, and releases live in one public place.
 
@@ -19,7 +19,7 @@ There is **no automation**. Sync is a manual act, performed by a maintainer, at 
 ### Upstream → mirror (the common direction)
 
 1. A maintainer cuts a release tag in the upstream private monorepo.
-2. The relevant `packages/weft-*` subtrees are copied into this repo.
+2. The relevant `packages/@symplek/*` subtrees are copied into this repo.
 3. The maintainer runs `pnpm changeset version` here to generate the version bump and CHANGELOG entries.
 4. The maintainer pushes the release commit to `main` here.
 5. The maintainer tags the release and `pnpm changeset publish` pushes to npm.
@@ -35,7 +35,7 @@ This means a merged PR may appear here under one commit hash and ship to npm und
 
 ## Drift detection
 
-`packages/weft-core/src/__tests__/canonicalMirrorContract.test.ts` (in this repo and upstream) asserts behavioural and structural equivalence on four shared concepts: `AgentUnit`, `WeftError`, `WeftBuilder`, `RetryOptions`. If these tests fail in CI, sync has drifted and a maintainer must reconcile before the next release.
+`packages/symplek-core/src/__tests__/canonicalMirrorContract.test.ts` (in this repo and upstream) asserts behavioural and structural equivalence on four shared concepts: `AgentUnit`, `SymplekError`, `SymplekBuilder`, `RetryOptions`. If these tests fail in CI, sync has drifted and a maintainer must reconcile before the next release.
 
 Some asymmetries are **deliberate** and documented in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Do not "fix" them.
 

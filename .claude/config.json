@@ -1,5 +1,5 @@
 {
-  "projectName": "Weft",
+  "projectName": "Symplek",
   "productCodePaths": [
     "src"
   ],
@@ -9,16 +9,16 @@
   "devServerUrl": "http://localhost:3000",
   "features": {
     "convex": false,
-    "weft": false,
+    "symplek": false,
     "workos": false,
     "bmad": false,
     "codex": false,
     "marketing": false
   },
   "aiIntegrityTests": [],
-  "weftProtectedPaths": [],
+  "symplekProtectedPaths": [],
   "protectedImportPrefixes": [],
   "productLocAllowlist": [],
-  "techStack": "TypeScript pnpm monorepo (weft-* packages, Node >=20, changesets)",
+  "techStack": "TypeScript pnpm monorepo (@symplek/* packages, Node >=20, changesets)",
   "authSetup": "Environment variables (e.g. ANTHROPIC_API_KEY for the AI SDK)"
 }
