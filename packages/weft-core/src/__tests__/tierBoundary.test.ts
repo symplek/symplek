@@ -1,15 +1,15 @@
 /**
- * @module tierBoundary - Verifies free-tier developer primitives are fully accessible from weft-core
+ * @module tierBoundary - Verifies free-tier developer primitives are fully accessible from @symplek/core
  * @description Confirms that solo, interview, conduct, dialectic, debate, coherence, converge,
- *   rehearse, and replay operators are available on AgentUnit without any weft-pro dependency.
- *   All imports are from weft-core relative paths only.
+ *   rehearse, and replay operators are available on AgentUnit without any @symplek/pro dependency.
+ *   All imports are from @symplek/core relative paths only.
  */
 import { describe, expect, it } from "vitest";
 
-// ONLY weft-core imports — must never import from weft-pro
+// ONLY @symplek/core imports — must never import from @symplek/pro
 import { AgentUnit, createContext } from "../index";
 
-describe("weft-core free-tier operator boundary", () => {
+describe("@symplek/core free-tier operator boundary", () => {
   const ctx = createContext();
 
   // ─── Method presence (prototype shape) ──────────────────────────────────────
@@ -56,9 +56,9 @@ describe("weft-core free-tier operator boundary", () => {
     });
   });
 
-  // ─── Smoke: operators return AgentUnit instances (no weft-pro needed) ───────
+  // ─── Smoke: operators return AgentUnit instances (no @symplek/pro needed) ───────
 
-  describe("free-tier operators produce AgentUnit without weft-pro", () => {
+  describe("free-tier operators produce AgentUnit without @symplek/pro", () => {
     it(".solo() returns an AgentUnit", () => {
       const unit = AgentUnit.from(() =>
         Promise.resolve({ confidence: 0.9, coherence: 0.9, riskScore: 0.1 }),
@@ -105,9 +105,9 @@ describe("weft-core free-tier operator boundary", () => {
     });
   });
 
-  // ─── End-to-end: operators execute without weft-pro ────────────────────────
+  // ─── End-to-end: operators execute without @symplek/pro ────────────────────────
 
-  describe("free-tier operators execute end-to-end without weft-pro", () => {
+  describe("free-tier operators execute end-to-end without @symplek/pro", () => {
     it(".dialectic() runs leader-satisfied with no advisors", async () => {
       const unit = AgentUnit.from<string>(() => Promise.resolve("problem"));
       const leader = {

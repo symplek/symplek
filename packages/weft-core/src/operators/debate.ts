@@ -1,5 +1,5 @@
 /**
- * @module weft-core/operators/debate
+ * @module @symplek/core/operators/debate
  * @description Debate operator: sequential converge + unanimous consensus with optional retry on rejection.
  * @blast_radius MEDIUM
  * @status STABLE
@@ -166,7 +166,7 @@ export function createDebateComputation<T>(
               const unit = result as import("../AgentUnit").AgentUnit<
                 ConvergeContribution<T>
               >;
-              return unit.run(ctx, { trustMode: "legacy" });
+              return (await unit.run(ctx)).value;
             }
             if (result instanceof Promise) {
               return result;

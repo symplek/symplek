@@ -2,10 +2,10 @@
  * @fileoverview Basic operators for AgentUnit — re-export barrel.
  * @description All operator implementations live under ./operators/*.ts.
  *   This file exists as a stable import path for the rest of the codebase.
- * @module weft-core/operators
+ * @module @symplek/core/operators
  * @since 1.0.0-beta.1
  *
- * 📝 BUILD[05.04]: Basic operators for weft-core package (MIT License)
+ * 📝 BUILD[05.04]: Basic operators for @symplek/core package (MIT License)
  */
 
 export {

@@ -1,7 +1,7 @@
 /**
  * @fileoverview Lightweight Observability (Free Tier)
  * @description In-process trace collection for agent compositions
- * @module weft-core/observability
+ * @module @symplek/core/observability
  * @since 1.0.0-beta.1
  *
  * Provides an in-memory trace store that records span entries when
@@ -10,7 +10,7 @@
  * testing, and feeding external systems via the `TraceCollector` hook.
  *
  * Advanced features (multi-agent trace aggregation, cost dashboards,
- * distributed tracing) will live in weft-pro when added.
+ * distributed tracing) will live in @symplek/pro when added.
  */
 
 import type { AgentUnit } from "./AgentUnit";
@@ -47,7 +47,7 @@ function generateSpanId(): string {
  *
  * @example
  * ```typescript
- * import { configureObservability } from 'weft-core';
+ * import { configureObservability } from '@symplek/core';
  *
  * configureObservability({
  *   verbosity: 'full',
@@ -96,7 +96,7 @@ export function clearTraces(): number {
  *
  * @example
  * ```typescript
- * import { observable, getTraces, clearTraces } from 'weft-core';
+ * import { observable, getTraces, clearTraces } from '@symplek/core';
  *
  * const traced = observable(myUnit, { verbosity: 'full' });
  * await traced.run(ctx);

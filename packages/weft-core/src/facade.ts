@@ -1,9 +1,9 @@
 /**
- * @module facade - Server-side callable namespace for weft-core
+ * @module facade - Server-side callable namespace for @symplek/core
  * @description Real AI execution facade — SERVER-ONLY (Node.js / Convex Actions).
- *   Exports `Weft` as a callable namespace with `.run()`, `.stream()`, `.agent()`,
+ *   Exports `Symplek` as a callable namespace with `.run()`, `.stream()`, `.agent()`,
  *   `.configure()`, and `.providers()` methods, while preserving the direct
- *   `Weft(task)` call signature returning `WeftBuilder<T>`.
+ *   `Symplek(task)` call signature returning `SymplekBuilder<T>`.
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  * @blast_radius MEDIUM
  * @status stable
@@ -16,32 +16,34 @@ import type { AgentConfig } from "./agent";
 import { AgentBuilder, createAgent } from "./agent";
 import { AgentUnit } from "./AgentUnit";
 import type { AgentComputation } from "./AgentUnit";
-import { WeftBuilder } from "./builder";
-import { WeftError } from "./errors";
+import { SymplekBuilder } from "./builder";
+import { SymplekError } from "./errors";
 import {
   getGlobalConfig,
   mergeGlobalConfig,
   resetAll,
   setInitPromise,
 } from "./globalConfig";
+import { createProviderAdapter } from "./providers/bootstrap";
+import { getEnvKeyForProvider, KNOWN_PROVIDERS } from "./providers/known";
 import { providerRegistry } from "./providers/registry";
 import type { StreamOptions } from "./streaming";
 import { stream } from "./streaming";
 import { traceManager } from "./trace";
 import type { TrackedResult } from "./types";
 
-export type { WeftOptions } from "./builder";
+export type { SymplekOptions } from "./builder";
 // Re-export for external consumers who previously imported from "./facade"
-export { WeftBuilder } from "./builder";
+export { SymplekBuilder } from "./builder";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES — Namespace additions
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * One-time global configuration for the Weft facade.
+ * One-time global configuration for the Symplek facade.
  */
-export interface WeftConfigOptions {
+export interface SymplekConfigOptions {
   /** Provider identifier override (e.g. 'openai', 'anthropic'). */
   provider?: string;
   /** Model name override (e.g. 'gpt-4o'). */
@@ -65,40 +67,40 @@ export interface ProviderInfo {
 }
 
 /**
- * The Weft callable namespace type.
- * Supports direct call (returns WeftBuilder) AND named methods.
+ * The Symplek callable namespace type.
+ * Supports direct call (returns SymplekBuilder) AND named methods.
  */
-export interface WeftFunction {
-  /** Direct call returning a WeftBuilder<string>. */
-  (task: string): WeftBuilder<string>;
-  /** Direct call with schema returning a WeftBuilder<T>. */
+export interface SymplekFunction {
+  /** Direct call returning a SymplekBuilder<string>. */
+  (task: string): SymplekBuilder<string>;
+  /** Direct call with schema returning a SymplekBuilder<T>. */
   <T>(
     task: string,
-    options: import("./builder").WeftOptions<T> & { schema: z.ZodType<T> },
-  ): WeftBuilder<T>;
+    options: import("./builder").SymplekOptions<T> & { schema: z.ZodType<T> },
+  ): SymplekBuilder<T>;
   /** Direct call with options but no schema (model/timeout/etc overrides). */
   <T = string>(
     task: string,
-    options: import("./builder").WeftOptions<T>,
-  ): WeftBuilder<T>;
+    options: import("./builder").SymplekOptions<T>,
+  ): SymplekBuilder<T>;
   /** Explicitly run a task. Equivalent to awaiting the direct call. */
   run(
     task: string,
-    options?: import("./builder").WeftOptions<unknown>,
+    options?: import("./builder").SymplekOptions<unknown>,
   ): Promise<TrackedResult<unknown>>;
   /** Stream incremental text chunks from the AI provider. */
   stream(task: string, options?: StreamOptions): AsyncGenerator<string>;
   /** Create a fluent AgentBuilder with per-agent configuration. */
   agent(config?: AgentConfig): AgentBuilder;
   /**
-   * Bridge into AgentUnit composition from the Weft namespace. Equivalent to
+   * Bridge into AgentUnit composition from the Symplek namespace. Equivalent to
    * `AgentUnit.from(computation)` — lets you reach `.consensus()`, `.zipAll()`,
-   * `.retry()`, etc. without a second import. Complements `Weft(task).coordinate()`
-   * which bridges from a Weft(task) call into the same AgentUnit composition.
+   * `.retry()`, etc. without a second import. Complements `Symplek(task).coordinate()`
+   * which bridges from a Symplek(task) call into the same AgentUnit composition.
    *
    * @example
    * ```typescript
-   * const decision = await Weft.unit(async () => "Ship the feature")
+   * const decision = await Symplek.unit(async () => "Ship the feature")
    *   .consensus([voter1, voter2, voter3])
    *   .run(ctx);
    * ```
@@ -111,7 +113,7 @@ export interface WeftFunction {
    */
   of<T>(value: T): AgentUnit<T>;
   /** Store one-time global configuration (provider, model, apiKey, debug). */
-  configure(options: WeftConfigOptions): void;
+  configure(options: SymplekConfigOptions): void;
   /** List all known providers and their configured status. */
   providers(): ProviderInfo[];
 }
@@ -137,8 +139,7 @@ export interface WeftFunction {
  * configure({ provider: "openrouter" }) throws a clear PROVIDER_ERROR so callers
  * get an actionable message instead of a silent mis-route.
  */
-const SUPPORTED_PROVIDERS = ["openai", "anthropic", "google"] as const;
-type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number];
+const SUPPORTED_PROVIDERS: readonly string[] = KNOWN_PROVIDERS.map((p) => p.id);
 
 /**
  * Monotonically increasing counter that advances on every `configure()` call.
@@ -165,46 +166,9 @@ async function _bootstrapProvider(
   apiKey: string,
   generation: number,
 ): Promise<void> {
-  switch (provider as SupportedProvider) {
-    case "openai": {
-      const { createOpenAIProvider } = await import("./providers/openai");
-      const p = await createOpenAIProvider(apiKey);
-      if (generation === _bootstrapGeneration) {
-        providerRegistry.register(p, true);
-      }
-      break;
-    }
-    case "anthropic": {
-      const { createAnthropicProvider } = await import(
-        "./providers/anthropic"
-      );
-      const p = await createAnthropicProvider(apiKey);
-      if (generation === _bootstrapGeneration) {
-        providerRegistry.register(p, true);
-      }
-      break;
-    }
-    case "google": {
-      const { createGoogleProvider } = await import("./providers/google");
-      const p = await createGoogleProvider(apiKey);
-      if (generation === _bootstrapGeneration) {
-        providerRegistry.register(p, true);
-      }
-      break;
-    }
-    default: {
-      // Unreachable: provider was validated synchronously in _configure().
-      // Retained as a defensive guard.
-      throw new WeftError({
-        code: "PROVIDER_ERROR",
-        why: `Unknown provider "${String(provider)}". Supported providers: ${SUPPORTED_PROVIDERS.join(", ")}.`,
-        fix: {
-          description: `Use one of the supported provider identifiers.`,
-          docsUrl: "https://github.com/weft-ai/weft-core#provider-setup",
-        },
-        example: `Weft.configure({ provider: "openai", apiKey: process.env.OPENAI_API_KEY })`,
-      });
-    }
+  const adapter = await createProviderAdapter(provider, apiKey);
+  if (generation === _bootstrapGeneration) {
+    providerRegistry.register(adapter, true);
   }
 }
 
@@ -238,30 +202,30 @@ export function _getBootstrapGenerationForTesting(): number {
 
 async function _run(
   task: string,
-  options?: import("./builder").WeftOptions<unknown>,
+  options?: import("./builder").SymplekOptions<unknown>,
 ): Promise<TrackedResult<unknown>> {
-  return new WeftBuilder<unknown>(task, options).run();
+  return new SymplekBuilder<unknown>(task, options).run();
 }
 
 function _agent(config?: AgentConfig): AgentBuilder {
   return createAgent(config);
 }
 
-function _configure(options: WeftConfigOptions): void {
+function _configure(options: SymplekConfigOptions): void {
   // Validate provider name synchronously so callers get immediate feedback
   // even though the bootstrap itself is deferred.
   if (
     options.provider !== undefined &&
-    !SUPPORTED_PROVIDERS.includes(options.provider as SupportedProvider)
+    !SUPPORTED_PROVIDERS.includes(options.provider)
   ) {
-    throw new WeftError({
+    throw new SymplekError({
       code: "PROVIDER_ERROR",
       why: `Unknown provider "${options.provider}". Supported providers: ${SUPPORTED_PROVIDERS.join(", ")}.`,
       fix: {
         description: `Use one of the supported provider identifiers.`,
-        docsUrl: "https://github.com/weft-ai/weft-core#provider-setup",
+        docsUrl: "https://github.com/symplek/symplek#install",
       },
-      example: `Weft.configure({ provider: "openai", apiKey: process.env.OPENAI_API_KEY })`,
+      example: `Symplek.configure({ provider: "openai", apiKey: process.env.OPENAI_API_KEY })`,
     });
   }
 
@@ -308,21 +272,9 @@ function _configure(options: WeftConfigOptions): void {
  * enqueues no bootstrap and the first call fails on an unregistered provider.
  */
 function _apiKeyFromEnv(provider: string): string | undefined {
-  const envKey = KNOWN_PROVIDERS.find((p) => p.id === provider)?.envKey;
-  return envKey ? process.env[envKey] : undefined;
+  return getEnvKeyForProvider(provider);
 }
 
-
-const KNOWN_PROVIDERS: ReadonlyArray<{
-  id: string;
-  name: string;
-  envKey: string;
-}> = [
-  { id: "openai", name: "OpenAI", envKey: "OPENAI_API_KEY" },
-  { id: "anthropic", name: "Anthropic", envKey: "ANTHROPIC_API_KEY" },
-  { id: "google", name: "Google", envKey: "GOOGLE_GENERATIVE_AI_API_KEY" },
-  // openrouter omitted — not yet supported via configure(); see SUPPORTED_PROVIDERS note above.
-];
 
 function _providers(): ProviderInfo[] {
   const registered = providerRegistry.getAll();
@@ -351,54 +303,54 @@ function _providers(): ProviderInfo[] {
 // BASE FUNCTION
 // ─────────────────────────────────────────────────────────────────────────────
 
-function _weftFn<T = string>(
+function _symplekFn<T = string>(
   task: string,
-  options?: import("./builder").WeftOptions<T>,
-): WeftBuilder<T> {
-  return new WeftBuilder<T>(task, options);
+  options?: import("./builder").SymplekOptions<T>,
+): SymplekBuilder<T> {
+  return new SymplekBuilder<T>(task, options);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EXPORT — Weft callable namespace
+// EXPORT — Symplek callable namespace
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * The Weft callable namespace.
+ * The Symplek callable namespace.
  *
  * @example
  * ```typescript
  * // Simple AI call
- * const result = await Weft('Summarise this document');
+ * const result = await Symplek('Summarise this document');
  *
- * // Bridge to coordination via .coordinate() (from a Weft(task) call)
- * const consensus = await Weft('Analyse this clause')
+ * // Bridge to coordination via .coordinate() (from a Symplek(task) call)
+ * const consensus = await Symplek('Analyse this clause')
  *   .coordinate()
  *   .consensus([reviewer1, reviewer2, reviewer3])
  *   .run(ctx);
  *
- * // Or bridge directly from the namespace with Weft.unit / Weft.of
- * const decision = await Weft.unit(async () => "Ship the feature")
+ * // Or bridge directly from the namespace with Symplek.unit / Symplek.of
+ * const decision = await Symplek.unit(async () => "Ship the feature")
  *   .consensus([voter1, voter2, voter3])
  *   .run(ctx);
  *
- * const voted = await Weft.of("Ship the feature")
+ * const voted = await Symplek.of("Ship the feature")
  *   .consensus([voter1, voter2, voter3])
  *   .run(ctx);
  *
  * // Streaming
- * for await (const chunk of Weft.stream('task')) { process.stdout.write(chunk); }
+ * for await (const chunk of Symplek.stream('task')) { process.stdout.write(chunk); }
  *
  * // Agent builder
- * const result = await Weft.agent({ model: 'gpt-4o' }).prompt('Summarize').run();
+ * const result = await Symplek.agent({ model: 'gpt-4o' }).prompt('Summarize').run();
  *
  * // One-time config
- * Weft.configure({ provider: 'anthropic', model: 'claude-sonnet-4-20250514' });
+ * Symplek.configure({ provider: 'anthropic', model: 'claude-sonnet-5-5' });
  *
  * // Provider list
- * const providers = Weft.providers();
+ * const providers = Symplek.providers();
  * ```
  */
-export const Weft: WeftFunction = Object.assign(_weftFn, {
+export const Symplek: SymplekFunction = Object.assign(_symplekFn, {
   run: _run,
   stream,
   agent: _agent,
@@ -406,7 +358,7 @@ export const Weft: WeftFunction = Object.assign(_weftFn, {
   of: <T>(value: T) => AgentUnit.of<T>(value),
   configure: _configure,
   providers: _providers,
-}) as unknown as WeftFunction;
+}) as unknown as SymplekFunction;
 
 // Re-export agent types for consumers
 export { AgentBuilder };

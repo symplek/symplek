@@ -12,7 +12,7 @@ import {
   createRetryComputation,
   createTimeoutComputation,
 } from "../../operators";
-import { WeftError } from "../../errors";
+import { SymplekError } from "../../errors";
 import type { RetryOptions } from "../../types";
 import type { AgentComputation } from "../AgentUnit";
 import { AgentUnit } from "../AgentUnit";
@@ -67,7 +67,7 @@ AgentUnit.prototype.retry = function <T>(
 ): AgentUnit<T> {
   if (maxAttempts < 1) {
     return AgentUnit.fail<T>(
-      new WeftError({
+      new SymplekError({
         code: "SETUP_ERROR",
         why: `retry maxAttempts must be >= 1, got ${maxAttempts}`,
         action: "Pass a positive integer for maxAttempts.",

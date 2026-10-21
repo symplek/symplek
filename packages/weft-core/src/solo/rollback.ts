@@ -1,8 +1,8 @@
 ﻿/**
  * @fileoverview Rollback Manager for Solo Mechanism
  * @description Checkpoint-based rollback for autonomous agent actions
- * @module weft-core/solo/rollback
- * @since 2.2.0
+ * @module @symplek/core/solo/rollback
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[STORY-01.09]: Rollback manager implementation
  *

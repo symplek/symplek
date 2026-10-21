@@ -1,8 +1,8 @@
 ﻿/**
  * @fileoverview Objective Confidence Configuration
  * @description Default weights, presets, and thresholds for confidence calculation
- * @module weft-core/confidence/config
- * @since 2.0.0
+ * @module @symplek/core/confidence/config
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[01.03]: Configuration constants from architecture design
  */

@@ -1,9 +1,9 @@
 ﻿/**
- * @fileoverview Circuit Breaker for weft-core
+ * @fileoverview Circuit Breaker for @symplek/core
  * @description Implements the circuit breaker pattern to handle provider failures gracefully.
  */
 
-import { WeftError } from "../errors";
+import { SymplekError } from "../errors";
 
 /**
  * Circuit Breaker States
@@ -44,13 +44,13 @@ export class CircuitBreaker {
    *
    * @param fn - The async function to execute
    * @returns The result of the function
-   * @throws WeftError if the circuit is OPEN or if the function fails
+   * @throws SymplekError if the circuit is OPEN or if the function fails
    */
   async execute<T>(fn: () => Promise<T>): Promise<T> {
     this.evaluateState();
 
     if (this.state === "OPEN" && this.nextAttemptTime !== undefined) {
-      throw new WeftError({
+      throw new SymplekError({
         code: "NETWORK_ERROR",
         message:
           "Circuit breaker is OPEN. Request rejected to prevent cascading failures.",

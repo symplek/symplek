@@ -1,8 +1,8 @@
 ﻿/**
  * @fileoverview Agreement Rate Confidence Calculation
  * @description Tier 1 - Immediate confidence from voting agreement
- * @module weft-core/confidence/calculations/agreementRate
- * @since 2.0.0
+ * @module @symplek/core/confidence/calculations/agreementRate
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[01.04]: Agreement rate calculation from research
  *

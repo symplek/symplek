@@ -1,5 +1,5 @@
 /**
- * @module weft-core/operators/consensus
+ * @module @symplek/core/operators/consensus
  * @description Consensus operator: single-round weighted voting across multiple agent voters.
  * @blast_radius MEDIUM - Used by debate operator; consensus shape is part of public API
  * @status STABLE
@@ -32,7 +32,7 @@ type Voter<T> = (
  *
  * @remarks
  * This is the free-tier single-round consensus. For multi-round TaCo consensus,
- * see weft-pro package.
+ * see @symplek/pro package.
  */
 export function createConsensusComputation<T>(
   innerComputation: AgentComputation<T>,
@@ -99,7 +99,7 @@ export function createConsensusComputation<T>(
         const unit = voterCallResult as import("../AgentUnit").AgentUnit<
           Vote | VoteInput
         >;
-        const result = await unit.run(runCtx, { trustMode: "legacy" });
+        const { value: result } = await unit.run(runCtx);
         voteInput =
           "agentId" in result
             ? {

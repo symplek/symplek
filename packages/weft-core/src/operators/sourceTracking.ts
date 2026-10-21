@@ -1,5 +1,5 @@
 /**
- * @module weft-core/operators/sourceTracking
+ * @module @symplek/core/operators/sourceTracking
  * @description Source tracking operator: wraps computation results with provenance metadata.
  * @blast_radius LOW
  * @status STABLE

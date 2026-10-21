@@ -1,5 +1,5 @@
 /**
- * @module weft-core/operators/retry
+ * @module @symplek/core/operators/retry
  * @description Retry operator: retries a computation on failure with exponential backoff.
  * @blast_radius LOW
  * @status STABLE

@@ -1,5 +1,5 @@
 /**
- * Package Contract Smoke Test — weft-core
+ * Package Contract Smoke Test — @symplek/core
  *
  * Proves that the package entrypoint (src/index.ts) exports what the
  * package.json contract claims. Imports ONLY from "../index" (the
@@ -10,6 +10,8 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { createRequire } from "node:module";
+import { resolve } from "node:path";
 import * as entrypoint from "../index";
 import {
   AgentUnit,
@@ -63,10 +65,10 @@ import {
   VERSION,
   VectorClockManager,
   WEIGHT_PRESETS,
-  WeftError,
+  SymplekError,
 } from "../index";
 
-describe("weft-core — Package Contract Smoke", () => {
+describe("@symplek/core — Package Contract Smoke", () => {
   describe("Core exports", () => {
     it("exports AgentUnit as a class with static factory methods", () => {
       expect(AgentUnit).toBeDefined();
@@ -75,9 +77,9 @@ describe("weft-core — Package Contract Smoke", () => {
       expect(typeof AgentUnit.fromPromise).toBe("function");
     });
 
-    it("exports WeftError as an Error subclass", () => {
-      expect(WeftError).toBeDefined();
-      expect(new WeftError("test", "UNKNOWN")).toBeInstanceOf(Error);
+    it("exports SymplekError as an Error subclass", () => {
+      expect(SymplekError).toBeDefined();
+      expect(new SymplekError("test", "UNKNOWN")).toBeInstanceOf(Error);
     });
 
     it("exports createContext as a function", () => {
@@ -86,19 +88,25 @@ describe("weft-core — Package Contract Smoke", () => {
       expect(ctx).toBeDefined();
     });
 
-    it("exports VERSION string", () => {
+    it("exports VERSION string that matches package.json", () => {
+      // B14 fix: compare against the live package.json version rather than a
+      // pinned literal so the test fails when the version constant is not updated
+      // alongside the manifest.
+      const pkgPath = resolve(__dirname, "../../package.json");
+      const _require = createRequire(import.meta.url);
+      const pkg = _require(pkgPath) as { version: string };
       expect(typeof VERSION).toBe("string");
-      expect(VERSION).toBe("1.0.0-beta.1");
+      expect(VERSION).toBe(pkg.version);
     });
   });
 
   describe("BOUNDARY TRUTH: Facade is server-only", () => {
-    it("Weft is NOT exported from package root (moved to weft-core/server)", () => {
-      expect((entrypoint as any).Weft).toBeUndefined();
+    it("Symplek is NOT exported from package root (moved to @symplek/core/server)", () => {
+      expect((entrypoint as any).Symplek).toBeUndefined();
     });
 
-    it("WeftBuilder is NOT exported from package root", () => {
-      expect((entrypoint as any).WeftBuilder).toBeUndefined();
+    it("SymplekBuilder is NOT exported from package root", () => {
+      expect((entrypoint as any).SymplekBuilder).toBeUndefined();
     });
   });
 

@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Tests for Transaction Log
- * @module weft-core/solo/__tests__/transactionLog
+ * @module @symplek/core/solo/__tests__/transactionLog
  *
  * 📝 BUILD[STORY-03.03]: Transaction log tests
  */

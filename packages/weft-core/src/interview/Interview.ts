@@ -1,10 +1,10 @@
 ﻿/**
  * @fileoverview Interview - Lazy configuration holder for interview operator
  * @description Validates configuration and holds interview setup until execution
- * @module weft-core/interview/Interview
- * @since 1.0.0-beta.3
+ * @module @symplek/core/interview/Interview
+ * @since 1.0.0-beta.1
  *
- * 📝 BUILD[Weft-interview]: Interview class for human-in-the-loop Q&A
+ * 📝 BUILD[Symplek-interview]: Interview class for human-in-the-loop Q&A
  */
 
 import type { z } from "zod";
@@ -27,7 +27,7 @@ import type {
  *
  * @remarks
  * Interview is lazy - it does NOT execute until `.conduct()` is called
- * on the resulting AgentUnit. This maintains Weft's algebraic philosophy.
+ * on the resulting AgentUnit. This maintains Symplek's algebraic philosophy.
  *
  * @typeParam TContext - The target context schema type
  *

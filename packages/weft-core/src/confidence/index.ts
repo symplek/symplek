@@ -1,8 +1,8 @@
 ﻿/**
  * @fileoverview Objective Confidence Module
  * @description Mathematically computed confidence scoring for multi-agent AI
- * @module weft-core/confidence
- * @since 2.0.0
+ * @module @symplek/core/confidence
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[01.10]: Barrel exports for confidence module
  *
@@ -23,7 +23,7 @@
  *   calculateObjectiveConfidence,
  *   DEFAULT_WEIGHTS,
  *   CONFIDENCE_THRESHOLDS,
- * } from 'weft-core/confidence';
+ * } from '@symplek/core/confidence';
  *
  * // Calculate confidence from consensus votes
  * const result = calculateObjectiveConfidence({

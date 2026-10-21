@@ -1,104 +1,97 @@
 # Changelog
 
-All notable changes to the Weft monorepo will be documented in this file.
+All notable changes to the Symplek monorepo will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-Per-package changelogs live in each package directory (`packages/*/CHANGELOG.md`). This file
-covers the monorepo as a whole: cross-cutting changes, new packages, breaking renames, and
-release-coordination notes.
+Per-package changelogs live in each package directory (`packages/*/CHANGELOG.md`). Today
+`@symplek/core`, `@symplek/pro` and `@symplek/cli` have one; Changesets creates the others the first time
+their package is versioned. This file covers the monorepo as a whole: cross-cutting changes,
+new packages, breaking renames, and release-coordination notes.
 
-## [1.0.0-beta.1] - 2026-04-13
+## [Unreleased]
 
-### What is Weft?
+Nothing has been published to npm yet. `1.0.0-beta.1` (2026-04-13) was an internal milestone
+for `@symplek/core` and `@symplek/pro` and was never published or tagged. The notes for the first
+public beta are the changeset files in `.changeset/`; they become the per-package changelog
+entries when that release is versioned.
 
-Weft is a set of composable agent primitives for TypeScript. It replaces
-hand-rolled coordination scaffolding — promise chains, retry loops, consensus
-aggregation, result tracking — with a small algebra centred on `AgentUnit<T>`.
+### What is Symplek?
+
+Symplek is a set of composable agent primitives for TypeScript. It replaces
+hand-rolled coordination scaffolding (promise chains, retry loops, consensus
+aggregation, result tracking) with a small algebra centred on `AgentUnit<T>`.
 The same coordination patterns (retry, timeout, fallback, parallel consensus,
 iterative refinement) compose as method chains on a single type.
 
-Weft was extracted from a real product. The API was shaped by actual usage, not
-by imagining what developers might want. The core is 25 KB, MIT-licensed, with
-zero required peer dependencies beyond the AI provider SDK you already use.
+Symplek was extracted from a real product. The API was shaped by actual usage, not
+by imagining what developers might want. The core is MIT-licensed. Its one
+required peer dependency is `zod`; the provider SDKs are optional peers, loaded
+on first use.
 
 ### What's included
 
-- **`weft-core`** (MIT) — The `AgentUnit` algebra: composition, resilience,
-  coordination, reliability, and observability operators. Provider adapters for
-  OpenAI, Anthropic, and Google. The `Weft` namespace facade for single-prompt
-  work and streaming. Golden-path test suite with 25 passing tests.
+- **`@symplek/core`** (MIT): The `AgentUnit` algebra: composition, resilience,
+  coordination, record and replay, and observability operators. Provider
+  adapters for OpenAI, Anthropic, and Google. The `Symplek` namespace facade for
+  single-prompt work and streaming. Golden-path test suite
+  (`pnpm --filter @symplek/core run test:golden`).
 
-- **`weft-pro`** (BSL 1.1) — Advanced multi-agent coordination: TaCo consensus
-  (multi-round iterative voting), team coordination via `TeamRegistry`,
-  stigmergy-based collaboration, antibody registry for output quality, trust
-  registry for scan-depth control, and standalone confidence/coherence scoring
-  libraries. Contract test suite.
+- **`@symplek/pro`** (BSL 1.1): TaCo consensus (multi-round iterative voting),
+  stigmergy-based collaboration, an antibody registry for output quality and a
+  trust registry for scan-depth control. It also re-exports `@symplek/core`'s
+  teams, confidence, coherence, interview and change-kernel modules behind its
+  licence gate. Importing it requires a licence key. Contract test suite.
 
-- **`weft-react`** (MIT) — React hooks for streaming (`useWeftStream`) and error
-  boundaries (`AIErrorBoundary`).
+- **`@symplek/react`** (MIT): React bindings: the `useAgent`, `useConsensus` and
+  `useSwarm` hooks, `AIProvider` with `useAIConfig`, and `AIErrorBoundary`.
 
-- **`weft-convex`** (MIT) — First-class Convex action bindings wrapping
-  `weft-core/server`.
+- **`@symplek/convex`** (MIT): Convex action helpers (`withAI`,
+  `streamToMutation`, activity and cost middleware) built on
+  `@symplek/core/server`.
 
-- **`weft-cli`** (MIT) — Project scaffolding (`weft init`) with minimal,
-  standard, and full templates.
+- **`@symplek/cli`** (MIT): Project scaffolding (`symplek init`) with minimal,
+  standard, and full templates, plus `add`, `validate`, `generate` and
+  `migrate`.
 
-- **`weft-mcp`** (MIT) — MCP server exposing Weft operations as tool calls.
+- **`create-symplek`** (MIT): Wrapper that runs `symplek init`. Held back from
+  release: the npm name belongs to another project.
 
-- **`weft-harness`** (MIT) — Replay, rehearse, fault injection, and
-  determinism-assertion utilities for testing agent compositions.
+- **`@symplek/mcp`** (MIT): MCP client with trust policies, plus a stdio demo
+  server.
 
-- **`weft-testing`** (MIT) — Vitest utilities, mock factories, and deterministic
-  provider stubs.
+- **`@symplek/harness`** (MIT): Plan, permission-gate and execute operators for
+  agent sessions, with a replay adapter for recorded tool-use traces and a
+  determinism assertion. Pre-alpha: no agent SDK is wired yet, so every
+  result is a stand-in.
 
-- **`weft-devtools`** (MIT) — Chrome DevTools bridge for agent trace and span
-  inspection.
+- **`@symplek/testing`** (MIT): Re-exports the record and replay engine from
+  `@symplek/core/rehearsal`.
 
-### Breaking rename: `@weft/*` → `weft-*`
+- **`@symplek/devtools`** (MIT): Chrome DevTools bridge for agent trace and span
+  inspection. Private package, not published.
 
-Packages moved from the `@weft/*` npm scope to unscoped `weft-*` names. All
-imports, install commands, and documentation now use `weft-core`, `weft-pro`,
-etc. The old `@weft/*` packages do not exist on npm.
+### Breaking rename: `@symplek/*` → `@symplek/*`
+
+Packages moved from the `@symplek/*` npm scope to unscoped `@symplek/*` names. All
+imports, install commands, and documentation now use `@symplek/core`, `@symplek/pro`,
+etc. The old `@symplek/*` packages do not exist on npm.
 
 ### Architecture
 
-Weft has a canonical source (private upstream monorepo) and this distribution
-mirror (`wefthq/weft`). Sync is manual, per-release. The mirror strips
-runtime-specific bindings so any consumer can `pnpm add weft-core` without
-bringing in internal dependencies. The four shared concepts (`AgentUnit`,
-`AgentUnitMetadata`, `WeftError`, `RetryOptions`) are contract-tested for
-equivalence between canonical and mirror.
-
-### What's coming
-
-The `[Unreleased]` sections of the per-package changelogs track work in flight.
-Key items landing in the next beta:
-
-- Dynamic provider imports so only the provider in use must be installed (no
-  `MODULE_NOT_FOUND` for optional peer dependencies).
-- `Weft.configure()` wired through to `ai()` and provider detection so global
-  config is actually consumed.
-- API-key redaction hardened: all occurrences replaced, deep-sanitised
-  `error.cause`.
-- Provider-appropriate default models (Anthropic/Google users no longer receive
-  OpenAI model strings).
-- CLI fixes: case-sensitive binary resolution, `--version` reads real package
-  version, template path safety.
-- TaCo veto correctness, converge parallel-mode warnings, per-instance lock
-  state.
-- CI hardening: weft-pro test coverage in CI, pack-and-inspect validation for
-  `workspace:*` peer dependency rewriting.
-
-See each package's `CHANGELOG.md` under `[Unreleased]` for the full per-package
-detail.
+Symplek has a canonical source (private upstream monorepo) and this distribution
+mirror (`symplek/symplek`). Sync is manual, per-release. The mirror strips
+runtime-specific bindings so any consumer can `pnpm add @symplek/core` without
+bringing in internal dependencies. A contract test for the shared concepts
+lives at `packages/symplek-core/src/__tests__/canonicalMirrorContract.test.ts`.
+It needs the upstream source checked out next to it and skips itself in this
+repository, so nothing here checks the two for equivalence.
 
 ### Release schedule
 
-Weft is pre-1.0. APIs may change between minor versions. Every breaking change
-gets a changelog entry and a migration path in the release notes. Packages
-version independently via Changesets; core and pro are currently pinned to the
-same beta cadence (`linked` in `.changeset/config.json`).
-
-[1.0.0-beta.1]: https://github.com/wefthq/weft/releases/tag/v1.0.0-beta.1
+Symplek is in beta. APIs may change between beta releases. Every breaking change
+gets a changelog entry. Packages version independently via Changesets, with two
+linked pairs in `.changeset/config.json`: `@symplek/core` with `@symplek/pro`, and
+`create-symplek` with `@symplek/cli`. Prerelease mode is on (`.changeset/pre.json`),
+so versions carry a `-beta.N` suffix.

@@ -1,5 +1,5 @@
 /**
- * @module weft-core/AgentUnit/operators/solo
+ * @module @symplek/core/AgentUnit/operators/solo
  * @description AgentUnit solo operator: .solo()
  * @blast_radius HIGH
  * @status STABLE

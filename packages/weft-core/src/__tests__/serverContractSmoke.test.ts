@@ -1,10 +1,10 @@
 /**
- * Package Contract Smoke Test — weft-core/server
+ * Package Contract Smoke Test — @symplek/core/server
  *
  * Proves the server-only subpath exports:
  * 1. Runtime AI utilities (ai, stream, providerRegistry)
- * 2. The Weft facade backed by real AI execution
- * 3. Contract 2 — lazy provider loading (absent SDK → WeftError; cache; configure+await)
+ * 2. The Symplek facade backed by real AI execution
+ * 3. Contract 2 — lazy provider loading (absent SDK → SymplekError; cache; configure+await)
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,11 +22,11 @@ import {
   ProviderRegistry,
   providerRegistry,
   stream,
-  Weft,
-  WeftBuilder,
+  Symplek,
+  SymplekBuilder,
 } from "../server";
 
-describe("weft-core/server — Package Contract Smoke", () => {
+describe("@symplek/core/server — Package Contract Smoke", () => {
   beforeEach(() => {
     aiMock.mockReset();
   });
@@ -44,18 +44,18 @@ describe("weft-core/server — Package Contract Smoke", () => {
     expect(providerRegistry).toBeInstanceOf(ProviderRegistry);
   });
 
-  describe("Weft facade (real execution contract)", () => {
-    it("exports Weft factory function", () => {
-      expect(typeof Weft).toBe("function");
+  describe("Symplek facade (real execution contract)", () => {
+    it("exports Symplek factory function", () => {
+      expect(typeof Symplek).toBe("function");
     });
 
-    it("exports WeftBuilder class", () => {
-      expect(WeftBuilder).toBeDefined();
+    it("exports SymplekBuilder class", () => {
+      expect(SymplekBuilder).toBeDefined();
     });
 
-    it("Weft() returns a WeftBuilder with run/coordinate/toUnit/then methods", () => {
-      const builder = Weft("test task");
-      expect(builder).toBeInstanceOf(WeftBuilder);
+    it("Symplek() returns a SymplekBuilder with run/coordinate/toUnit/then methods", () => {
+      const builder = Symplek("test task");
+      expect(builder).toBeInstanceOf(SymplekBuilder);
       expect(typeof builder.coordinate).toBe("function");
       expect(typeof builder.toUnit).toBe("function");
       expect(typeof builder.run).toBe("function");
@@ -63,21 +63,21 @@ describe("weft-core/server — Package Contract Smoke", () => {
     });
 
     it("coordinate() returns an AgentUnit backed by a real computation (not a static string)", () => {
-      const unit = Weft("test task").coordinate();
+      const unit = Symplek("test task").coordinate();
       expect(typeof unit.run).toBe("function");
       expect(typeof unit.map).toBe("function");
       expect(typeof unit.flatMap).toBe("function");
     });
 
     it("toUnit() is an alias for coordinate() returning the same instance", () => {
-      const builder = Weft("test task");
+      const builder = Symplek("test task");
       expect(builder.coordinate()).toBe(builder.toUnit());
     });
 
-    it("routes Weft().run() through ai() and returns the AI result instead of echoing the task", async () => {
+    it("routes Symplek().run() through ai() and returns the AI result instead of echoing the task", async () => {
       aiMock.mockResolvedValue("server-generated answer");
 
-      const result = await Weft("test task", {
+      const result = await Symplek("test task", {
         model: "test-model",
       }).run();
 
@@ -100,8 +100,8 @@ describe("weft-core/server — Package Contract Smoke", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("Contract 2 — Lazy provider imports", () => {
-  // ── Obligation 1: absent SDK throws WeftError with pnpm add hint ─────────────
-  it("(1) createAnthropicProvider throws WeftError PROVIDER_ERROR when SDK is absent", async () => {
+  // ── Obligation 1: absent SDK throws SymplekError with pnpm add hint ─────────────
+  it("(1) createAnthropicProvider throws SymplekError PROVIDER_ERROR when SDK is absent", async () => {
     // Mock dynamic import to simulate the SDK not being installed
     const originalImport = globalThis[Symbol.for("__vitest_import__") as symbol] as unknown;
     void originalImport; // reference to avoid lint
@@ -138,7 +138,7 @@ describe("Contract 2 — Lazy provider imports", () => {
   });
 
   // ── Obligation 2: openai absent SDK ──────────────────────────────────────────
-  it("(1b) createOpenAIProvider throws WeftError PROVIDER_ERROR when SDK is absent", async () => {
+  it("(1b) createOpenAIProvider throws SymplekError PROVIDER_ERROR when SDK is absent", async () => {
     vi.doMock("openai", () => {
       throw new Error("Cannot find module 'openai'");
     });
@@ -210,7 +210,7 @@ describe("Contract 2 — Lazy provider imports", () => {
   });
 
   // ── Obligation 4: configure() + await ai() → provider resolved ───────────────
-  it("(4) Weft.configure({ provider:'openai', apiKey }) → initPromise settled before ai() executes", async () => {
+  it("(4) Symplek.configure({ provider:'openai', apiKey }) → initPromise settled before ai() executes", async () => {
     // Reset global state before this test.
     const { _resetForTesting } = await import("../facade");
     const { providerRegistry: reg } = await import("../providers/registry");
@@ -238,8 +238,8 @@ describe("Contract 2 — Lazy provider imports", () => {
     vi.resetModules();
 
     // Re-import facade after module reset so it gets the mocked openai.
-    const { Weft: WeftFresh } = await import("../facade");
-    WeftFresh.configure({ provider: "openai", apiKey: "sk-smoke-test" });
+    const { Symplek: SymplekFresh } = await import("../facade");
+    SymplekFresh.configure({ provider: "openai", apiKey: "sk-smoke-test" });
 
     // Drain the init promise (as ai() would)
     const { getInitPromise, clearInitPromise } = await import("../globalConfig");

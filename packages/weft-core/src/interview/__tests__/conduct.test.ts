@@ -1,10 +1,10 @@
 ﻿/**
  * @fileoverview Conduct Execution Tests
  * @description Tests for .conduct() operator execution and interview loop behavior
- * @module weft-core/interview/__tests__/conduct.test
- * @since 1.0.0-beta.3
+ * @module @symplek/core/interview/__tests__/conduct.test
+ * @since 1.0.0-beta.1
  *
- * 📝 BUILD[Weft-interview-operator]: Story 03-02 - Execution Tests
+ * 📝 BUILD[Symplek-interview-operator]: Story 03-02 - Execution Tests
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

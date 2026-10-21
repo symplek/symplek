@@ -1,5 +1,5 @@
 /**
- * @module weft-core/operators/dialectic
+ * @module @symplek/core/operators/dialectic
  * @description Dialectic operator: thesis/antithesis/synthesis pattern with leader and advisors.
  * @blast_radius MEDIUM
  * @status STABLE

@@ -1,28 +1,28 @@
 /**
- * @module WeftHarness - Public API barrel for weft-harness
+ * @module SymplekHarness - Public API barrel for @symplek/harness
  * @description Exports all type contracts and error classes. The createHarness factory
  * implementation is provided by adapter modules (W1-B).
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */
 
 // W1-B: real createHarness factory backed by the Claude Agent SDK adapter.
-export { createHarness } from "./adapter/claude-agent-sdk";
-export type { ConsensusDefaults } from "./consensus-defaults";
-export { getConsensusDefaults } from "./consensus-defaults";
+export { createHarness } from "./adapter/claude-agent-sdk.js";
+export type { ConsensusDefaults } from "./consensus-defaults.js";
+export { getConsensusDefaults } from "./consensus-defaults.js";
 export {
   ContractViolationError,
   HarnessDeviationError,
   LowProvenanceError,
-} from "./errors";
-export type { SdkEvent, SdkSession } from "./operators/execute";
-export { execute } from "./operators/execute";
-export type { PermissionDecision } from "./permission-bridge";
-export { buildPermissionBridge } from "./permission-bridge";
+} from "./errors.js";
+export type { SdkEvent, SdkSession } from "./operators/execute.js";
+export { execute } from "./operators/execute.js";
+export type { PermissionDecision } from "./permission-bridge.js";
+export { buildPermissionBridge } from "./permission-bridge.js";
 export {
   assertDeterministic,
   DeterminismViolationError,
-} from "./replay/assert-deterministic";
-export type { SessionEndEntry, ToolUseEntry, TraceEntry } from "./replay/index";
+} from "./replay/assert-deterministic.js";
+export type { SessionEndEntry, ToolUseEntry, TraceEntry } from "./replay/index.js";
 // W2-B: replay / determinism exports
 export {
   isSessionEnd,
@@ -30,7 +30,7 @@ export {
   parseTrace,
   ReplayAdapter,
   ReplayMismatchError,
-} from "./replay/index";
+} from "./replay/index.js";
 export type {
   ConsensusVote,
   ExecuteOptions,
@@ -47,4 +47,4 @@ export type {
   PlanUnit,
   SourceRef,
   VerifiedPlan,
-} from "./types";
+} from "./types.js";

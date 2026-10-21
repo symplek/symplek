@@ -1,6 +1,6 @@
 // Type-only import — erased at runtime; safe for lazy SDK loading.
 import type OpenAI from "openai";
-import { WeftError } from "../errors";
+import { SymplekError } from "../errors";
 import { redactErrorMessage, safeCause } from "./redact";
 import type {
   AIMessage,
@@ -24,7 +24,7 @@ async function loadOpenAISdk(): Promise<typeof import("openai")["default"]> {
     _OpenAISdk = mod.default;
     return _OpenAISdk;
   } catch {
-    throw new WeftError({
+    throw new SymplekError({
       code: "PROVIDER_ERROR",
       why: "openai is not installed. Run: pnpm add openai",
       fix: {
@@ -43,7 +43,7 @@ export async function createOpenAIProvider(
   apiKey: string,
 ): Promise<Provider> {
   if (!apiKey) {
-    throw new WeftError({
+    throw new SymplekError({
       code: "PROVIDER_ERROR",
       why: "OPENAI_API_KEY is not set",
       fix: {
@@ -136,7 +136,7 @@ export async function createOpenAIProvider(
         };
       } catch (error: unknown) {
         const detail = redactErrorMessage(apiKey, error);
-        throw new WeftError({
+        throw new SymplekError({
           code: "PROVIDER_ERROR",
           why: `OpenAI request failed: ${detail}`,
           fix: {
@@ -197,7 +197,7 @@ export async function createOpenAIProvider(
         }
       } catch (error: unknown) {
         const detail = redactErrorMessage(apiKey, error);
-        throw new WeftError({
+        throw new SymplekError({
           code: "PROVIDER_ERROR",
           why: `OpenAI streaming failed: ${detail}`,
           fix: {

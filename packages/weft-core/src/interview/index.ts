@@ -1,18 +1,18 @@
 ﻿/**
- * @fileoverview Interview module exports for weft-core
+ * @fileoverview Interview module exports for @symplek/core
  * @description Re-exports Interview, types, and utilities
- * @module weft-core/interview
- * @since 1.0.0-beta.3
+ * @module @symplek/core/interview
+ * @since 1.0.0-beta.1
  *
- * 📝 BUILD[Weft-interview]: Interview barrel exports
+ * 📝 BUILD[Symplek-interview]: Interview barrel exports
  *
  * @example
  * ```typescript
  * // Primary usage
- * import { Interview } from 'weft-core/interview';
+ * import { Interview } from '@symplek/core/interview';
  *
  * // Or via main package
- * import { Interview, type InterviewConfig } from 'weft-core';
+ * import { Interview, type InterviewConfig } from '@symplek/core';
  * ```
  */
 

@@ -45,7 +45,7 @@ export async function parallel<T extends z.ZodType = any>(
   globalOptions?: AIOptions<T>,
 ): Promise<AIResult<T>[] | (AIResult<T> | undefined)[]> {
   console.warn(
-    "[Weft] parallel() is deprecated. Use AgentUnit.zipAll() instead. " +
+    "[Symplek] parallel() is deprecated. Use AgentUnit.zipAll() instead. " +
       "Scheduled for removal in v2.0.0.",
   );
 
@@ -69,7 +69,7 @@ export async function parallel<T extends z.ZodType = any>(
     if (result.status === "fulfilled") {
       return result.value;
     }
-    console.error(`[Weft] Parallel task ${index} failed:`, result.reason);
+    console.error(`[Symplek] Parallel task ${index} failed:`, result.reason);
     return undefined;
   });
 }

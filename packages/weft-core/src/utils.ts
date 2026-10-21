@@ -1,7 +1,7 @@
 ﻿/**
- * Utility functions for Weft core.
+ * Utility functions for Symplek core.
  *
- * 📝 BUILD[Weft-algebra-level3]: Type-safe unwrapping of TrackedResult
+ * 📝 BUILD[Symplek-algebra-level3]: Type-safe unwrapping of TrackedResult
  * @module
  */
 

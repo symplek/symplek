@@ -1,12 +1,12 @@
 /**
- * @module globalConfig - Process-level singleton for Weft.configure() options.
+ * @module globalConfig - Process-level singleton for Symplek.configure() options.
  * @description Thin shared module so facade.ts, ai.ts, and providers/auto.ts can
  *   share global configuration state without creating circular imports.
  *   facade.ts writes; ai.ts and providers/auto.ts read.
  * @internal — not part of the public API surface.
  */
 
-export interface WeftGlobalConfig {
+export interface SymplekGlobalConfig {
   provider?: string;
   model?: string;
   apiKey?: string;
@@ -17,10 +17,10 @@ export interface WeftGlobalConfig {
 // Global config singleton
 // ─────────────────────────────────────────────────────────────────────────────
 
-let _config: WeftGlobalConfig = {};
+let _config: SymplekGlobalConfig = {};
 
 /** Read the current global config. */
-export function getGlobalConfig(): Readonly<WeftGlobalConfig> {
+export function getGlobalConfig(): Readonly<SymplekGlobalConfig> {
   return _config;
 }
 
@@ -39,7 +39,7 @@ export function getGlobalConfig(): Readonly<WeftGlobalConfig> {
  * Callers that change provider must supply the new `apiKey` in the same call,
  * or call `configure({ apiKey })` as a follow-up before any `ai()` call.
  */
-export function mergeGlobalConfig(options: WeftGlobalConfig): void {
+export function mergeGlobalConfig(options: SymplekGlobalConfig): void {
   const providerChanging =
     options.provider !== undefined &&
     options.provider !== _config.provider;
@@ -76,6 +76,22 @@ export function getInitPromise(): Promise<void> | null {
 /** Store a new init promise (set by configure()). */
 export function setInitPromise(p: Promise<void>): void {
   _initPromise = p;
+  // The failure is delivered to whichever call awaits it (awaitInit below).
+  // Without a handler here, a failed bootstrap that no call ever awaits
+  // would end the process as an unhandled rejection.
+  p.catch(() => {});
+}
+
+/**
+ * Wait for the provider bootstrap that configure() started, if one is
+ * pending. The promise is taken before it is awaited, so a failed bootstrap
+ * is reported to this caller once and cannot poison every later call.
+ */
+export async function awaitInit(): Promise<void> {
+  const pending = _initPromise;
+  if (!pending) return;
+  _initPromise = null;
+  await pending;
 }
 
 /** Clear the init promise after ai() has awaited it. */

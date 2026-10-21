@@ -8,7 +8,7 @@
  */
 
 import { readFile } from "node:fs/promises";
-import type { SdkEvent, SdkSession } from "../operators/execute";
+import type { SdkEvent, SdkSession } from "../operators/execute.js";
 
 // ─── Trace Types ──────────────────────────────────────────────────────────────
 
@@ -171,8 +171,8 @@ export class ReplayAdapter implements SdkSession {
 
 // ─── Re-exports ───────────────────────────────────────────────────────────────
 // assertDeterministic and DeterminismViolationError live in their own module
-// but are surfaced here so "weft-harness/replay" is the single import path.
+// but are surfaced here so "@symplek/harness/replay" is the single import path.
 export {
   assertDeterministic,
   DeterminismViolationError,
-} from "./assert-deterministic";
+} from "./assert-deterministic.js";

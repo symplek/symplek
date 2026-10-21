@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Integration tests for Rehearsal Mode
- * @module weft-core/rehearsal/__tests__/integration
+ * @module @symplek/core/rehearsal/__tests__/integration
  */
 
 import { afterEach, describe, expect, it } from "vitest";

@@ -1,10 +1,10 @@
 ﻿/**
  * @fileoverview Interview Types - Type definitions for human-in-the-loop Q&A
  * @description Complete type definitions for the interview operator system
- * @module weft-core/interview/types
- * @since 1.0.0-beta.3
+ * @module @symplek/core/interview/types
+ * @since 1.0.0-beta.1
  *
- * 📝 BUILD[Weft-interview]: Types for .interview() and .conduct() operators
+ * 📝 BUILD[Symplek-interview]: Types for .interview() and .conduct() operators
  */
 
 import type { z } from "zod";
@@ -20,7 +20,7 @@ import type { AgentUnit } from "../AgentUnit";
  * @typeParam TContext - The target context schema type
  *
  * @remarks
- * InterviewConfig follows the Weft pattern of schema-driven defaults
+ * InterviewConfig follows the Symplek pattern of schema-driven defaults
  * with optional overrides for power users.
  */
 export interface InterviewConfig<TContext> {

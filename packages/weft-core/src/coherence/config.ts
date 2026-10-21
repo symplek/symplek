@@ -1,8 +1,8 @@
 ﻿/**
  * @fileoverview Coherence Configuration
  * @description Default weights, thresholds, and presets for coherence calculations
- * @module weft-core/coherence/config
- * @since 2.1.0
+ * @module @symplek/core/coherence/config
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[STORY-01.02]: Configuration constants for coherence module
  */

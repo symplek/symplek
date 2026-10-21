@@ -1,8 +1,8 @@
 ﻿/**
  * @fileoverview Contract validation types and utilities for AgentUnit
  * @description Enables compile-time and runtime validation of data contracts
- * @module weft-core/contract
- * @since 1.0.0-beta.2
+ * @module @symplek/core/contract
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[F-047]: Contract-based data validation for AgentUnit composition
  *

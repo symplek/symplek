@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Tests for Distributed Lock Manager
- * @module weft-core/solo/__tests__/lock
+ * @module @symplek/core/solo/__tests__/lock
  *
  * 📝 BUILD[STORY-03.02]: Lock manager tests
  */

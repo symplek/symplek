@@ -1,5 +1,5 @@
 /**
- * @module weft-core/idempotency
+ * @module @symplek/core/idempotency
  * @description Idempotency-key infrastructure preventing duplicate execution of
  *   side-effecting AgentUnit runs. Provides the config/store contracts, an
  *   in-memory store with TTL expiry, and the IDEMPOTENCY_VIOLATION error.
@@ -10,7 +10,7 @@
  * @rules @.claude/rules/patterns/029-file-header-contracts.md
  */
 
-import { WeftError } from "./errors";
+import { SymplekError } from "./errors";
 import type { TrackedResult } from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -84,7 +84,7 @@ export interface IdempotencyStore {
  * Thrown when a `reject`-strategy run encounters an already-used idempotency key.
  * Carries the descriptive code `IDEMPOTENCY_VIOLATION`.
  */
-export class IdempotencyError extends WeftError {
+export class IdempotencyError extends SymplekError {
   /** The duplicate key that triggered the violation. */
   readonly key: string;
 

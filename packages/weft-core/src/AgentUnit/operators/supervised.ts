@@ -4,7 +4,7 @@
  *   Adds human-in-the-loop oversight to any agent composition. When the
  *   predicate fires on the output, the value is held and a review function
  *   is called before downstream computation receives the value.
- * @rules @.cursor/rules/frameworks/206-weft-framework.mdc
+ * @rules @.cursor/rules/frameworks/206-symplek-framework.mdc
  * @blast_radius HIGH - All agent operations depend on these operators
  * @status STABLE
  * @runtime node

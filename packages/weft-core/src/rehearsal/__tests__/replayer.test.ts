@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Unit tests for Trace Replayer
- * @module weft-core/rehearsal/__tests__/replayer
+ * @module @symplek/core/rehearsal/__tests__/replayer
  */
 
 import { describe, expect, it, vi } from "vitest";

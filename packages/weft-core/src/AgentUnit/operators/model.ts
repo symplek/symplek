@@ -1,5 +1,5 @@
 /**
- * @module weft-core/AgentUnit/operators/model
+ * @module @symplek/core/AgentUnit/operators/model
  * @description AgentUnit model selection operators: .model(), .quality()
  * @blast_radius HIGH
  * @status STABLE
@@ -21,7 +21,7 @@ AgentUnit.prototype.model = function <T>(
     async (ctx) => {
       const modelCtx = {
         ...ctx,
-        extensions: { ...ctx.extensions, __Weft_model: name },
+        extensions: { ...ctx.extensions, __Symplek_model: name },
       };
       return selfComp(modelCtx);
     },
@@ -45,7 +45,7 @@ AgentUnit.prototype.quality = function <T>(
     async (ctx) => {
       const qualityCtx = {
         ...ctx,
-        extensions: { ...ctx.extensions, __Weft_quality: level },
+        extensions: { ...ctx.extensions, __Symplek_quality: level },
       };
       return selfComp(qualityCtx);
     },

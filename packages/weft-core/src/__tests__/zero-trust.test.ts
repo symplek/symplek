@@ -1,8 +1,8 @@
 ﻿/**
  * @fileoverview Tests for zero-trust default implementation
  * @description Validates TrackedResult return by default and legacy mode
- * @module weft-core/__tests__/zero-trust
- * @since 2.0.0
+ * @module @symplek/core/__tests__/zero-trust
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[01.05]: Zero-trust default implementation tests
  */
@@ -111,7 +111,7 @@ describe("Zero-Trust Default Implementation", () => {
         expect.stringContaining('trustMode: "legacy" is deprecated'),
       );
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("https://Weft.ai/docs/migration/zero-trust"),
+        expect.stringContaining("Use the default mode instead"),
       );
     });
 

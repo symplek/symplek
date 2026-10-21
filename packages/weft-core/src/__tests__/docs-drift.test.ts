@@ -1,18 +1,23 @@
 /**
  * @module docs-drift — Mechanical README TypeScript block drift guard
  * @description Extracts fenced TypeScript code blocks from all workspace README
- *   files and fails if any block references a non-existent weft-core API.
+ *   files and fails if any block references a non-existent @symplek/core API.
  *   Catches the class of drift confirmed in audit BRIEF findings B11/N48/N58/N70.
  *   Add new FORBIDDEN entries here as future APIs are removed or renamed.
  */
 
-import { readdirSync, readFileSync } from "node:fs";
+import {
+  type Dirent,
+  existsSync,
+  readdirSync,
+  readFileSync,
+} from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 // ─── Forbidden API patterns ───────────────────────────────────────────────────
 // Each entry names a symbol that no longer (or never did) exist in the public
-// weft-core surface but may appear in README examples if docs drift from code.
+// @symplek/core surface but may appear in README examples if docs drift from code.
 
 interface ForbiddenPattern {
   pattern: RegExp;
@@ -28,13 +33,13 @@ const FORBIDDEN: ForbiddenPattern[] = [
       "AgentUnit.create() does not exist — use AgentUnit.of() or AgentUnit.from() (BRIEF B11/N48)",
   },
   {
-    // defineTool is not exported from weft-core. Template-generated code
+    // defineTool is not exported from @symplek/core. Template-generated code
     // incorrectly imports it, confirmed in BRIEF B11/N58. Any README that shows
     // this import would mislead consumers.
     pattern:
-      /import\s*\{[^}]*\bdefineTool\b[^}]*\}\s*from\s*['"]weft-core['"]/,
+      /import\s*\{[^}]*\bdefineTool\b[^}]*\}\s*from\s*['"]@symplek/core['"]/,
     message:
-      'defineTool is not exported from "weft-core" (BRIEF B11/N58)',
+      'defineTool is not exported from "@symplek/core" (BRIEF B11/N58)',
   },
   {
     // AgentUnit.create used in non-import contexts (e.g. method call chaining).
@@ -51,7 +56,17 @@ const FORBIDDEN: ForbiddenPattern[] = [
 function findReadmes(dir: string): string[] {
   const SKIP = new Set(["node_modules", ".git", "dist", ".cache", "coverage"]);
   const results: string[] = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch (error) {
+    // Other test files create and delete scratch directories inside the
+    // workspace while this walk runs. One that disappears between being
+    // listed and being opened holds no README worth checking.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return results;
+    throw error;
+  }
+  for (const entry of entries) {
     if (SKIP.has(entry.name)) continue;
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
@@ -73,13 +88,19 @@ function extractTsBlocks(content: string): string[] {
 
 // ─── Scan workspace ───────────────────────────────────────────────────────────
 
-// __dirname resolves to packages/weft-core/src/__tests__; workspace root is 4 up.
-const WORKSPACE_ROOT = resolve(__dirname, "../../../../..");
+// __dirname is packages/symplek-core/src/__tests__, so the workspace root is four
+// levels up. Five reaches the folder that holds the repository and scans
+// every project checked out beside it.
+const WORKSPACE_ROOT = resolve(__dirname, "../../../..");
 const allReadmes = findReadmes(WORKSPACE_ROOT);
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("docs-drift: README fenced TypeScript blocks", () => {
+  it("scans this repository, not the folder that contains it", () => {
+    expect(existsSync(join(WORKSPACE_ROOT, "pnpm-workspace.yaml"))).toBe(true);
+  });
+
   it("discovers at least one README to check", () => {
     expect(allReadmes.length).toBeGreaterThan(0);
   });

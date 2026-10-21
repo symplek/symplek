@@ -1,6 +1,6 @@
 // Type-only import — erased at runtime; safe for lazy SDK loading.
 import type Anthropic from "@anthropic-ai/sdk";
-import { WeftError } from "../errors";
+import { SymplekError } from "../errors";
 import { redactErrorMessage, safeCause } from "./redact";
 import type {
   AIMessage,
@@ -26,7 +26,7 @@ async function loadAnthropicSdk(): Promise<
     _AnthropicSdk = mod.default;
     return _AnthropicSdk;
   } catch {
-    throw new WeftError({
+    throw new SymplekError({
       code: "PROVIDER_ERROR",
       why: "@anthropic-ai/sdk is not installed. Run: pnpm add @anthropic-ai/sdk",
       fix: {
@@ -39,13 +39,24 @@ async function loadAnthropicSdk(): Promise<
 }
 
 /**
+ * Output cap used when the caller sets none. Anthropic requires the field.
+ * On current Claude models thinking tokens count toward it, so a small cap can
+ * be spent before any answer text is written.
+ */
+const DEFAULT_MAX_TOKENS = 16000;
+
+/**
  * Anthropic Provider Adapter
+ *
+ * `temperature` and `topP` are not forwarded. Current Claude models reject
+ * sampling parameters with a 400 (Opus outright, Sonnet and Haiku for any
+ * non-default value), so a request that carried them failed before it ran.
  */
 export async function createAnthropicProvider(
   apiKey: string,
 ): Promise<Provider> {
   if (!apiKey) {
-    throw new WeftError({
+    throw new SymplekError({
       code: "PROVIDER_ERROR",
       why: "ANTHROPIC_API_KEY is not set",
       fix: {
@@ -99,6 +110,8 @@ export async function createAnthropicProvider(
         return "length";
       case "tool_use":
         return "tool_calls";
+      case "refusal":
+        return "content_filter";
       default:
         return "other";
     }
@@ -116,14 +129,18 @@ export async function createAnthropicProvider(
           model: request.model,
           system,
           messages,
-          max_tokens: request.maxTokens || 4096,
-          temperature: request.temperature,
+          max_tokens: request.maxTokens || DEFAULT_MAX_TOKENS,
           stop_sequences: request.stop,
-          top_p: request.topP,
         });
 
-        const content = response.content[0];
-        const text = content.type === "text" ? content.text : "";
+        // Current Claude models think by default, so the reply is a list of
+        // blocks with thinking first and the answer after it. The answer is
+        // every text block, in order; reading only the first block returns
+        // an empty string.
+        const text = response.content
+          .filter((block) => block.type === "text")
+          .map((block) => (block as Anthropic.TextBlock).text)
+          .join("");
 
         return {
           text,
@@ -138,7 +155,7 @@ export async function createAnthropicProvider(
         };
       } catch (error: unknown) {
         const detail = redactErrorMessage(apiKey, error);
-        throw new WeftError({
+        throw new SymplekError({
           code: "PROVIDER_ERROR",
           why: `Anthropic request failed: ${detail}`,
           fix: {
@@ -163,10 +180,8 @@ export async function createAnthropicProvider(
             model: request.model,
             system,
             messages,
-            max_tokens: request.maxTokens || 4096,
-            temperature: request.temperature,
+            max_tokens: request.maxTokens || DEFAULT_MAX_TOKENS,
             stop_sequences: request.stop,
-            top_p: request.topP,
           },
           request.signal ? { signal: request.signal } : undefined,
         );
@@ -214,7 +229,7 @@ export async function createAnthropicProvider(
         }
       } catch (error: unknown) {
         const detail = redactErrorMessage(apiKey, error);
-        throw new WeftError({
+        throw new SymplekError({
           code: "PROVIDER_ERROR",
           why: `Anthropic streaming failed: ${detail}`,
           fix: {

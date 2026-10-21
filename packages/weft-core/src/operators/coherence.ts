@@ -1,5 +1,5 @@
 /**
- * @module weft-core/operators/coherence
+ * @module @symplek/core/operators/coherence
  * @description Coherence operator: measures ensemble agreement and throws on low coherence.
  * @blast_radius MEDIUM - CoherenceError is part of the public error API
  * @status STABLE

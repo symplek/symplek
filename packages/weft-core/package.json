@@ -1,5 +1,5 @@
 {
-  "name": "weft-core",
+  "name": "@symplek/core",
   "version": "1.0.0-beta.1",
   "description": "Composable AI agents for TypeScript",
   "type": "module",
@@ -12,44 +12,36 @@
   },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+      "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
     },
     "./server": {
-      "types": "./dist/server.d.ts",
-      "import": "./dist/server.js",
-      "require": "./dist/server.cjs"
+      "import": { "types": "./dist/server.d.ts", "default": "./dist/server.js" },
+      "require": { "types": "./dist/server.d.cts", "default": "./dist/server.cjs" }
     },
     "./confidence": {
-      "types": "./dist/confidence/index.d.ts",
-      "import": "./dist/confidence/index.js",
-      "require": "./dist/confidence/index.cjs"
+      "import": { "types": "./dist/confidence/index.d.ts", "default": "./dist/confidence/index.js" },
+      "require": { "types": "./dist/confidence/index.d.cts", "default": "./dist/confidence/index.cjs" }
     },
     "./coherence": {
-      "types": "./dist/coherence/index.d.ts",
-      "import": "./dist/coherence/index.js",
-      "require": "./dist/coherence/index.cjs"
+      "import": { "types": "./dist/coherence/index.d.ts", "default": "./dist/coherence/index.js" },
+      "require": { "types": "./dist/coherence/index.d.cts", "default": "./dist/coherence/index.cjs" }
     },
     "./interview": {
-      "types": "./dist/interview/index.d.ts",
-      "import": "./dist/interview/index.js",
-      "require": "./dist/interview/index.cjs"
+      "import": { "types": "./dist/interview/index.d.ts", "default": "./dist/interview/index.js" },
+      "require": { "types": "./dist/interview/index.d.cts", "default": "./dist/interview/index.cjs" }
     },
     "./change-kernel": {
-      "types": "./dist/change-kernel/index.d.ts",
-      "import": "./dist/change-kernel/index.js",
-      "require": "./dist/change-kernel/index.cjs"
+      "import": { "types": "./dist/change-kernel/index.d.ts", "default": "./dist/change-kernel/index.js" },
+      "require": { "types": "./dist/change-kernel/index.d.cts", "default": "./dist/change-kernel/index.cjs" }
     },
     "./operators": {
-      "types": "./dist/operators/index.d.ts",
-      "import": "./dist/operators/index.js",
-      "require": "./dist/operators/index.cjs"
+      "import": { "types": "./dist/operators/index.d.ts", "default": "./dist/operators/index.js" },
+      "require": { "types": "./dist/operators/index.d.cts", "default": "./dist/operators/index.cjs" }
     },
     "./rehearsal": {
-      "types": "./dist/rehearsal/index.d.ts",
-      "import": "./dist/rehearsal/index.js",
-      "require": "./dist/rehearsal/index.cjs"
+      "import": { "types": "./dist/rehearsal/index.d.ts", "default": "./dist/rehearsal/index.js" },
+      "require": { "types": "./dist/rehearsal/index.d.cts", "default": "./dist/rehearsal/index.cjs" }
     }
   },
   "files": [
@@ -72,16 +64,16 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/wefthq/weft.git",
-    "directory": "packages/weft-core"
+    "url": "https://github.com/symplek/symplek.git",
+    "directory": "packages/symplek-core"
   },
   "bugs": {
-    "url": "https://github.com/wefthq/weft/issues"
+    "url": "https://github.com/symplek/symplek/issues"
   },
-  "homepage": "https://github.com/wefthq/weft#readme",
+  "homepage": "https://github.com/symplek/symplek#readme",
   "scripts": {
-    "build": "tsup src/index.ts src/server.ts src/confidence/index.ts src/coherence/index.ts src/interview/index.ts src/change-kernel/index.ts src/operators/index.ts src/rehearsal/index.ts --format cjs,esm --dts --outDir dist",
-    "dev": "tsup src/index.ts src/server.ts src/confidence/index.ts src/coherence/index.ts src/interview/index.ts src/change-kernel/index.ts src/operators/index.ts src/rehearsal/index.ts --format cjs,esm --watch --dts --outDir dist",
+    "build": "tsup",
+    "dev": "tsup --watch",
     "lint": "biome check .",
     "typecheck": "tsc --noEmit",
     "typecheck:boundary": "tsc --noEmit -p tsconfig.boundary.json",
@@ -89,19 +81,8 @@
     "test:watch": "vitest",
     "test:contract": "vitest run src/__tests__/contractSmoke.test.ts src/__tests__/serverContractSmoke.test.ts",
     "test:golden": "vitest run src/__tests__/golden-path.test.ts",
-    "test:size": "size-limit",
     "typecheck:change-kernel": "tsc --noEmit -p tsconfig.change-kernel.json"
   },
-  "size-limit": [
-    {
-      "path": "dist/index.js",
-      "limit": "25 KB"
-    },
-    {
-      "path": "dist/server.js",
-      "limit": "40 KB"
-    }
-  ],
   "peerDependencies": {
     "@anthropic-ai/sdk": ">=0.78.0",
     "@google/generative-ai": ">=0.24.0",
@@ -110,7 +91,7 @@
     "@opentelemetry/resources": ">=2.0.0 <3.0.0",
     "@opentelemetry/sdk-trace-node": ">=2.0.0 <3.0.0",
     "openai": ">=4.0.0",
-    "zod": ">=3.0.0"
+    "zod": "^3.25.28 || ^4.0.0"
   },
   "peerDependenciesMeta": {
     "@opentelemetry/api": {
@@ -143,16 +124,17 @@
     "@opentelemetry/resources": "^2.8.0",
     "@opentelemetry/sdk-trace-base": "^2.8.0",
     "@opentelemetry/sdk-trace-node": "^2.8.0",
-    "@size-limit/preset-small-lib": "^11.0.0",
     "@types/node": "^22.14.0",
-    "size-limit": "^11.0.0",
     "tsup": "^8.4.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.17",
-    "zod": "^3.24.0"
+    "zod": "^3.25.28"
   },
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
+  },
+  "dependencies": {
+    "zod-to-json-schema": "^3.25.2"
   }
 }

@@ -1,16 +1,17 @@
 ﻿/**
- * @fileoverview Streaming utilities for weft-core
+ * @fileoverview Streaming utilities for @symplek/core
  * @description Provides a unified interface for real-time AI response streaming.
  */
 
-import { WeftError } from "./errors";
-import { clearInitPromise, getInitPromise } from "./globalConfig";
+import { SymplekError } from "./errors";
+import { awaitInit } from "./globalConfig";
 import {
   type AIMessage,
   detectProvider,
   providerRegistry,
   selectModelForTask,
 } from "./providers";
+import { registerProviderFromEnv } from "./providers/bootstrap";
 import { redactErrorMessage, safeCause } from "./providers/redact";
 
 /**
@@ -44,22 +45,18 @@ export async function* stream(
   prompt: string,
   options?: StreamOptions,
 ): AsyncGenerator<string> {
-  // Drain the deferred provider bootstrap enqueued by Weft.configure().
+  // Drain the deferred provider bootstrap enqueued by Symplek.configure().
   // Mirrors the same drain in ai.ts (aiImplementation). Without this, a caller
-  // who does `Weft.configure({ provider, apiKey }); Weft.stream(...)` will
+  // who does `Symplek.configure({ provider, apiKey }); Symplek.stream(...)` will
   // call detectProvider() before the configured adapter is registered and fail
   // with "provider not found".
-  const initP = getInitPromise();
-  if (initP) {
-    await initP;
-    clearInitPromise();
-  }
+  await awaitInit();
 
   const signal = options?.signal;
 
   // Check if already aborted
   if (signal?.aborted) {
-    throw new WeftError({
+    throw new SymplekError({
       code: "UNKNOWN_ERROR",
       message: "Stream aborted before starting.",
       action: "Check the AbortSignal status.",
@@ -68,15 +65,18 @@ export async function* stream(
   }
 
   try {
-    // 1. Detect provider
+    // 1. Detect provider — apply the same lazy-bootstrap as ai.ts so that an
+    // environment API key alone is sufficient without Symplek.configure().
     const providerId = options?.provider || detectProvider();
+    await registerProviderFromEnv(providerId);
     const provider = providerRegistry.get(providerId);
 
     if (!provider) {
-      throw new WeftError({
+      throw new SymplekError({
         code: "PROVIDER_ERROR",
         message: `Provider "${providerId}" not found in registry.`,
-        action: "Ensure the provider is registered and the API key is set.",
+        action:
+          "Set a provider API key (e.g. OPENAI_API_KEY) or call Symplek.configure({ provider, apiKey }).",
         context: { providerId },
       });
     }
@@ -143,7 +143,7 @@ export async function* stream(
     // accumulation logic testable and to avoid silent discard.
 
     if (signal?.aborted) {
-      throw new WeftError({
+      throw new SymplekError({
         code: "UNKNOWN_ERROR",
         message: "Stream aborted.",
         action: "Check the AbortSignal status.",
@@ -151,13 +151,13 @@ export async function* stream(
       });
     }
   } catch (error) {
-    if (error instanceof WeftError) throw error;
+    if (error instanceof SymplekError) throw error;
 
     // Defense-in-depth (mirrors ai.ts UNKNOWN_ERROR backstop): a provider SDK
     // stream error could carry the API key in its message or request-header
     // objects. We have no apiKey reference here, so redactErrorMessage scrubs
     // env keys and safeCause DROPS the raw secret-bearing SDK object.
-    throw new WeftError({
+    throw new SymplekError({
       code: "UNKNOWN_ERROR",
       message:
         error instanceof Error

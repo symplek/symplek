@@ -1,8 +1,8 @@
 ﻿/**
  * @fileoverview Transaction Log for Solo Mechanism
  * @description Append-only transaction log for audit trail and rollback
- * @module weft-core/solo/transactionLog
- * @since 2.2.0
+ * @module @symplek/core/solo/transactionLog
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[STORY-01.07]: Transaction log implementation
  *

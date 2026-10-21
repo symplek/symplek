@@ -1,5 +1,5 @@
 /**
- * @fileoverview Providers entry point for weft-core
+ * @fileoverview Providers entry point for @symplek/core
  *
  * Adapter files (anthropic.ts, openai.ts, google.ts) are NOT barrel-exported
  * here. Each adapter lazy-loads its SDK on first call (Contract 2). Barrel-

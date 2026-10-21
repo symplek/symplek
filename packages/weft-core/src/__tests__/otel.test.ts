@@ -1,5 +1,5 @@
 /**
- * OpenTelemetry Export Contract Test — weft-core
+ * OpenTelemetry Export Contract Test — @symplek/core
  *
  * Verifies the additive OTLP export layer:
  *  - gen_ai semantic-convention attribute mapping (pure, dependency-free)
@@ -57,7 +57,7 @@ function hrTimeToMs([seconds, nanos]: HrTime): number {
   return seconds * 1000 + nanos / 1e6;
 }
 
-describe("weft-core — OpenTelemetry export contract", () => {
+describe("@symplek/core — OpenTelemetry export contract", () => {
   beforeEach(() => {
     clearTraces();
     exportedSpans.length = 0;
@@ -90,8 +90,8 @@ describe("weft-core — OpenTelemetry export contract", () => {
     expect(attrs["gen_ai.response.model"]).toBe("gpt-4o-2024");
     expect(attrs["gen_ai.usage.input_tokens"]).toBe(120);
     expect(attrs["gen_ai.usage.output_tokens"]).toBe(45);
-    expect(attrs["weft.operator.type"]).toBe("llm");
-    expect(attrs["weft.operator.name"]).toBe("generate");
+    expect(attrs["symplek.operator.type"]).toBe("llm");
+    expect(attrs["symplek.operator.name"]).toBe("generate");
   });
 
   it("genAiSpanAttributes falls back to agent.cost.* keys", () => {
@@ -176,7 +176,7 @@ describe("weft-core — OpenTelemetry export contract", () => {
 
     await configureOpenTelemetry({
       endpoint: "http://127.0.0.1:4318/v1/traces",
-      serviceName: "weft-test",
+      serviceName: "symplek-test",
     });
 
     const result = await exportTraces();
@@ -205,7 +205,7 @@ describe("weft-core — OpenTelemetry export contract", () => {
     expect(parentSpan.parentSpanContext).toBeUndefined();
 
     // Service resource set from serviceName.
-    expect(parentSpan.resource.attributes["service.name"]).toBe("weft-test");
+    expect(parentSpan.resource.attributes["service.name"]).toBe("symplek-test");
 
     // Custom + error attributes reach the span (not just gen_ai.* keys).
     expect(childSpan.attributes["gen_ai.request.model"]).toBe("gpt-4o");
@@ -214,6 +214,6 @@ describe("weft-core — OpenTelemetry export contract", () => {
     expect(childSpan.attributes["agent.error.message"]).toBe(
       "downstream failure",
     );
-    expect(childSpan.attributes["weft.operator.type"]).toBe("llm");
+    expect(childSpan.attributes["symplek.operator.type"]).toBe("llm");
   });
 });

@@ -95,7 +95,7 @@ export function redactErrorMessage(
 }
 
 /**
- * Cause value attached to a `WeftError` for a provider SDK failure.
+ * Cause value attached to a `SymplekError` for a provider SDK failure.
  *
  * We deliberately DO NOT forward the raw SDK error object — it carries the API
  * key inside request headers (`Authorization: Bearer …`) reachable via

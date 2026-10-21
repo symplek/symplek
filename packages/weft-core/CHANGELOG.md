@@ -13,13 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **OC-0**: Initial package structure with AgentUnit algebra extracted from Convex source.
 - **OC-0**: Tier boundary enforcement separating open-core surfaces from Convex-internal code.
-- **OC-1**: Weft namespace facade (`Weft.stream`, `Weft.agent`, `Weft.configure`, `Weft.providers`).
-- **OC-1**: WeftBuilder and AgentBuilder connected to the public API.
+- **OC-1**: Symplek namespace facade (`Symplek.stream`, `Symplek.agent`, `Symplek.configure`, `Symplek.providers`).
+- **OC-1**: SymplekBuilder and AgentBuilder connected to the public API.
 - **OC-1**: Golden-path test suite with 25 passing tests.
 - **OC-1**: Quickstart documentation.
-- **OC-2 DX**: `WeftError` messages include `[weft@VERSION]` prefix for self-identifying stack traces.
+- **OC-2 DX**: `SymplekError` messages include `[symplek@VERSION]` prefix for self-identifying stack traces.
 - **OC-2 DX**: Debug mode (`ai.debug = true`) logs one-line trace per AI call to stderr.
-- **OC-2 DX**: Provider adapters surface missing API key as `WeftError` with `code: PROVIDER_ERROR`, `why`, `fix`, and `example` fields.
+- **OC-2 DX**: Provider adapters surface missing API key as `SymplekError` with `code: PROVIDER_ERROR`, `why`, `fix`, and `example` fields.
 - **OC-2 DX**: JSDoc `@example`, `@param`, `@returns` added to all public `AgentUnit` methods and exported functions.
 - **OC-2 PKG**: Package metadata complete for npm discoverability (`keywords`, `description`, `engines`).
 
@@ -27,5 +27,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **OC-0**: Import path cleanup for published package layout and consumer ergonomics.
 
-[Unreleased]: https://github.com/wefthq/weft/compare/weft-core@1.0.0-beta.1...HEAD
-[1.0.0-beta.1]: https://github.com/wefthq/weft/releases/tag/weft-core@1.0.0-beta.1
+[Unreleased]: https://github.com/symplek/symplek/compare/@symplek/core@1.0.0-beta.1...HEAD
+[1.0.0-beta.1]: https://github.com/symplek/symplek/releases/tag/@symplek/core@1.0.0-beta.1

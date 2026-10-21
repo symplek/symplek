@@ -12,14 +12,14 @@
 import { inspect } from "node:util";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ai } from "../../ai";
-import { WeftError } from "../../errors";
+import { SymplekError } from "../../errors";
 import type { Provider } from "../interface";
 import { providerRegistry } from "../registry";
 
 const FAKE_KEY = "sk-proj-FAKEKEY0987654321";
 
 /**
- * A provider whose generate() throws a raw, NON-WeftError SDK-shaped error that
+ * A provider whose generate() throws a raw, NON-SymplekError SDK-shaped error that
  * embeds the key in its message and in a request-header object — simulating an
  * SDK failure that bypassed adapter redaction and hit the ai() backstop.
  */
@@ -82,8 +82,8 @@ describe("ai() UNKNOWN_ERROR backstop (M2)", () => {
       caught = e;
     }
 
-    expect(caught).toBeInstanceOf(WeftError);
-    const err = caught as WeftError;
+    expect(caught).toBeInstanceOf(SymplekError);
+    const err = caught as SymplekError;
     expect(err.code).toBe("UNKNOWN_ERROR");
 
     // The raw header/request objects must NOT be retained on the cause.

@@ -1,8 +1,8 @@
 /**
- * Observability Contract Test — weft-core
+ * Observability Contract Test — @symplek/core
  *
  * Verifies the observability module exported from the package root.
- * Moved from weft-pro in Phase 0 of the opencore release (2026-04-24)
+ * Moved from @symplek/pro in Phase 0 of the opencore release (2026-04-24)
  * so that basic trace recording is available in the free tier.
  *
  * Imports ONLY from "../index" (the package entrypoint).
@@ -21,7 +21,7 @@ import {
   trackError,
 } from "../index";
 
-describe("weft-core — Observability contract", () => {
+describe("@symplek/core — Observability contract", () => {
   beforeEach(() => {
     clearTraces();
     configureObservability({

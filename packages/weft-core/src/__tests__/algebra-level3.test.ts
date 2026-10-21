@@ -2,7 +2,7 @@
  * @fileoverview Tests for AgentUnit algebra Level 3 operators
  * @description Tests for: model, quality, zip, zipAll, race, branch, unwrapTracked
  *
- * 📝 BUILD[Weft-algebra-level3]: STORY-01.08 — full test suite for new operators
+ * 📝 BUILD[Symplek-algebra-level3]: STORY-01.08 — full test suite for new operators
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -38,7 +38,7 @@ describe("AgentUnit Algebra Level 3", () => {
       let capturedModel: string | undefined;
 
       const unit = AgentUnit.from<string>(async (ctx) => {
-        capturedModel = ctx.extensions.__Weft_model as string | undefined;
+        capturedModel = ctx.extensions.__Symplek_model as string | undefined;
         return "result";
       }).model("gpt-4o");
 
@@ -50,7 +50,7 @@ describe("AgentUnit Algebra Level 3", () => {
       let capturedModel: string | undefined;
 
       const unit = AgentUnit.from<string>(async (ctx) => {
-        capturedModel = ctx.extensions.__Weft_model as string | undefined;
+        capturedModel = ctx.extensions.__Symplek_model as string | undefined;
         return "result";
       })
         .model("gemini-2.5-flash")
@@ -66,7 +66,7 @@ describe("AgentUnit Algebra Level 3", () => {
       const unit = AgentUnit.from<string>(async () => "result").model("gpt-4o");
 
       await unit.run(ctx, { trustMode: "legacy" });
-      expect(ctx.extensions.__Weft_model).toBeUndefined();
+      expect(ctx.extensions.__Symplek_model).toBeUndefined();
     });
 
     it("should track model in metadata operatorChain", () => {
@@ -81,7 +81,7 @@ describe("AgentUnit Algebra Level 3", () => {
       let capturedQuality: string | undefined;
 
       const unit = AgentUnit.from<string>(async (ctx) => {
-        capturedQuality = ctx.extensions.__Weft_quality as string | undefined;
+        capturedQuality = ctx.extensions.__Symplek_quality as string | undefined;
         return "result";
       }).quality("high");
 
@@ -93,7 +93,7 @@ describe("AgentUnit Algebra Level 3", () => {
       let capturedQuality: string | undefined;
 
       const unit = AgentUnit.from<string>(async (ctx) => {
-        capturedQuality = ctx.extensions.__Weft_quality as string | undefined;
+        capturedQuality = ctx.extensions.__Symplek_quality as string | undefined;
         return "result";
       }).quality("fast");
 
@@ -110,20 +110,20 @@ describe("AgentUnit Algebra Level 3", () => {
 
   describe("resolveModelFromContext()", () => {
     it("should resolve model from context extensions", () => {
-      const ctx = { extensions: { __Weft_model: "gpt-4o" } };
+      const ctx = { extensions: { __Symplek_model: "gpt-4o" } };
       const result = resolveModelFromContext(ctx);
       expect(result.model).toBe("gpt-4o");
     });
 
     it("should resolve quality from context extensions", () => {
-      const ctx = { extensions: { __Weft_quality: "high" } };
+      const ctx = { extensions: { __Symplek_quality: "high" } };
       const result = resolveModelFromContext(ctx);
       expect(result.quality).toBe("high");
     });
 
     it("should resolve both model and quality", () => {
       const ctx = {
-        extensions: { __Weft_model: "claude-4", __Weft_quality: "fast" },
+        extensions: { __Symplek_model: "claude-4", __Symplek_quality: "fast" },
       };
       const result = resolveModelFromContext(ctx);
       expect(result.model).toBe("claude-4");
@@ -350,7 +350,7 @@ describe("AgentUnit Algebra Level 3", () => {
           () => true,
           () =>
             AgentUnit.from(async (ctx) => {
-              capturedModel = ctx.extensions.__Weft_model as string | undefined;
+              capturedModel = ctx.extensions.__Symplek_model as string | undefined;
               return "branched";
             }),
           () => AgentUnit.of("other"),

@@ -1,10 +1,10 @@
 ﻿/**
  * @fileoverview Default Agents Tests
  * @description Tests for schema-driven default agent generation
- * @module weft-core/interview/__tests__/defaultAgents.test
- * @since 1.0.0-beta.3
+ * @module @symplek/core/interview/__tests__/defaultAgents.test
+ * @since 1.0.0-beta.1
  *
- * 📝 BUILD[Weft-interview-operator]: Story 03-03 - Default Agents Tests
+ * 📝 BUILD[Symplek-interview-operator]: Story 03-03 - Default Agents Tests
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

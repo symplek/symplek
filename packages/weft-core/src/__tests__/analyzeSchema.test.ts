@@ -6,6 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { z as z4 } from "zod/v4";
 import { analyzeSchema, type AnalyzedField } from "../interview/defaultAgents";
 
 describe("analyzeSchema — public-API Zod v3 introspection", () => {
@@ -206,5 +207,58 @@ describe("analyzeSchema — public-API Zod v3 introspection", () => {
     //
     // Conclusion: grep-clean + behavioral regression = sufficient proof.
     expect(true).toBe(true); // sentinel: this test exists to document the proof strategy
+  });
+});
+
+describe("analyzeSchema reads Zod 3 and Zod 4 schemas the same way", () => {
+  // The same shape built with each generation of Zod. A project can hold both
+  // at once, so the analysis cannot depend on which one is installed.
+  const build = (zod: typeof z | typeof z4) =>
+    (zod as typeof z).object({
+      name: zod.string().describe("Project name"),
+      size: zod.number().optional(),
+      kind: zod.literal("web"),
+      tier: zod.enum(["free", "paid"]),
+      owners: zod.array(zod.string()),
+      budget: zod.union([zod.number(), zod.string()]).nullable(),
+      labels: zod.record(zod.string(), zod.string()),
+      region: zod.string().default("eu"),
+    });
+
+  const summarise = (fields: AnalyzedField[]) =>
+    fields.map(({ name, type, isRequired, hasDefault, description }) => ({
+      name,
+      type,
+      isRequired,
+      hasDefault,
+      description,
+    }));
+
+  it("reports the same fields for both generations", () => {
+    const fromV3 = summarise(analyzeSchema(build(z)));
+    const fromV4 = summarise(analyzeSchema(build(z4) as never));
+
+    expect(fromV3).toHaveLength(8);
+    expect(fromV4).toEqual(fromV3);
+    expect(fromV3).toContainEqual({
+      name: "tier",
+      type: "ZodEnum",
+      isRequired: true,
+      hasDefault: false,
+      description: undefined,
+    });
+    expect(fromV3).toContainEqual({
+      name: "region",
+      type: "ZodString",
+      isRequired: false,
+      hasDefault: true,
+      description: undefined,
+    });
+    expect(fromV3.find((f) => f.name === "name")?.description).toBe("Project name");
+  });
+
+  it("returns no fields for a schema that is not an object, in either generation", () => {
+    expect(analyzeSchema(z.string())).toEqual([]);
+    expect(analyzeSchema(z4.array(z4.string()) as never)).toEqual([]);
   });
 });

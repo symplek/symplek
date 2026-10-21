@@ -1,8 +1,8 @@
 ﻿/**
  * @fileoverview Solo Module Barrel Export
  * @description Public API for autonomous agent action mechanism
- * @module weft-core/solo
- * @since 2.2.0
+ * @module @symplek/core/solo
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[STORY-01.10]: Barrel exports for solo module
  *
@@ -22,7 +22,7 @@
  *   createTransaction,
  *   executeWithRollback,
  *   SOLO_DEFAULTS,
- * } from 'weft-core/solo';
+ * } from '@symplek/core/solo';
  *
  * // Check if agent should act solo
  * const decision = shouldActSolo(0.92, 0.88, 0.15, true);

@@ -1,22 +1,24 @@
 /**
- * @module honesty.test — Surface-honesty assertions for weft-harness (Move 15 / B8 / A17 / N70)
+ * @module honesty.test — Surface-honesty assertions for @symplek/harness (Move 15 / B8 / A17 / N70 / S-SESSION)
  * @description Every assertion here represents a contract that was previously broken.
  *   A failure in this file means the fix regressed, not that the test is wrong.
  *
  *   Tests are grouped by the finding they gate:
- *   - B8  / Item 1: execute() must not stamp source:"verified" on a stub run.
- *   - A17 / Item 2: plan() stub must not stamp source:"tool" for unexecuted calls.
- *   - N70 / Item 3: result.value is the PlanArtifact — no double-wrap.
+ *   - B8         / Item 1: execute() must not stamp source:"verified" on a stub run.
+ *   - A17        / Item 2: plan() stub must not stamp source:"tool" for unexecuted calls.
+ *   - N70        / Item 3: result.value is the PlanArtifact — no double-wrap.
+ *   - S-SESSION  / Item 4: session() stub must not stamp source:"agent" or verifiedBy.
  *
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */
 
 import { describe, expect, it } from "vitest";
-import { createContext } from "weft-core";
+import { createContext } from "@symplek/core";
 import { createHarness } from "../adapter/claude-agent-sdk";
 import { execute } from "../operators/execute";
 import type { SdkSession } from "../operators/execute";
 import { makePlanUnit } from "../operators/plan";
+import { session } from "../operators/session";
 import type { HarnessConfig, VerifiedPlan } from "../types";
 
 const ctx = createContext();
@@ -139,13 +141,145 @@ describe("N70 — plan() result shape: single wrap, result.value.id is the plan 
     expect(result.value.intent).toBe("migrate auth to PKCE");
   });
 
-  it("requireMinChainConfidence gate result shape is also single-wrap", async () => {
+  it("requireMinChainConfidence gate throws for synthesized plans (H9 correction)", async () => {
+    // CORRECTED (H9): requireMinChainConfidence now rejects synthesized plans
+    // unconditionally because their sources are heuristic estimates, not real
+    // execution records. The old test used a stub plan which is always synthesized.
     const unit = makePlanUnit("gate test", { tools: ["WebFetch"] }, config);
-    const gated = unit.requireMinChainConfidence(0.5); // below 0.85 → passes
-    const result = await gated.run(ctx);
+    const gated = unit.requireMinChainConfidence(0.5);
 
-    // gated result is also TrackedResult<PlanArtifact>, not double-wrapped
-    expect(typeof result.value.id).toBe("string");
-    expect(result.value.intent).toBe("gate test");
+    // A synthesized plan always throws LowProvenanceError.
+    const { LowProvenanceError: LPE } = await import("../errors");
+    await expect(gated.run(ctx)).rejects.toBeInstanceOf(LPE);
+  });
+});
+
+// ─── H3: default (zero-trust) mode — inner value carries honest label ─────────
+// In zero-trust mode AgentUnit.run() wraps the operator's return value in a second
+// TrackedResult. The outer source is stamped by the framework; what matters for
+// honesty is (a) the outer source is never "verified" on a stub, and (b) the inner
+// value's source is "synthesized" so callers who inspect it see the truth.
+
+describe("H3 — default (zero-trust) mode exposes honest source in result.value", () => {
+  it("execute() stub — outer source is not 'verified' in default mode", async () => {
+    const sdkSession = makeStubSession();
+    const verified = makeVerifiedPlan();
+
+    const unit = execute(sdkSession, verified, {}, { isStub: true });
+    const result = await unit.run(ctx); // no trustMode — zero-trust default
+
+    expect(result.source).not.toBe("verified");
+  });
+
+  it("execute() stub — inner result.value.source is 'synthesized' in default mode", async () => {
+    const sdkSession = makeStubSession();
+    const verified = makeVerifiedPlan();
+
+    const unit = execute(sdkSession, verified, {}, { isStub: true });
+    const result = await unit.run(ctx); // no trustMode
+
+    // result.value is the TrackedResult<T> from the operator (double-wrap in zero-trust)
+    const inner = result.value as { source?: string };
+    expect(inner.source).toBe("synthesized");
+  });
+
+  it("session() stub — outer source is not 'verified' in default mode", async () => {
+    const stubSession = makeStubSession();
+    const unit = session(stubSession, "test prompt", { isStub: true });
+    const result = await unit.run(ctx); // no trustMode
+
+    expect(result.source).not.toBe("verified");
+  });
+
+  it("session() stub — inner result.value.source is 'synthesized' in default mode", async () => {
+    const stubSession = makeStubSession();
+    const unit = session(stubSession, "test prompt", { isStub: true });
+    const result = await unit.run(ctx); // no trustMode
+
+    const inner = result.value as { source?: string };
+    expect(inner.source).toBe("synthesized");
+  });
+});
+
+// ─── H4: execute() with no context argument defaults to isStub:true ───────────
+// Before this fix: context defaulted to {} → isStub=undefined → falsy → source:"verified"
+// on any session including ReplayAdapter. Now defaults to isStub:true.
+
+describe("H4 — execute() with no context argument defaults to synthesized, not verified", () => {
+  it("calling execute(session, plan) with no context does not stamp source:'verified'", async () => {
+    const sdkSession = makeStubSession();
+    const verified = makeVerifiedPlan();
+
+    // Three-argument form — no context provided
+    const unit = execute(sdkSession, verified);
+    const result = await unit.run(ctx, { trustMode: "legacy" });
+
+    expect(result.source).not.toBe("verified");
+    expect(result.source).toBe("synthesized");
+  });
+
+  it("ReplayAdapter passed to execute() without context yields source:'synthesized'", async () => {
+    // ReplayAdapter satisfies SdkSession. Without context, isStub should default to true.
+    const replayLike: SdkSession = {
+      async run(_options) {
+        return { finalMessage: "replayed output" };
+      },
+    };
+    const verified = makeVerifiedPlan();
+
+    const unit = execute(replayLike, verified); // no context
+    const result = await unit.run(ctx, { trustMode: "legacy" });
+
+    expect(result.source).not.toBe("verified");
+    expect(result.source).toBe("synthesized");
+  });
+});
+
+// ─── S-SESSION: session() stub must not claim source:"agent" ─────────────────
+// Before this fix: session() always stamped source:"agent" + verifiedBy regardless
+// of whether the SDK was installed. A stub session must say source:"synthesized".
+
+describe("S-SESSION — session() stub provenance is honest", () => {
+  function makeSessionStub(finalMessage = "stub output"): SdkSession {
+    return {
+      async run(_options) {
+        return { finalMessage };
+      },
+    };
+  }
+
+  it("stub session() stamps source:'synthesized', not source:'agent'", async () => {
+    const stubSession = makeSessionStub();
+    const unit = session(stubSession, "test prompt", { isStub: true });
+    const result = await unit.run(ctx, { trustMode: "legacy" });
+
+    expect(result.source).toBe("synthesized");
+    expect(result.source).not.toBe("agent");
+  });
+
+  it("stub session() does not set verifiedBy", async () => {
+    const stubSession = makeSessionStub();
+    const unit = session(stubSession, "test prompt", { isStub: true });
+    const result = await unit.run(ctx, { trustMode: "legacy" });
+
+    expect((result as Record<string, unknown>).verifiedBy).toBeUndefined();
+  });
+
+  it("real session() stamps source:'agent' and sets verifiedBy", async () => {
+    const realSession = makeSessionStub("real output");
+    const unit = session(realSession, "test prompt", { isStub: false });
+    const result = await unit.run(ctx, { trustMode: "legacy" });
+
+    expect(result.source).toBe("agent");
+    expect((result as Record<string, unknown>).verifiedBy).toBeDefined();
+  });
+
+  it("createHarness.session() returns source:'synthesized' when SDK is absent", async () => {
+    const harness = createHarness({ adapter: "claude-agent-sdk", tools: ["Read"] });
+    const unit = harness.session("test prompt");
+    const result = await unit.run(ctx, { trustMode: "legacy" });
+
+    // The SDK is never wired — session() must not claim source:"agent".
+    expect(result.source).toBe("synthesized");
   });
 });

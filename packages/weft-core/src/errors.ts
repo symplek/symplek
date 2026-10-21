@@ -1,14 +1,14 @@
 /**
- * Unified error types for weft-core.
+ * Unified error types for @symplek/core.
  *
  * Two code systems coexist:
  *  - Exx codes (E001–E403) for developer-facing diagnostics with fix suggestions
  *  - Descriptive codes (AUTH_FAILED, TIMEOUT, …) for programmatic error handling
  *
- * ⚠️ FIX-GUARD[FP-WEFT-ERROR-CONSOLIDATION-20260313]: Consolidated from 5
- * incompatible WeftError definitions into this single canonical package-side
+ * ⚠️ FIX-GUARD[FP-SYMPLEK-ERROR-CONSOLIDATION-20260313]: Consolidated from 5
+ * incompatible SymplekError definitions into this single canonical package-side
  * definition. The convex-side canonical definition lives in
- * convex/lib/agent_framework/core/weftErrors.ts (cannot share due to bundler).
+ * convex/lib/agent_framework/core/symplekErrors.ts (cannot share due to bundler).
  */
 
 import { VERSION } from "./version";
@@ -46,7 +46,7 @@ export type ErrorCode =
 
 // ── Descriptive Error Codes (backwards-compat) ─────────────────────────────
 
-export type WeftErrorCode =
+export type SymplekErrorCode =
   | "AUTH_FAILED"
   | "RATE_LIMIT_EXCEEDED"
   | "INVALID_SCHEMA"
@@ -60,13 +60,13 @@ export type WeftErrorCode =
   | "VALIDATION_ERROR"
   | "UNKNOWN_ERROR";
 
-// ── WeftError Detail (attached to enhanced errors) ──────────────────────────
+// ── SymplekError Detail (attached to enhanced errors) ──────────────────────────
 
 /**
  * Structured error detail attached to thrown errors via `enhanceError()`.
- * This is what consumers (e.g. AIErrorBoundary) read from `error.WeftError`.
+ * This is what consumers (e.g. AIErrorBoundary) read from `error.SymplekError`.
  */
-export interface WeftErrorDetail {
+export interface SymplekErrorDetail {
   code: ErrorCode;
   message: string;
   location?: {
@@ -85,10 +85,10 @@ export interface WeftErrorDetail {
   timestamp: number;
 }
 
-// ── WeftError Class ─────────────────────────────────────────────────────────
+// ── SymplekError Class ─────────────────────────────────────────────────────────
 
-export interface WeftErrorOptions {
-  code: WeftErrorCode;
+export interface SymplekErrorOptions {
+  code: SymplekErrorCode;
   /** Human-readable error description (legacy field). Use `why` for new code. */
   message?: string;
   /** Human-readable explanation of what went wrong — preferred over `message` for new code. */
@@ -96,7 +96,7 @@ export interface WeftErrorOptions {
   /** A runnable TypeScript example showing the correct setup or usage. */
   example?: string;
   action?: string;
-  fix?: WeftErrorDetail["fix"];
+  fix?: SymplekErrorDetail["fix"];
   docs?: string;
   context?: Record<string, any>;
   cause?: unknown;
@@ -104,9 +104,9 @@ export interface WeftErrorOptions {
 
 export interface SerializedError {
   name: string;
-  code: WeftErrorCode;
+  code: SymplekErrorCode;
   message: string;
-  fix?: WeftErrorDetail["fix"];
+  fix?: SymplekErrorDetail["fix"];
   action?: string;
   docs?: string;
   example?: string;
@@ -114,14 +114,14 @@ export interface SerializedError {
 }
 
 /**
- * Custom error class for weft-core with actionable feedback.
+ * Custom error class for @symplek/core with actionable feedback.
  *
- * Error messages are automatically prefixed with `[weft@VERSION]` so they
+ * Error messages are automatically prefixed with `[symplek@VERSION]` so they
  * are self-identifying in stack traces across bundled and server environments.
  *
  * @example
  * ```typescript
- * throw new WeftError({
+ * throw new SymplekError({
  *   code: "PROVIDER_ERROR",
  *   why: "OPENAI_API_KEY is missing",
  *   fix: { description: "Set OPENAI_API_KEY", docsUrl: "https://platform.openai.com/api-keys" },
@@ -129,30 +129,30 @@ export interface SerializedError {
  * });
  * ```
  */
-export class WeftError extends Error {
-  readonly code: WeftErrorCode;
+export class SymplekError extends Error {
+  readonly code: SymplekErrorCode;
   readonly action?: string;
-  readonly fix?: WeftErrorDetail["fix"];
+  readonly fix?: SymplekErrorDetail["fix"];
   readonly docs?: string;
   readonly example?: string;
   readonly context?: Record<string, any>;
   declare cause?: unknown;
 
-  constructor(options: WeftErrorOptions) {
+  constructor(options: SymplekErrorOptions) {
     const msg = options.why ?? options.message ?? "";
-    super(`[weft@${VERSION}] ${msg}`);
-    this.name = "WeftError";
+    super(`[symplek@${VERSION}] ${msg}`);
+    this.name = "SymplekError";
     this.code = options.code;
     this.action = options.action;
     this.fix = options.fix;
     this.docs = options.docs;
     this.example = options.example;
     this.context = options.context
-      ? WeftError.sanitizeContext(options.context)
+      ? SymplekError.sanitizeContext(options.context)
       : undefined;
 
     if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, WeftError);
+      Error.captureStackTrace(this, SymplekError);
     }
 
     if (options.cause) {
@@ -188,7 +188,7 @@ export class WeftError extends Error {
     context: Record<string, any>,
     seen: WeakSet<object> = new WeakSet(),
   ): Record<string, any> {
-    return WeftError.sanitizeValue(context, seen) as Record<string, any>;
+    return SymplekError.sanitizeValue(context, seen) as Record<string, any>;
   }
 
   private static sanitizeValue(value: unknown, seen: WeakSet<object>): unknown {
@@ -203,16 +203,16 @@ export class WeftError extends Error {
     seen.add(value as object);
 
     if (Array.isArray(value)) {
-      return value.map((item) => WeftError.sanitizeValue(item, seen));
+      return value.map((item) => SymplekError.sanitizeValue(item, seen));
     }
 
     const sanitized: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
       const lowerKey = key.toLowerCase();
-      if (WeftError.SENSITIVE_KEYS.some((s) => lowerKey.includes(s))) {
+      if (SymplekError.SENSITIVE_KEYS.some((s) => lowerKey.includes(s))) {
         sanitized[key] = "[REDACTED]";
       } else {
-        sanitized[key] = WeftError.sanitizeValue(val, seen);
+        sanitized[key] = SymplekError.sanitizeValue(val, seen);
       }
     }
     return sanitized;
@@ -247,7 +247,7 @@ export class WeftError extends Error {
  * }
  * ```
  */
-export class CompensationError extends WeftError {
+export class CompensationError extends SymplekError {
   /** The error thrown by the primary computation that triggered rollback. */
   readonly originalError: Error;
   /**
@@ -294,7 +294,7 @@ export class CompensationError extends WeftError {
  * Callers MUST NOT retry on this error as if the computation failed — the
  * side effects already occurred.
  */
-export class IdempotencyStoreWriteError extends WeftError {
+export class IdempotencyStoreWriteError extends SymplekError {
   /** The computation result that was produced successfully. */
   readonly computationResult: unknown;
 

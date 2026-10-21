@@ -1,5 +1,5 @@
 import type { Content } from "@google/generative-ai";
-import { WeftError } from "../errors";
+import { SymplekError } from "../errors";
 import { redactErrorMessage, safeCause } from "./redact";
 import type {
   AIMessage,
@@ -24,7 +24,7 @@ async function loadGoogleSdk(): Promise<GoogleGenAIMod> {
     _GoogleSdk = mod;
     return _GoogleSdk;
   } catch {
-    throw new WeftError({
+    throw new SymplekError({
       code: "PROVIDER_ERROR",
       why: "@google/generative-ai is not installed. Run: pnpm add @google/generative-ai",
       fix: {
@@ -43,7 +43,7 @@ export async function createGoogleProvider(
   apiKey: string,
 ): Promise<Provider> {
   if (!apiKey) {
-    throw new WeftError({
+    throw new SymplekError({
       code: "PROVIDER_ERROR",
       why: "GOOGLE_GENERATIVE_AI_API_KEY is not set",
       fix: {
@@ -148,7 +148,7 @@ export async function createGoogleProvider(
         };
       } catch (error: unknown) {
         const detail = redactErrorMessage(apiKey, error);
-        throw new WeftError({
+        throw new SymplekError({
           code: "PROVIDER_ERROR",
           why: `Google Gemini request failed: ${detail}`,
           fix: {
@@ -213,7 +213,7 @@ export async function createGoogleProvider(
         }
       } catch (error: unknown) {
         const detail = redactErrorMessage(apiKey, error);
-        throw new WeftError({
+        throw new SymplekError({
           code: "PROVIDER_ERROR",
           why: `Google Gemini streaming failed: ${detail}`,
           fix: {

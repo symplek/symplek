@@ -3,8 +3,8 @@
  * @description Adversarial tests verifying the idempotency infrastructure resists
  *   malicious stores returning non-TrackedResult objects, and documents behavior
  *   around cross-key replay of genuine TrackedResults.
- * @module weft-core/__tests__/idempotency-poisoning
- * @since 2.1.0 — FATAL #5 HARDENING (2026-07-07)
+ * @module @symplek/core/__tests__/idempotency-poisoning
+ * @since 1.0.0-beta.1 — FATAL #5 HARDENING (2026-07-07)
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

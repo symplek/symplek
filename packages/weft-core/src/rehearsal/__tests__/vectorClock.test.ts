@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Unit tests for Vector Clock operations
- * @module weft-core/rehearsal/__tests__/vectorClock
+ * @module @symplek/core/rehearsal/__tests__/vectorClock
  */
 
 import { describe, expect, it } from "vitest";

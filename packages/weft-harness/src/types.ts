@@ -1,12 +1,12 @@
 /**
- * @module HarnessTypes - Core type contracts for weft-harness
+ * @module HarnessTypes - Core type contracts for @symplek/harness
  * @description Public interface definitions for HarnessConfig, PlanArtifact, VerifiedPlan,
  * and Harness. Wave 1 parallel implementations (adapters, permission bridge, session operator)
  * all implement against these types.
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */
 
-import type { AgentUnit, TrackedResult } from "weft-core";
+import type { AgentUnit, TrackedResult } from "@symplek/core";
 
 // ─── Adapter ─────────────────────────────────────────────────────────────────
 
@@ -131,6 +131,13 @@ export interface ExecuteOptions {
   rehearsalPath?: string;
   onDeviation?: "fail" | "rollback" | "ask";
   onProgress?: (event: HarnessProgressEvent) => void;
+  /**
+   * Forward `allowShell: true` to the permission bridge so that shell tools
+   * declared in the plan's `requiredTools` are permitted. Off by default.
+   * Requires the plan to have declared the shell tool in `requiredTools` at
+   * verification time — this flag alone is not sufficient.
+   */
+  allowShell?: boolean;
 }
 
 // ─── Harness Interface ────────────────────────────────────────────────────────

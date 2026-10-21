@@ -1,5 +1,5 @@
 /**
- * @module weft-core/operators/solo
+ * @module @symplek/core/operators/solo
  * @description Solo operator: executes solo action with lock acquisition and safety guarantees.
  * @blast_radius MEDIUM
  * @status STABLE

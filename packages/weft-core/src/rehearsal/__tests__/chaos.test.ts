@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Chaos engineering tests for Rehearsal Mode
- * @module weft-core/rehearsal/__tests__/chaos
+ * @module @symplek/core/rehearsal/__tests__/chaos
  */
 
 import { describe, expect, it, vi } from "vitest";

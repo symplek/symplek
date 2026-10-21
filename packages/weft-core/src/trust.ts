@@ -1,5 +1,5 @@
 /**
- * @module weft-core/trust
+ * @module @symplek/core/trust
  * @description Zero-trust provenance layer. Uses a module-private WeakSet to
  *   track authentic TrackedResult objects — the marker Symbol is deliberately
  *   NOT exported AND the registry prevents forgery via
@@ -9,7 +9,7 @@
  *   through createTrackedResult(). Objects constructed manually — even with
  *   a leaked marker Symbol — will NOT be in the WeakSet and will be rejected.
  *
- * @since 2.1.0 — Hardened against forgery (Codex FATAL #1, 2026-07-07)
+ * @since 1.0.0-beta.1 — Hardened against forgery (Codex FATAL #1, 2026-07-07)
  */
 import type { ObjectiveConfidence } from "./confidence";
 import type { ResultSource, TrackedResult } from "./types";
@@ -24,7 +24,7 @@ import type { ResultSource, TrackedResult } from "./types";
  * Object.getOwnPropertySymbols(), the extracted marker won't help because
  * the WeakSet registry is the true authority.
  */
-const TRACKED_MARKER: unique symbol = Symbol("__Weft_tracked__");
+const TRACKED_MARKER: unique symbol = Symbol("__Symplek_tracked__");
 
 /**
  * Private WeakSet registry of all genuine TrackedResult objects.

@@ -3,8 +3,8 @@
  * @description Tests that the solo gate correctly BLOCKS untracked/forged objects
  *   even when they carry perfect-looking confidence/coherence/riskScore fields.
  *   Also verifies that only genuine TrackedResults pass the gate.
- * @module weft-core/solo/__tests__/hardening
- * @since 2.2.0 — FATAL #2 & #3 HARDENING (2026-07-07)
+ * @module @symplek/core/solo/__tests__/hardening
+ * @since 1.0.0-beta.1 — FATAL #2 & #3 HARDENING (2026-07-07)
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

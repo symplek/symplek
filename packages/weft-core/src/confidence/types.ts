@@ -1,8 +1,8 @@
 ﻿/**
  * @fileoverview Objective Confidence Type Definitions
  * @description Core type definitions for mathematically computed confidence scoring
- * @module weft-core/confidence/types
- * @since 2.0.0
+ * @module @symplek/core/confidence/types
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[01.02]: Objective confidence types from research findings
  */

@@ -1,10 +1,10 @@
 ﻿/**
  * @fileoverview Composition Tests
  * @description Tests for algebraic composition with other AgentUnit operators
- * @module weft-core/interview/__tests__/composition.test
- * @since 1.0.0-beta.3
+ * @module @symplek/core/interview/__tests__/composition.test
+ * @since 1.0.0-beta.1
  *
- * 📝 BUILD[Weft-interview-operator]: Story 03-04 - Composition Tests
+ * 📝 BUILD[Symplek-interview-operator]: Story 03-04 - Composition Tests
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

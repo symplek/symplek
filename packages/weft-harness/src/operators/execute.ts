@@ -8,12 +8,13 @@
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */
 
-import { appendFile, readFile, writeFile } from "node:fs/promises";
-import type { ResultSource, TrackedResult } from "weft-core";
-import { AgentUnit, createTrackedResult } from "weft-core";
-import { ContractViolationError, HarnessDeviationError } from "../errors";
-import { buildPermissionBridge } from "../permission-bridge";
-import type { ExecuteOptions, VerifiedPlan } from "../types";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
+import type { ResultSource, TrackedResult } from "@symplek/core";
+import { AgentUnit, createTrackedResult } from "@symplek/core";
+import { ContractViolationError, HarnessDeviationError } from "../errors.js";
+import { buildPermissionBridge } from "../permission-bridge.js";
+import type { ExecuteOptions, VerifiedPlan } from "../types.js";
 
 // ─── SDK Interface Stub ───────────────────────────────────────────────────────
 // @anthropic-ai/claude-agent-sdk is NOT a direct dependency. The adapter module
@@ -79,6 +80,8 @@ async function restoreSnapshots(snapshots: FileSnapshot[]): Promise<void> {
 // ─── Rehearsal Trace ──────────────────────────────────────────────────────────
 
 async function appendTrace(tracePath: string, entry: unknown): Promise<void> {
+  // Create the parent directory if it doesn't exist (e.g. traces/ on first run).
+  await mkdir(dirname(tracePath), { recursive: true });
   await appendFile(tracePath, `${JSON.stringify(entry)}\n`, {
     encoding: "utf8",
   });
@@ -92,28 +95,35 @@ async function appendTrace(tracePath: string, entry: unknown): Promise<void> {
  * The returned `AgentUnit` is lazy — the session only starts when `.run()` is
  * called by the caller.
  *
+ * **isStub default is `true`**: calling `execute(session, plan)` with no third
+ * or fourth argument produces `source:"synthesized"`, not `source:"verified"`.
+ * Pass `{ isStub: false }` only when the session is a real SDK session that
+ * actually executed the plan. This ensures that replay adapters, stubs, and
+ * any session whose provenance is unknown default to the honest label.
+ *
  * @param session  - An SdkSession provided by the adapter (W1-B).
  * @param verified - The consensus-approved VerifiedPlan to execute.
- * @param options  - Optional rehearsal trace and deviation behaviour.
- * @param context  - Execution context. Pass `{ isStub: true }` when the session
- *                   is a no-op stub (SDK not installed) so the result is honestly
- *                   labelled `source:"synthesized"` instead of `source:"verified"`.
+ * @param options  - Optional rehearsal trace, deviation behaviour, and
+ *                   `allowShell` flag forwarded to the permission bridge.
+ * @param context  - Execution context. Defaults to `{ isStub: true }` so
+ *                   un-labelled callers get `source:"synthesized"`. Pass
+ *                   `{ isStub: false }` to stamp `source:"verified"` on real
+ *                   SDK execution.
  */
 export function execute<T>(
   session: SdkSession,
   verified: VerifiedPlan<T>,
   options: ExecuteOptions = {},
-  context: { isStub?: boolean } = {},
+  context: { isStub?: boolean } = { isStub: true },
 ): AgentUnit<TrackedResult<T>> {
   return AgentUnit.from<TrackedResult<T>>(async (_ctx) => {
-    const bridge = buildPermissionBridge(verified as VerifiedPlan<unknown>);
+    const bridge = buildPermissionBridge(verified as VerifiedPlan<unknown>, {
+      allowShell: options.allowShell,
+    });
     const tracePath =
       options.rehearsalPath ?? `traces/${verified.plan.id}.jsonl`;
-    let stepCounter = 0;
 
     // Snapshot file paths before execution when rollback is requested.
-    // This is a simplified best-effort rollback — it restores the pre-session
-    // state of every declared target path but cannot undo network side-effects.
     const declaredPaths = verified.plan.steps
       .filter((s) => s.targetPath !== undefined)
       .map((s) => s.targetPath as string);
@@ -123,23 +133,37 @@ export function execute<T>(
         ? await snapshotPaths(declaredPaths)
         : [];
 
-    const needsEvent = options.rehearse || options.onProgress !== undefined;
-    const onEvent = needsEvent
-      ? async (event: SdkEvent) => {
+    // ── H10 fix: Buffer events synchronously during the SDK session, then
+    // write them to the trace file in order AFTER the session returns.
+    // Previously, `void onEvent(event)` was used, making appendFile calls
+    // fire-and-forget; events could be written out of step order and the
+    // SessionEnd sentinel could land before outstanding tool entries.
+    //
+    // Now: onEvent pushes to a buffer synchronously (no async in the
+    // callback). After session.run() resolves, we flush the buffer in
+    // insertion order, then write the sentinel last.
+    interface BufferedEvent {
+      tool: string;
+      args: unknown;
+      result: unknown;
+    }
+    const eventBuffer: BufferedEvent[] = [];
+
+    const needsProgressOrRehearsal =
+      options.rehearse || options.onProgress !== undefined;
+    const onEvent = needsProgressOrRehearsal
+      ? (event: SdkEvent): void => {
           if (event.type === "tool_use") {
             options.onProgress?.({
               phase: "executing",
               tool: event.tool ?? "unknown",
             });
             if (options.rehearse) {
-              const entry = {
-                step: ++stepCounter,
+              eventBuffer.push({
                 tool: event.tool ?? "unknown",
                 args: event.args,
                 result: event.result,
-                timestamp: Date.now(),
-              };
-              await appendTrace(tracePath, entry);
+              });
             }
           }
         }
@@ -152,11 +176,7 @@ export function execute<T>(
       sdkResult = await session.run({
         permissionMode: "acceptEdits",
         canUseTool: bridge,
-        onEvent: onEvent
-          ? (event) => {
-              void onEvent(event);
-            }
-          : undefined,
+        onEvent,
       });
     } catch (err) {
       if (err instanceof HarnessDeviationError) {
@@ -174,10 +194,7 @@ export function execute<T>(
 
     options.onProgress?.({ phase: "complete", planId: verified.plan.id });
 
-    // ─── Contract Validation ─────────────────────────────────────────────────
-    // If the VerifiedPlan declared an expectedOutput schema, validate the actual
-    // SDK output against it. Duck-typed .parse() avoids vendor lock-in — works
-    // with Valibot, Zod, or any library that exposes a .parse(value) method.
+    // ── Contract Validation ──────────────────────────────────────────────────
     if (
       verified.expectedOutput !== undefined &&
       verified.expectedOutput !== null
@@ -200,21 +217,34 @@ export function execute<T>(
       }
     }
 
-    // Write sentinel on session end when rehearsing.
+    // ── Flush buffered events in insertion order, then write sentinel last ───
+    // This replaces the old `void onEvent(event)` pattern that allowed events
+    // to be written out of order and the sentinel to precede tool entries.
     if (options.rehearse) {
+      let stepCounter = 0;
+      for (const buffered of eventBuffer) {
+        const entry = {
+          step: ++stepCounter,
+          tool: buffered.tool,
+          args: buffered.args,
+          result: buffered.result,
+          timestamp: Date.now(),
+        };
+        await appendTrace(tracePath, entry);
+      }
       await appendTrace(tracePath, {
         _type: "SessionEnd",
         plan_id: verified.plan.id,
-        total_steps: stepCounter,
+        total_steps: eventBuffer.length,
         final_output: sdkResult.finalMessage,
       });
     }
 
-    // Build a TrackedResult<T> inheriting source chain from the verified plan.
+    // ── Build result ──────────────────────────────────────────────────────────
     // source:"verified" is only honest when a real SDK session executed the plan.
-    // When the SDK is absent and the session is a stub, use source:"synthesized"
-    // so callers can distinguish un-run stub results from genuinely executed ones.
-    const source: ResultSource = context.isStub ? "synthesized" : "verified";
+    // Default is isStub:true so un-labelled callers get "synthesized".
+    const isStub = context.isStub ?? true;
+    const source: ResultSource = isStub ? "synthesized" : "verified";
     const tracked = createTrackedResult(sdkResult.finalMessage as unknown as T, {
       source,
       confidence: verified.approvalScore,
@@ -224,7 +254,7 @@ export function execute<T>(
       ...(source === "verified"
         ? {
             verifiedAt: Date.now(),
-            verifiedBy: `weft-harness/execute@${verified.plan.id}`,
+            verifiedBy: `@symplek/harness/execute@${verified.plan.id}`,
           }
         : {}),
     });

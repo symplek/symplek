@@ -4,7 +4,7 @@
  *   Implements the saga pattern with multi-step execute/undo pairs.
  *   Executes steps in order; on failure rolls back completed steps in LIFO
  *   order. Undo errors are suppressed — original error always propagates.
- * @rules @.cursor/rules/frameworks/206-weft-framework.mdc
+ * @rules @.cursor/rules/frameworks/206-symplek-framework.mdc
  * @blast_radius HIGH - Part of the agent resilience safety layer
  * @status STABLE
  * @runtime node

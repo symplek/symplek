@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Core types for Rehearsal Mode
  * @description Deterministic record/replay types for multi-agent AI testing
- * @module weft-core/rehearsal/types
+ * @module @symplek/core/rehearsal/types
  * @since 1.0.0
  *
  * 📝 BUILD[01.01]: Core types for Rehearsal Mode
@@ -50,6 +50,12 @@ export interface LLMCallPayload {
   readonly model: string;
   readonly prompt?: string; // Optional - excluded by default for privacy
   readonly promptHash: string; // Always included for comparison
+  /**
+   * Hash of the whole call config. This is the value replay compares a call
+   * against, so it is recorded with the call. Absent from traces written
+   * before it was added.
+   */
+  readonly configHash?: string;
   readonly temperature?: number;
   readonly maxTokens?: number;
   readonly systemPrompt?: string;

@@ -1,5 +1,5 @@
 /**
- * @module weft-core/operators/fallback
+ * @module @symplek/core/operators/fallback
  * @description Fallback operator: falls back to an alternative computation when primary fails.
  * @blast_radius LOW
  * @status STABLE

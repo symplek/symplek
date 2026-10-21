@@ -1,10 +1,10 @@
 /**
- * @fileoverview Public type definitions for weft-core
+ * @fileoverview Public type definitions for @symplek/core
  * @description Core types exported from the MIT-licensed package
- * @module weft-core/types
+ * @module @symplek/core/types
  * @since 1.0.0-beta.1
  *
- * 📝 BUILD[05.04]: Public API types for weft-core package
+ * 📝 BUILD[05.04]: Public API types for @symplek/core package
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ export interface TrackedResult<T> {
    * based on agreement rate, entropy, variance, and behavioral signals.
    * This is more reliable than the `confidence` field which may be
    * subjectively reported by agents.
-   * @since 2.0.0
+   * @since 1.0.0-beta.1
    */
   objectiveConfidence?: import("./confidence").ObjectiveConfidence;
 }
@@ -142,7 +142,7 @@ export interface VoteInput {
  *
  * @remarks
  * This is the free-tier consensus result. For multi-round TaCo consensus,
- * see weft-pro package.
+ * see @symplek/pro package.
  */
 export interface ConsensusResult {
   /** Whether consensus was reached (approved) */
@@ -162,7 +162,7 @@ export interface ConsensusResult {
    * @remarks
    * This replaces subjective LLM confidence with mathematically computed
    * values based on agreement rate, entropy, variance, and behavioral signals.
-   * @since 2.0.0
+   * @since 1.0.0-beta.1
    */
   objectiveConfidence?: import("./confidence").ObjectiveConfidence;
 }
@@ -171,7 +171,7 @@ export interface ConsensusResult {
  * Options for the `.consensus()` operator (single-round only).
  *
  * @remarks
- * For multi-round TaCo consensus options, see weft-pro package.
+ * For multi-round TaCo consensus options, see @symplek/pro package.
  */
 export interface ConsensusOptions {
   /**
@@ -426,7 +426,7 @@ export interface RetryOptions {
  *
  * @remarks
  * This is a simplified context that doesn't require Convex.
- * For full Convex integration, use weft-convex package.
+ * For full Convex integration, use @symplek/convex package.
  */
 export interface AgentContext {
   /** Request timestamp */
@@ -454,7 +454,7 @@ export interface AgentContext {
  * - `'zero-trust'`: Returns `TrackedResult<T>` with source tracking metadata (DEFAULT)
  * - `'legacy'`: Returns raw `T` (backward compatible, no tracking)
  *
- * @since 2.0.0
+ * @since 1.0.0-beta.1
  * @see {@link RunOptionsWithTrust} for usage in run options
  * @see {@link TrackedResult} for the zero-trust return type
  *
@@ -477,7 +477,7 @@ export type TrustMode = "zero-trust" | "legacy";
 /**
  * Extended run options with trust mode configuration.
  *
- * @since 2.0.0
+ * @since 1.0.0-beta.1
  * @see {@link TrustMode} for available modes
  *
  * 📝 BUILD[01.04]: RunOptionsWithTrust for type-safe trust mode selection
@@ -487,7 +487,7 @@ export type TrustMode = "zero-trust" | "legacy";
  * ```typescript
  * // Zero-trust mode (default) returns TrackedResult<T>
  * const tracked = await unit.run(ctx);
- * console.log(tracked.confidence); // 0.95
+ * console.log(tracked.confidence); // 0.85 (base confidence; adjusts per operator chain)
  *
  * // Legacy mode returns raw T (deprecated)
  * const raw = await unit.run(ctx, { trustMode: 'legacy' });
@@ -683,7 +683,7 @@ export interface DebateResult<T> {
    * @remarks
    * This replaces subjective LLM confidence with mathematically computed
    * values based on agreement rate, entropy, variance, and behavioral signals.
-   * @since 2.0.0
+   * @since 1.0.0-beta.1
    */
   objectiveConfidence?: import("./confidence").ObjectiveConfidence;
 }
@@ -867,7 +867,7 @@ export interface DialecticResult<T> {
    * This replaces subjective LLM confidence with mathematically computed
    * values based on agreement rate, entropy, variance, and behavioral signals.
    * Only populated when terminationMode uses voting (consensus/majority).
-   * @since 2.0.0
+   * @since 1.0.0-beta.1
    */
   objectiveConfidence?: import("./confidence").ObjectiveConfidence;
 }
@@ -968,8 +968,8 @@ export type AdvisorAgent<T> = (
 ) => Critique | Promise<Critique>;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// INTERVIEW TYPES (Weft-interview-operator)
-// 📝 BUILD[Weft-interview]: Re-exports for interview types
+// INTERVIEW TYPES (Symplek-interview-operator)
+// 📝 BUILD[Symplek-interview]: Re-exports for interview types
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type {
@@ -990,7 +990,7 @@ export type {
 } from "./interview/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SOLO MECHANISM TYPES (Weft-solo-mechanism)
+// SOLO MECHANISM TYPES (Symplek-solo-mechanism)
 // 📝 BUILD[STORY-02.05]: Re-exports for solo types
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1141,7 +1141,7 @@ export interface CoherenceResult<T> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OBSERVABILITY TYPES (Free Tier — moved from weft-pro)
+// OBSERVABILITY TYPES (Free Tier — moved from @symplek/pro)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**

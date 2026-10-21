@@ -3,7 +3,7 @@
  * @description Tests that the TraceReplayer correctly detects tampered traces:
  *   truncated events, modified finalOutput, wrong event hashes, and other
  *   integrity violations that would let a compromised trace pass undetected.
- * @module weft-core/__tests__/replay-hardening
+ * @module @symplek/core/__tests__/replay-hardening
  * @since 1.0.0 — FATAL #4 HARDENING (2026-07-07)
  */
 

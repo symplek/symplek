@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Edge case tests for Vector Clock operations
- * @module weft-core/rehearsal/__tests__/vectorClock.edge
+ * @module @symplek/core/rehearsal/__tests__/vectorClock.edge
  */
 
 import { describe, expect, it } from "vitest";

@@ -1,10 +1,10 @@
 ﻿/**
  * @fileoverview Callback Tests
  * @description Tests for callback behavior and real-time updates during interview
- * @module weft-core/interview/__tests__/callbacks.test
- * @since 1.0.0-beta.3
+ * @module @symplek/core/interview/__tests__/callbacks.test
+ * @since 1.0.0-beta.1
  *
- * 📝 BUILD[Weft-interview-operator]: Story 03-05 - Callback Tests
+ * 📝 BUILD[Symplek-interview-operator]: Story 03-05 - Callback Tests
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

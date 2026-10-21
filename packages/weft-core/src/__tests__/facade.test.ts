@@ -1,13 +1,13 @@
 /**
- * @module facade.test - Unit tests for Weft callable namespace (OC-0-B)
- * @description Confirms Weft is a callable namespace with stream, agent,
+ * @module facade.test - Unit tests for Symplek callable namespace (OC-0-B)
+ * @description Confirms Symplek is a callable namespace with stream, agent,
  *   configure, providers, and run methods. Uses mocked providers — no real API calls.
  *   Contract 1 (wave-0-design.md) test obligations are in the "configure() — Contract 1"
  *   describe block at the bottom of this file.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createContext } from "../context";
-import { Weft, _resetForTesting } from "../facade";
+import { Symplek, _resetForTesting } from "../facade";
 import type {
   AIRequest,
   AIResponse,
@@ -73,47 +73,47 @@ afterEach(() => {
 // SHAPE TESTS — verify namespace methods exist with correct types
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("Weft callable namespace — shape", () => {
-  it("typeof Weft === 'function'", () => {
-    expect(typeof Weft).toBe("function");
+describe("Symplek callable namespace — shape", () => {
+  it("typeof Symplek === 'function'", () => {
+    expect(typeof Symplek).toBe("function");
   });
 
-  it("typeof Weft.run === 'function'", () => {
-    expect(typeof Weft.run).toBe("function");
+  it("typeof Symplek.run === 'function'", () => {
+    expect(typeof Symplek.run).toBe("function");
   });
 
-  it("typeof Weft.stream === 'function'", () => {
-    expect(typeof Weft.stream).toBe("function");
+  it("typeof Symplek.stream === 'function'", () => {
+    expect(typeof Symplek.stream).toBe("function");
   });
 
-  it("typeof Weft.agent === 'function'", () => {
-    expect(typeof Weft.agent).toBe("function");
+  it("typeof Symplek.agent === 'function'", () => {
+    expect(typeof Symplek.agent).toBe("function");
   });
 
-  it("typeof Weft.configure === 'function'", () => {
-    expect(typeof Weft.configure).toBe("function");
+  it("typeof Symplek.configure === 'function'", () => {
+    expect(typeof Symplek.configure).toBe("function");
   });
 
-  it("typeof Weft.providers === 'function'", () => {
-    expect(typeof Weft.providers).toBe("function");
+  it("typeof Symplek.providers === 'function'", () => {
+    expect(typeof Symplek.providers).toBe("function");
   });
 
-  it("typeof Weft.unit === 'function'", () => {
-    expect(typeof Weft.unit).toBe("function");
+  it("typeof Symplek.unit === 'function'", () => {
+    expect(typeof Symplek.unit).toBe("function");
   });
 
-  it("typeof Weft.of === 'function'", () => {
-    expect(typeof Weft.of).toBe("function");
+  it("typeof Symplek.of === 'function'", () => {
+    expect(typeof Symplek.of).toBe("function");
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Weft.unit() / Weft.of() — AgentUnit bridge
+// Symplek.unit() / Symplek.of() — AgentUnit bridge
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("Weft.unit() bridge", () => {
+describe("Symplek.unit() bridge", () => {
   it("returns an AgentUnit with composition operators", () => {
-    const unit = Weft.unit(async () => "hello");
+    const unit = Symplek.unit(async () => "hello");
     expect(typeof unit.run).toBe("function");
     expect(typeof unit.map).toBe("function");
     expect(typeof unit.consensus).toBe("function");
@@ -122,21 +122,21 @@ describe("Weft.unit() bridge", () => {
 
   it("executes the computation when .run() is called", async () => {
     const ctx = createContext();
-    const result = await Weft.unit(async () => 42).run(ctx);
+    const result = await Symplek.unit(async () => 42).run(ctx);
     expect((result as { value: number }).value).toBe(42);
   });
 });
 
-describe("Weft.of() bridge", () => {
+describe("Symplek.of() bridge", () => {
   it("lifts a plain value into an AgentUnit", async () => {
     const ctx = createContext();
-    const result = await Weft.of("ship it").run(ctx);
+    const result = await Symplek.of("ship it").run(ctx);
     expect((result as { value: string }).value).toBe("ship it");
   });
 
   it("chains into .consensus() without a separate AgentUnit import", async () => {
     const ctx = createContext();
-    const voted = await Weft.of("Ship the feature")
+    const voted = await Symplek.of("Ship the feature")
       .consensus([
         () => ({ decision: "approve" as const, confidence: 0.9 }),
         () => ({ decision: "approve" as const, confidence: 0.8 }),
@@ -149,49 +149,49 @@ describe("Weft.of() bridge", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Weft() — direct call returns WeftBuilder
+// Symplek() — direct call returns SymplekBuilder
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("Weft() direct call", () => {
+describe("Symplek() direct call", () => {
   it("returns an object with .run(), .coordinate(), and .toUnit()", () => {
-    const builder = Weft("some task");
+    const builder = Symplek("some task");
     expect(typeof builder.run).toBe("function");
     expect(typeof builder.coordinate).toBe("function");
     expect(typeof builder.toUnit).toBe("function");
   });
 
   it(".coordinate() and .toUnit() return the same cached AgentUnit", () => {
-    const builder = Weft("some task");
+    const builder = Symplek("some task");
     const fromCoordinate = builder.coordinate();
     const fromToUnit = builder.toUnit();
     expect(fromCoordinate).toBe(fromToUnit);
   });
 
   it("is thenable (PromiseLike)", () => {
-    const builder = Weft("some task");
+    const builder = Symplek("some task");
     expect(typeof builder.then).toBe("function");
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Weft.configure() — shape tests (preserved from before Contract 1)
+// Symplek.configure() — shape tests (preserved from before Contract 1)
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("Weft.configure()", () => {
+describe("Symplek.configure()", () => {
   it("does not throw when called with a known provider name and no apiKey", () => {
     // No apiKey → bootstrap is skipped; provider name validation still runs.
     expect(() =>
-      Weft.configure({ provider: "openai", model: "gpt-4o", debug: false }),
+      Symplek.configure({ provider: "openai", model: "gpt-4o", debug: false }),
     ).not.toThrow();
   });
 
   it("accepts a partial config without throwing", () => {
-    expect(() => Weft.configure({ model: "gpt-4o" })).not.toThrow();
+    expect(() => Symplek.configure({ model: "gpt-4o" })).not.toThrow();
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Weft.configure() — Contract 1 (wave-0-design.md) test obligations
+// Symplek.configure() — Contract 1 (wave-0-design.md) test obligations
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("configure() — Contract 1 obligations", () => {
@@ -205,7 +205,7 @@ describe("configure() — Contract 1 obligations", () => {
 
   // ── Obligation 1 ────────────────────────────────────────────────────────────
   it("(1) configure({ provider, apiKey }) registers named provider as registry default", async () => {
-    Weft.configure({ provider: "openai", apiKey: "sk-test-key" });
+    Symplek.configure({ provider: "openai", apiKey: "sk-test-key" });
     // The bootstrap is async; we must drain the init promise before checking registry.
     // The simplest way: await a fake ai() would do it, but since ai.ts is not wired
     // in this test file, we import and drain the init promise directly.
@@ -218,7 +218,7 @@ describe("configure() — Contract 1 obligations", () => {
 
   // ── Obligation 2 ────────────────────────────────────────────────────────────
   it("(2) configure({ model }) without provider → selectModelForTask returns configured model", () => {
-    Weft.configure({ model: "claude-3-opus" });
+    Symplek.configure({ model: "claude-3-opus" });
     // No call-site model, no quality, simple short prompt → falls through to globalConfig.model
     const selected = selectModelForTask("hello");
     expect(selected).toBe("claude-3-opus");
@@ -226,14 +226,14 @@ describe("configure() — Contract 1 obligations", () => {
 
   // ── Obligation 3 ────────────────────────────────────────────────────────────
   it("(3) configure({ debug: true }) → traceManager.debug === true", () => {
-    Weft.configure({ debug: true });
+    Symplek.configure({ debug: true });
     expect(traceManager.debug).toBe(true);
   });
 
   // ── Obligation 4 ────────────────────────────────────────────────────────────
   it("(4) two configure() calls merge — second wins per field, first field retained", async () => {
-    Weft.configure({ model: "gpt-4o-mini" });
-    Weft.configure({ provider: "anthropic", apiKey: "sk-ant-test" });
+    Symplek.configure({ model: "gpt-4o-mini" });
+    Symplek.configure({ provider: "anthropic", apiKey: "sk-ant-test" });
 
     // Drain init promise.
     const { getInitPromise, clearInitPromise } = await import("../globalConfig");
@@ -267,9 +267,9 @@ describe("configure() — Contract 1 obligations", () => {
   });
 
   // ── Obligation 6 ────────────────────────────────────────────────────────────
-  it("(6) unknown provider value → throws WeftError with code PROVIDER_ERROR", () => {
+  it("(6) unknown provider value → throws SymplekError with code PROVIDER_ERROR", () => {
     expect(() =>
-      Weft.configure({ provider: "unkown-provider-xyz", apiKey: "sk-test" }),
+      Symplek.configure({ provider: "unkown-provider-xyz", apiKey: "sk-test" }),
     ).toThrow(expect.objectContaining({ code: "PROVIDER_ERROR" }));
   });
 
@@ -283,17 +283,17 @@ describe("configure() — Contract 1 obligations", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Weft.providers()
+// Symplek.providers()
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("Weft.providers()", () => {
+describe("Symplek.providers()", () => {
   it("returns an array", () => {
-    const result = Weft.providers();
+    const result = Symplek.providers();
     expect(Array.isArray(result)).toBe(true);
   });
 
   it("each entry has id, name, configured fields", () => {
-    const result = Weft.providers();
+    const result = Symplek.providers();
     expect(result.length).toBeGreaterThan(0);
     for (const p of result) {
       expect(typeof p.id).toBe("string");
@@ -303,7 +303,7 @@ describe("Weft.providers()", () => {
   });
 
   it("includes the registered mock provider as configured:true", () => {
-    const result = Weft.providers();
+    const result = Symplek.providers();
     const mock = result.find((p) => p.id === "mock");
     expect(mock).toBeDefined();
     expect(mock?.configured).toBe(true);
@@ -312,7 +312,7 @@ describe("Weft.providers()", () => {
   it("includes known providers even if not registered", () => {
     // Clear registry so no providers are registered
     providerRegistry.clear();
-    const result = Weft.providers();
+    const result = Symplek.providers();
     const ids = result.map((p) => p.id);
     expect(ids).toContain("openai");
     expect(ids).toContain("anthropic");
@@ -320,40 +320,40 @@ describe("Weft.providers()", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Weft.agent()
+// Symplek.agent()
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("Weft.agent()", () => {
+describe("Symplek.agent()", () => {
   it("returns an object with a .prompt() method", () => {
-    const agent = Weft.agent({ model: "mock-model" });
+    const agent = Symplek.agent({ model: "mock-model" });
     expect(typeof agent.prompt).toBe("function");
   });
 
   it(".prompt() returns a builder with .run()", () => {
-    const agent = Weft.agent();
+    const agent = Symplek.agent();
     const promptBuilder = agent.prompt("Hello");
     expect(typeof promptBuilder.run).toBe("function");
   });
 
   it("works with no config argument", () => {
-    expect(() => Weft.agent()).not.toThrow();
+    expect(() => Symplek.agent()).not.toThrow();
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Weft.stream()
+// Symplek.stream()
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("Weft.stream()", () => {
+describe("Symplek.stream()", () => {
   it("returns an async generator", () => {
-    const gen = Weft.stream("task");
+    const gen = Symplek.stream("task");
     // An async generator has a Symbol.asyncIterator
     expect(typeof gen[Symbol.asyncIterator]).toBe("function");
   });
 
   it("yields string chunks from the mock provider", async () => {
     const chunks: string[] = [];
-    for await (const chunk of Weft.stream("hello")) {
+    for await (const chunk of Symplek.stream("hello")) {
       chunks.push(chunk);
     }
     expect(chunks.length).toBeGreaterThan(0);
@@ -374,7 +374,7 @@ describe("Bug 1 — configure({ model }) beats prompt heuristics", () => {
   it("complex prompt does NOT override a configured Anthropic model", () => {
     // Before fix: selectModelForTask ran the heuristic first and returned "gpt-4o"
     // for a long prompt even when configure({ model }) had been called.
-    Weft.configure({ model: "claude-3-5-sonnet-20241022" });
+    Symplek.configure({ model: "claude-3-5-sonnet-20241022" });
 
     // A prompt that would trigger the complexity heuristic (length > 500 chars)
     const longComplexPrompt = "analyze ".repeat(100);
@@ -385,14 +385,14 @@ describe("Bug 1 — configure({ model }) beats prompt heuristics", () => {
   });
 
   it("keyword heuristic does NOT override a configured model", () => {
-    Weft.configure({ model: "gemini-1.5-pro" });
+    Symplek.configure({ model: "gemini-1.5-pro" });
     // 'analyze' keyword would previously trigger the gpt-4o heuristic
     const selected = selectModelForTask("Please analyze this document.");
     expect(selected).toBe("gemini-1.5-pro");
   });
 
   it("call-site options.model still beats globalConfig.model", () => {
-    Weft.configure({ model: "claude-3-5-sonnet-20241022" });
+    Symplek.configure({ model: "claude-3-5-sonnet-20241022" });
     const selected = selectModelForTask("hello", { model: "gpt-4o-mini" });
     expect(selected).toBe("gpt-4o-mini");
   });
@@ -412,7 +412,7 @@ describe("Bug 2 — configure() then stream() sees the registered provider", () 
     vi.restoreAllMocks();
   });
 
-  it("Weft.stream() drains _initPromise so the configured provider is available", async () => {
+  it("Symplek.stream() drains _initPromise so the configured provider is available", async () => {
     // Register the mock as a realistic "anthropic" provider so we can verify
     // that the provider is found after configure() + stream() interaction.
     const anthropicMock = makeMockProvider("anthropic");
@@ -445,7 +445,7 @@ describe("Bug 2 — configure() then stream() sees the registered provider", () 
 
     // stream() must drain the init promise, then find the registered "openai" provider.
     const chunks: string[] = [];
-    for await (const chunk of Weft.stream("hello", { provider: "openai" })) {
+    for await (const chunk of Symplek.stream("hello", { provider: "openai" })) {
       chunks.push(chunk);
     }
 
@@ -460,16 +460,16 @@ describe("Bug 3 — configure({ provider: 'openrouter' }) throws PROVIDER_ERROR"
     providerRegistry.clear();
   });
 
-  it("throws WeftError PROVIDER_ERROR instead of silently misrouting to api.openai.com", () => {
+  it("throws SymplekError PROVIDER_ERROR instead of silently misrouting to api.openai.com", () => {
     expect(() =>
-      Weft.configure({ provider: "openrouter", apiKey: "sk-or-test" }),
+      Symplek.configure({ provider: "openrouter", apiKey: "sk-or-test" }),
     ).toThrow(expect.objectContaining({ code: "PROVIDER_ERROR" }));
   });
 
   it("error message explains openrouter is not yet supported", () => {
     let thrownError: unknown;
     try {
-      Weft.configure({ provider: "openrouter", apiKey: "sk-or-test" });
+      Symplek.configure({ provider: "openrouter", apiKey: "sk-or-test" });
     } catch (e) {
       thrownError = e;
     }
@@ -481,9 +481,9 @@ describe("Bug 3 — configure({ provider: 'openrouter' }) throws PROVIDER_ERROR"
     expect(errorMessage).toContain("openrouter");
   });
 
-  it("Weft.providers() does NOT advertise openrouter as a known provider", () => {
+  it("Symplek.providers() does NOT advertise openrouter as a known provider", () => {
     providerRegistry.clear();
-    const providers = Weft.providers();
+    const providers = Symplek.providers();
     const ids = providers.map((p) => p.id);
     expect(ids).not.toContain("openrouter");
   });
@@ -502,10 +502,10 @@ describe("N67 — configure() cross-provider key safety", () => {
 
   it("provider-only reconfigure does not bootstrap with previous vendor's apiKey", async () => {
     // First configure: anthropic + real-looking key
-    Weft.configure({ provider: "anthropic", apiKey: "sk-ant-stale-key" });
+    Symplek.configure({ provider: "anthropic", apiKey: "sk-ant-stale-key" });
 
     // Second configure: only change provider, no new key
-    Weft.configure({ provider: "openai" });
+    Symplek.configure({ provider: "openai" });
 
     // Drain any pending init promise
     const { getInitPromise, clearInitPromise, getGlobalConfig } = await import("../globalConfig");
@@ -520,9 +520,9 @@ describe("N67 — configure() cross-provider key safety", () => {
   });
 
   it("same-provider reconfigure preserves the existing apiKey", async () => {
-    Weft.configure({ provider: "openai", apiKey: "sk-test-123" });
+    Symplek.configure({ provider: "openai", apiKey: "sk-test-123" });
     // Second configure: update model only — same provider
-    Weft.configure({ provider: "openai", model: "gpt-4o-mini" });
+    Symplek.configure({ provider: "openai", model: "gpt-4o-mini" });
 
     const { getGlobalConfig } = await import("../globalConfig");
     const cfg = getGlobalConfig();
@@ -541,12 +541,12 @@ describe("N67 — configure() cross-provider key safety", () => {
     // _config.provider (including the undefined → "anthropic" transition).
     const { getGlobalConfig } = await import("../globalConfig");
 
-    Weft.configure({ apiKey: "sk-openai-staged-key" });
+    Symplek.configure({ apiKey: "sk-openai-staged-key" });
     // Confirm key is staged, no provider yet
     expect(getGlobalConfig().apiKey).toBe("sk-openai-staged-key");
     expect(getGlobalConfig().provider).toBeUndefined();
 
-    Weft.configure({ provider: "anthropic" });
+    Symplek.configure({ provider: "anthropic" });
 
     const cfg = getGlobalConfig();
     expect(cfg.provider).toBe("anthropic");
@@ -604,8 +604,8 @@ describe("configure() generation guard — stale bootstrap does not overwrite ne
     const { getInitPromise, clearInitPromise } = await import("../globalConfig");
 
     // Two back-to-back configures — the second call increments the generation.
-    Weft.configure({ provider: "openai", apiKey: "old-key" });
-    Weft.configure({ provider: "openai", apiKey: "new-key" });
+    Symplek.configure({ provider: "openai", apiKey: "old-key" });
+    Symplek.configure({ provider: "openai", apiKey: "new-key" });
 
     // Drain both init promises (the second one overwrites the first in the slot).
     const p = getInitPromise();
@@ -636,7 +636,7 @@ describe("configure() generation guard — stale bootstrap does not overwrite ne
     vi.stubEnv("ANTHROPIC_API_KEY", "");
     const genBefore = _getBootstrapGenerationForTesting();
 
-    Weft.configure({ provider: "anthropic" }); // no resolvable key
+    Symplek.configure({ provider: "anthropic" }); // no resolvable key
 
     expect(_getBootstrapGenerationForTesting()).toBe(genBefore + 1);
     vi.unstubAllEnvs();
@@ -656,7 +656,7 @@ describe("configure() generation guard — stale bootstrap does not overwrite ne
     const { _getBootstrapGenerationForTesting } = await import("../facade");
 
     // Step 1: first configure records a generation.
-    Weft.configure({ provider: "openai", apiKey: "sk-first" });
+    Symplek.configure({ provider: "openai", apiKey: "sk-first" });
     const genAfterFirstConfigure = _getBootstrapGenerationForTesting();
 
     // Step 2: reset.
@@ -668,7 +668,7 @@ describe("configure() generation guard — stale bootstrap does not overwrite ne
     expect(genAfterReset).toBeGreaterThan(genAfterFirstConfigure);
 
     // Step 3: post-reset configure increments again.
-    Weft.configure({ provider: "anthropic", apiKey: "sk-second" });
+    Symplek.configure({ provider: "anthropic", apiKey: "sk-second" });
     const genAfterSecondConfigure = _getBootstrapGenerationForTesting();
 
     // The post-reset generation is strictly greater than any pre-reset generation.
@@ -678,13 +678,13 @@ describe("configure() generation guard — stale bootstrap does not overwrite ne
 
 // ─────────────────────────────────────────────────────────────────────────────
 // N41 — builder resilience bypass: schema branch and timeout+retry must compose
-// N50 — Weft.agent provider/system/temperature forwarding
-// N51 — WeftOptions.confidence applied to result
+// N50 — Symplek.agent provider/system/temperature forwarding
+// N51 — SymplekOptions.confidence applied to result
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("N41 — WeftBuilder resilience: schema + timeout + retry compose", () => {
+describe("N41 — SymplekBuilder resilience: schema + timeout + retry compose", () => {
   it("schema branch applies timeout: computation times out", async () => {
-    const { WeftBuilder } = await import("../builder");
+    const { SymplekBuilder } = await import("../builder");
     const { z } = await import("zod");
 
     // Register a hanging provider so the schema-branch ai() call never returns.
@@ -705,18 +705,18 @@ describe("N41 — WeftBuilder resilience: schema + timeout + retry compose", () 
     providerRegistry.clear();
     providerRegistry.register(hangingProvider, true);
 
-    const builder = new WeftBuilder<{ name: string }>("slow task", {
+    const builder = new SymplekBuilder<{ name: string }>("slow task", {
       schema: z.object({ name: z.string() }),
       timeout: 30, // 30ms — should fire before any real work completes
     });
 
-    // The timeout operator throws a plain Error (not WeftError) — assert on message.
+    // The timeout operator throws a plain Error (not SymplekError) — assert on message.
     await expect(builder.run()).rejects.toThrow(/timed out/i);
   });
 
   it("schema branch applies retry: computation is retried on failure", async () => {
     // Use a real AgentUnit to verify retry wraps the schema branch
-    const { WeftBuilder } = await import("../builder");
+    const { SymplekBuilder } = await import("../builder");
     const { z } = await import("zod");
 
     let attempts = 0;
@@ -735,7 +735,7 @@ describe("N41 — WeftBuilder resilience: schema + timeout + retry compose", () 
     providerRegistry.clear();
     providerRegistry.register(failingProvider, true);
 
-    const builder = new WeftBuilder<{ name: string }>("retry task", {
+    const builder = new SymplekBuilder<{ name: string }>("retry task", {
       schema: z.object({ name: z.string() }),
       retry: 2, // maxAttempts = 2
     });
@@ -746,7 +746,7 @@ describe("N41 — WeftBuilder resilience: schema + timeout + retry compose", () 
   });
 
   it("non-schema branch applies both timeout AND retry when both specified", async () => {
-    const { WeftBuilder } = await import("../builder");
+    const { SymplekBuilder } = await import("../builder");
 
     let attempts = 0;
     const slowProvider: Provider = {
@@ -765,7 +765,7 @@ describe("N41 — WeftBuilder resilience: schema + timeout + retry compose", () 
     providerRegistry.clear();
     providerRegistry.register(slowProvider, true);
 
-    const builder = new WeftBuilder("timeout+retry task", {
+    const builder = new SymplekBuilder("timeout+retry task", {
       timeout: 20,  // 20ms — times out
       retry: 2,     // retries 2 times
     });
@@ -776,12 +776,12 @@ describe("N41 — WeftBuilder resilience: schema + timeout + retry compose", () 
   });
 });
 
-describe("N51 — WeftOptions.confidence applied to TrackedResult", () => {
+describe("N51 — SymplekOptions.confidence applied to TrackedResult", () => {
   it("result.confidence equals the user-specified value", async () => {
-    const { WeftBuilder } = await import("../builder");
+    const { SymplekBuilder } = await import("../builder");
     const { isTracked } = await import("../index");
 
-    const builder = new WeftBuilder<string>("any task", {
+    const builder = new SymplekBuilder<string>("any task", {
       confidence: 0.42,
     });
 
@@ -878,7 +878,7 @@ describe("Regression — OPENROUTER_API_KEY alone does not auto-detect openroute
 // ─────────────────────────────────────────────────────────────────────────────
 // N21 — the documented quick-start must work on a first run.
 //
-// README shows `Weft.configure({ provider, model })` with no apiKey, relying
+// README shows `Symplek.configure({ provider, model })` with no apiKey, relying
 // on the conventional environment variable. Previously the bootstrap only ran
 // when BOTH provider and apiKey were supplied, so this path enqueued nothing
 // and the first call failed on an unregistered provider.
@@ -893,7 +893,7 @@ describe("N21 — configure() resolves the API key from the environment", () => 
     vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant-test-key");
     const { getInitPromise } = await import("../globalConfig");
 
-    Weft.configure({
+    Symplek.configure({
       provider: "anthropic",
       model: "claude-sonnet-4-20250514",
     });
@@ -906,7 +906,7 @@ describe("N21 — configure() resolves the API key from the environment", () => 
     vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant-from-env");
     const { getInitPromise } = await import("../globalConfig");
 
-    Weft.configure({ provider: "anthropic", apiKey: "sk-ant-explicit" });
+    Symplek.configure({ provider: "anthropic", apiKey: "sk-ant-explicit" });
 
     expect(getInitPromise()).not.toBeNull();
     vi.unstubAllEnvs();
@@ -916,7 +916,7 @@ describe("N21 — configure() resolves the API key from the environment", () => 
     vi.stubEnv("ANTHROPIC_API_KEY", "");
     const { getInitPromise } = await import("../globalConfig");
 
-    Weft.configure({ provider: "anthropic" });
+    Symplek.configure({ provider: "anthropic" });
 
     expect(getInitPromise()).toBeNull();
     vi.unstubAllEnvs();

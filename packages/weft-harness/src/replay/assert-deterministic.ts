@@ -7,8 +7,8 @@
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  */
 
-import type { ToolUseEntry, TraceEntry } from "./index";
-import { loadTrace } from "./index";
+import type { ToolUseEntry, TraceEntry } from "./index.js";
+import { loadTrace } from "./index.js";
 
 // ─── Error ────────────────────────────────────────────────────────────────────
 

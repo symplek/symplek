@@ -1,5 +1,5 @@
 /**
- * @module weft-core/operators/timeout
+ * @module @symplek/core/operators/timeout
  * @description Timeout operator: cancels a computation after a specified duration.
  * @blast_radius LOW
  * @status STABLE

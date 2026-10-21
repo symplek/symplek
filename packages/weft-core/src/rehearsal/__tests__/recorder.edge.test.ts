@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Edge case tests for Trace Recorder
- * @module weft-core/rehearsal/__tests__/recorder.edge
+ * @module @symplek/core/rehearsal/__tests__/recorder.edge
  */
 
 import { describe, expect, it } from "vitest";

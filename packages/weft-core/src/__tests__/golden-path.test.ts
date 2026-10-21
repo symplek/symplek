@@ -1,12 +1,12 @@
 /**
  * @module golden-path.test
- * @description Golden-path test suite for weft-core public API.
+ * @description Golden-path test suite for @symplek/core public API.
  *   Exercises each published primitive on the happy path — proves the package
  *   works end-to-end as shipped with zero external providers required.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AgentUnit, createContext, VERSION, WeftError } from "../index";
+import { AgentUnit, createContext, VERSION, SymplekError } from "../index";
 import type { AgentContext } from "../types";
 
 // ─── Shared Context ──────────────────────────────────────────────────────────
@@ -97,39 +97,39 @@ describe("AgentUnit.consensus", () => {
   });
 });
 
-// ─── 4. WeftError field verification ─────────────────────────────────────────
+// ─── 4. SymplekError field verification ─────────────────────────────────────────
 
-describe("WeftError", () => {
+describe("SymplekError", () => {
   it("stores code, message, and action correctly", () => {
-    const err = new WeftError({
+    const err = new SymplekError({
       code: "SETUP_ERROR",
       message: "test message",
       action: "fix it",
     });
     expect(err.code).toBe("SETUP_ERROR");
-    // Message is prefixed with [weft@VERSION] for self-identifying stack traces
-    expect(err.message).toBe(`[weft@${VERSION}] test message`);
+    // Message is prefixed with [symplek@VERSION] for self-identifying stack traces
+    expect(err.message).toBe(`[symplek@${VERSION}] test message`);
     expect(err.action).toBe("fix it");
   });
 
   it("is an instance of Error", () => {
-    const err = new WeftError({ code: "TIMEOUT", message: "timed out" });
+    const err = new SymplekError({ code: "TIMEOUT", message: "timed out" });
     expect(err).toBeInstanceOf(Error);
-    expect(err.name).toBe("WeftError");
+    expect(err.name).toBe("SymplekError");
   });
 
   it("serializes to JSON with expected shape", () => {
-    const err = new WeftError({ code: "NETWORK_ERROR", message: "no network" });
+    const err = new SymplekError({ code: "NETWORK_ERROR", message: "no network" });
     const json = err.toJSON();
     expect(json).toMatchObject({
-      name: "WeftError",
+      name: "SymplekError",
       code: "NETWORK_ERROR",
-      message: `[weft@${VERSION}] no network`,
+      message: `[symplek@${VERSION}] no network`,
     });
   });
 
   it("sanitizes sensitive context keys", () => {
-    const err = new WeftError({
+    const err = new SymplekError({
       code: "AUTH_FAILED",
       message: "auth error",
       context: { api_key: "secret-value", userId: "u123" },
@@ -139,7 +139,7 @@ describe("WeftError", () => {
   });
 
   it("exposes .fix field when fix is provided", () => {
-    const err = new WeftError({
+    const err = new SymplekError({
       code: "SETUP_ERROR",
       why: "OPENAI_API_KEY is missing",
       fix: {
@@ -156,11 +156,11 @@ describe("WeftError", () => {
   });
 
   it("SETUP_ERROR matches the AgentUnit guard error — code, message, action fields present", () => {
-    const err = new WeftError({
+    const err = new SymplekError({
       code: "SETUP_ERROR",
       message:
-        'AgentUnit operators not loaded. Import from "weft-core", not internal paths.',
-      action: 'Change import to: import { AgentUnit } from "weft-core";',
+        'AgentUnit operators not loaded. Import from "@symplek/core", not internal paths.',
+      action: 'Change import to: import { AgentUnit } from "@symplek/core";',
     });
     expect(err.code).toBe("SETUP_ERROR");
     expect(err.message).toContain("AgentUnit operators not loaded");
@@ -190,22 +190,22 @@ describe("createContext", () => {
   });
 });
 
-// ─── 6. Weft.stream (mocked) ─────────────────────────────────────────────────
+// ─── 6. Symplek.stream (mocked) ─────────────────────────────────────────────────
 
-describe("Weft.stream (mocked)", () => {
+describe("Symplek.stream (mocked)", () => {
   it("yields chunks from a mocked stream", { timeout: 20000 }, async () => {
-    // Import Weft facade locally so vi.spyOn works on the named export
-    const { Weft } = await import("../facade");
+    // Import Symplek facade locally so vi.spyOn works on the named export
+    const { Symplek } = await import("../facade");
 
     async function* fakeStream(): AsyncGenerator<string> {
       yield "Hello";
       yield " world";
     }
 
-    const spy = vi.spyOn(Weft, "stream").mockImplementation(() => fakeStream());
+    const spy = vi.spyOn(Symplek, "stream").mockImplementation(() => fakeStream());
 
     const chunks: string[] = [];
-    for await (const chunk of Weft.stream("test prompt")) {
+    for await (const chunk of Symplek.stream("test prompt")) {
       chunks.push(chunk);
     }
 
@@ -310,22 +310,22 @@ describe("AgentUnit.prototype.runStandalone", () => {
   });
 });
 
-// ─── 9. Weft.configure sets global config ────────────────────────────────────
+// ─── 9. Symplek.configure sets global config ────────────────────────────────────
 
-describe("Weft.configure", () => {
+describe("Symplek.configure", () => {
   it("does not throw when called with a model override", async () => {
-    const { Weft } = await import("../facade");
-    expect(() => Weft.configure({ model: "gpt-4o-mini" })).not.toThrow();
+    const { Symplek } = await import("../facade");
+    expect(() => Symplek.configure({ model: "gpt-4o-mini" })).not.toThrow();
   });
 
   it("does not throw when called with a provider override", async () => {
-    const { Weft } = await import("../facade");
-    expect(() => Weft.configure({ provider: "openai" })).not.toThrow();
+    const { Symplek } = await import("../facade");
+    expect(() => Symplek.configure({ provider: "openai" })).not.toThrow();
   });
 
-  it("Weft.providers() returns an array of known providers", async () => {
-    const { Weft } = await import("../facade");
-    const providers = Weft.providers();
+  it("Symplek.providers() returns an array of known providers", async () => {
+    const { Symplek } = await import("../facade");
+    const providers = Symplek.providers();
     expect(Array.isArray(providers)).toBe(true);
     expect(providers.length).toBeGreaterThan(0);
     const providerIds = providers.map((p) => p.id);

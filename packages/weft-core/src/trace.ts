@@ -14,7 +14,7 @@
  *     during `fn`'s execution. Concurrent scopes are isolated, so a
  *     Convex action serving user A never captures user B's trace.
  *
- * Hosts that run Weft calls per-request (Convex actions, HTTP handlers,
+ * Hosts that run Symplek calls per-request (Convex actions, HTTP handlers,
  * queue workers) MUST use `withScope` instead of subscribing via `onTrace`.
  *
  * **Content retention**: `Trace.prompt` and `Trace.response` store the full
@@ -85,7 +85,7 @@ class TraceManager {
    * trace is stored in `_lastTrace`, pushed to scope buffers, or broadcast to
    * subscribers. Pass `null` to remove a previously installed hook.
    *
-   * The activity-middleware path in weft-convex persists `trace.prompt` and
+   * The activity-middleware path in @symplek/convex persists `trace.prompt` and
    * `trace.response`; setting a redactor here controls what that path sees.
    */
   setRedactor(redactor: TraceRedactor | null): void {
@@ -102,7 +102,7 @@ class TraceManager {
   lastTrace(): Trace | null {
     if (this._scope.getStore() !== undefined) {
       console.warn(
-        "[Weft] lastTrace() called inside a withScope() context. " +
+        "[Symplek] lastTrace() called inside a withScope() context. " +
           "This returns a PROCESS-GLOBAL trace — under concurrency it may be " +
           "another request's trace. Use the traces array returned by withScope() " +
           "for per-request isolation.",
@@ -122,7 +122,7 @@ class TraceManager {
   onTrace(callback: TraceCallback): () => void {
     if (this._scope.getStore() !== undefined) {
       console.warn(
-        "[Weft] onTrace() registered inside a withScope() context. " +
+        "[Symplek] onTrace() registered inside a withScope() context. " +
           "Broadcast callbacks receive ALL traces in the process, not just the " +
           "current scope's. Use withScope() return value for per-request isolation.",
       );
@@ -177,7 +177,7 @@ class TraceManager {
       try {
         callback(stored);
       } catch (error) {
-        console.error("[Weft] Error in onTrace callback:", error);
+        console.error("[Symplek] Error in onTrace callback:", error);
       }
     }
 
@@ -187,17 +187,17 @@ class TraceManager {
   }
 
   private logToConsole(trace: Trace): void {
-    console.log(`[Weft] Starting request...`);
-    console.log(`[Weft] Provider: ${trace.provider}`);
-    console.log(`[Weft] Model: ${trace.model}`);
+    console.log(`[Symplek] Starting request...`);
+    console.log(`[Symplek] Provider: ${trace.provider}`);
+    console.log(`[Symplek] Model: ${trace.model}`);
     console.log(
-      `[Weft] Request: "${this.truncate(trace.prompt)}" (${trace.prompt.length} chars)`,
+      `[Symplek] Request: "${this.truncate(trace.prompt)}" (${trace.prompt.length} chars)`,
     );
     console.log(
-      `[Weft] Response: "${this.truncate(trace.response)}" (${trace.response.length} chars)`,
+      `[Symplek] Response: "${this.truncate(trace.response)}" (${trace.response.length} chars)`,
     );
     console.log(
-      `[Weft] Duration: ${trace.duration}ms | Tokens: ${trace.tokens.input} in / ${trace.tokens.output} out`,
+      `[Symplek] Duration: ${trace.duration}ms | Tokens: ${trace.tokens.input} in / ${trace.tokens.output} out`,
     );
   }
 

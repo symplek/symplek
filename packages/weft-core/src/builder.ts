@@ -1,5 +1,5 @@
 /**
- * @module builder - WeftBuilder class and WeftOptions type
+ * @module builder - SymplekBuilder class and SymplekOptions type
  * @description Lazy promise-like builder that defers AI execution until awaited.
  *   Extracted from facade.ts to break the facade ↔ agent circular dependency.
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
@@ -17,7 +17,7 @@ import type { RetryOptions, TrackedResult } from "./types";
 // TYPES
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface WeftOptions<T = unknown> {
+export interface SymplekOptions<T = unknown> {
   /** Zod schema for output validation and type inference. */
   schema?: z.ZodType<T>;
   /**
@@ -47,30 +47,30 @@ export interface WeftOptions<T = unknown> {
 /**
  * Lazy builder wrapping real AI execution via ai().
  *
- * - `await Weft("task")` runs the prompt through the provider pipeline.
- * - `Weft("task").coordinate()` bridges into the full AgentUnit algebra,
+ * - `await Symplek("task")` runs the prompt through the provider pipeline.
+ * - `Symplek("task").coordinate()` bridges into the full AgentUnit algebra,
  *   so coordination operators like `.consensus()`, `.debate()`, and
  *   `.dialectic()` compose directly onto a facade call.
- * - `Weft("task").toUnit()` is an alias for `.coordinate()`.
+ * - `Symplek("task").toUnit()` is an alias for `.coordinate()`.
  *
  * @example
  * ```typescript
  * // Simple call
- * const result = await Weft("Summarise this");
+ * const result = await Symplek("Summarise this");
  *
  * // Bridge to multi-agent coordination
- * const consensus = await Weft("Analyse this clause")
+ * const consensus = await Symplek("Analyse this clause")
  *   .coordinate()
  *   .consensus([legal, contractor, mediator])
  *   .run(ctx);
  * ```
  */
-export class WeftBuilder<T = unknown> implements PromiseLike<TrackedResult<T>> {
+export class SymplekBuilder<T = unknown> implements PromiseLike<TrackedResult<T>> {
   private readonly task: string;
-  private readonly options: WeftOptions<T>;
+  private readonly options: SymplekOptions<T>;
   private _unit: AgentUnit<T> | null = null;
 
-  constructor(task: string, options?: WeftOptions<T>) {
+  constructor(task: string, options?: SymplekOptions<T>) {
     this.task = task;
     this.options = options ?? {};
   }
@@ -100,7 +100,7 @@ export class WeftBuilder<T = unknown> implements PromiseLike<TrackedResult<T>> {
     const ctx = createContext();
     const result = await this.coordinate().run(ctx);
     // N51 fix: apply the user-specified confidence to the result.
-    // Previously, WeftOptions.confidence was accepted but silently ignored;
+    // Previously, SymplekOptions.confidence was accepted but silently ignored;
     // the confidence was always recomputed from the operator chain.
     if (this.options.confidence !== undefined) {
       result.confidence = this.options.confidence;
@@ -126,7 +126,7 @@ export class WeftBuilder<T = unknown> implements PromiseLike<TrackedResult<T>> {
     const opts = this.options;
 
     // N50 fix: forward all AgentConfig fields to ai() — provider, system, and
-    // temperature were previously accepted in WeftOptions but silently dropped.
+    // temperature were previously accepted in SymplekOptions but silently dropped.
     const aiOpts = {
       model: opts.model,
       provider: opts.provider,

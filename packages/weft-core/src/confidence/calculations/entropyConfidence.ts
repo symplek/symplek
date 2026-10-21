@@ -1,8 +1,8 @@
 ﻿/**
  * @fileoverview Entropy-Based Confidence Calculation
  * @description Tier 2a - Statistical confidence from vote distribution entropy
- * @module weft-core/confidence/calculations/entropyConfidence
- * @since 2.0.0
+ * @module @symplek/core/confidence/calculations/entropyConfidence
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[01.05]: Entropy confidence from information theory research
  *

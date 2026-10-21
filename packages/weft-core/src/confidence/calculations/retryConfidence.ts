@@ -1,8 +1,8 @@
 ﻿/**
  * @fileoverview Retry-Based Confidence Calculation
  * @description Tier 3 - Behavioral confidence from retry patterns
- * @module weft-core/confidence/calculations/retryConfidence
- * @since 2.0.0
+ * @module @symplek/core/confidence/calculations/retryConfidence
+ * @since 1.0.0-beta.1
  *
  * 📝 BUILD[01.07]: Retry confidence from behavioral research
  *

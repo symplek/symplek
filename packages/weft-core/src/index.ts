@@ -1,7 +1,7 @@
 /**
- * @fileoverview Public API exports for weft-core
+ * @fileoverview Public API exports for @symplek/core
  * @description MIT-licensed free-tier package — full public surface
- * @module weft-core
+ * @module @symplek/core
  * @since 1.0.0-beta.1
  * @rules .cursor/rules/patterns/029-file-header-contracts.mdc
  */
@@ -43,11 +43,11 @@ export { ContractError, defineContract } from "./contract";
 // ─── Errors ──────────────────────────────────────────────────────────────────
 export type {
   ErrorCode,
-  WeftErrorCode,
-  WeftErrorDetail,
-  WeftErrorOptions,
+  SymplekErrorCode,
+  SymplekErrorDetail,
+  SymplekErrorOptions,
 } from "./errors";
-export { CompensationError, IdempotencyStoreWriteError, WeftError } from "./errors";
+export { CompensationError, IdempotencyStoreWriteError, SymplekError } from "./errors";
 export type {
   InterviewConfig,
   InterviewOptions,
@@ -66,7 +66,7 @@ export type {
   IdempotencyStore,
   IdempotencyStrategy,
 } from "./idempotency";
-// ─── Observability (Free Tier — moved from weft-pro) ────────────────────────
+// ─── Observability (Free Tier — moved from @symplek/pro) ────────────────────────
 export {
   clearTraces,
   configureObservability,
@@ -108,9 +108,9 @@ export {
   TraceVersionError,
   VectorClockManager,
 } from "./rehearsal";
-// ─── Solo Mechanism (free tier — basic solo; Pro tier extends in weft-pro) ───
+// ─── Solo Mechanism (free tier — basic solo; Pro tier extends in @symplek/pro) ───
 // These are the building blocks. For TaCo, trust registry, antibodies, change-kernel,
-// install weft-pro and call validateLicense().
+// install @symplek/pro and call validateLicense().
 export {
   // Config
   getPresetFromConfig,
@@ -190,7 +190,7 @@ export {
 } from "./solo";
 export type { StreamOptions } from "./streaming";
 export type { TeamConfig, TeamMode, TeamResult } from "./teams";
-// ─── Teams (free tier — basic team; Pro tier extends in weft-pro) ────────────
+// ─── Teams (free tier — basic team; Pro tier extends in @symplek/pro) ────────────
 export { Team, TeamRegistry, teams } from "./teams";
 // ─── Trace ───────────────────────────────────────────────────────────────────
 export type { Trace, TraceCallback, TraceRedactor } from "./trace";

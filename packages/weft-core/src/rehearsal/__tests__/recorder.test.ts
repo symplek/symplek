@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Unit tests for Trace Recorder
- * @module weft-core/rehearsal/__tests__/recorder
+ * @module @symplek/core/rehearsal/__tests__/recorder
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

@@ -1,16 +1,16 @@
 /**
  * @fileoverview OpenTelemetry Export (additive observability layer)
- * @module weft-core/otel
+ * @module @symplek/core/otel
  * @description Exports the in-memory trace store as OTLP spans using
  *   gen_ai semantic conventions. The OpenTelemetry packages are OPTIONAL
  *   peer dependencies — they are loaded lazily via dynamic import only when
- *   {@link configureOpenTelemetry} is called, so importing weft-core never
+ *   {@link configureOpenTelemetry} is called, so importing @symplek/core never
  *   pulls OTel into a bundle and the browser entrypoint stays clean.
- * @rules @.claude/rules/frameworks/weft/weft-no-duplicate-analysis.md
+ * @rules @.claude/rules/frameworks/symplek/symplek-no-duplicate-analysis.md
  * @since 1.0.0-beta.1
  */
 
-import { WeftError } from "./errors";
+import { SymplekError } from "./errors";
 import { getTraces } from "./observability";
 import type { TraceEntry } from "./types";
 
@@ -18,11 +18,11 @@ import type { TraceEntry } from "./types";
 // PUBLIC TYPES
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Options for wiring weft traces to an OTLP collector. */
+/** Options for wiring symplek traces to an OTLP collector. */
 export interface OpenTelemetryOptions {
   /** OTLP HTTP traces endpoint, e.g. "http://localhost:4318/v1/traces". */
   endpoint: string;
-  /** Logical service name reported on every span (default: "weft"). */
+  /** Logical service name reported on every span (default: "symplek"). */
   serviceName?: string;
   /** Optional headers (auth tokens, tenant ids) sent with each OTLP request. */
   headers?: Record<string, string>;
@@ -57,8 +57,8 @@ export function genAiSpanAttributes(
 ): Record<string, OtelAttributeValue> {
   const a = entry.attributes ?? {};
   const out: Record<string, OtelAttributeValue> = {
-    "weft.operator.type": entry.operatorType,
-    "weft.operator.name": entry.operatorName,
+    "symplek.operator.type": entry.operatorType,
+    "symplek.operator.name": entry.operatorName,
   };
 
   // Pass through arbitrary scalar attributes recorded via setAttribute —
@@ -162,7 +162,7 @@ let runtime: OtelRuntime | null = null;
  * packages, builds a `NodeTracerProvider` wired to an OTLP/HTTP exporter,
  * and stores a tracer for {@link exportTraces}.
  *
- * @throws {WeftError} SETUP_ERROR if the optional `@opentelemetry/*` packages
+ * @throws {SymplekError} SETUP_ERROR if the optional `@opentelemetry/*` packages
  *   are not installed.
  *
  * @example
@@ -181,7 +181,7 @@ export async function configureOpenTelemetry(
   const [api, sdkNode, otlp, resources] = await loadOtel();
 
   const resource = resources.resourceFromAttributes({
-    "service.name": options.serviceName ?? "weft",
+    "service.name": options.serviceName ?? "symplek",
   });
 
   const exporter = new otlp.OTLPTraceExporter({
@@ -196,7 +196,7 @@ export async function configureOpenTelemetry(
 
   runtime = {
     provider,
-    tracer: provider.getTracer("weft-core"),
+    tracer: provider.getTracer("@symplek/core"),
     api,
   };
 }
@@ -294,13 +294,13 @@ async function loadOtel(): Promise<[any, any, any, any]> {
     ]);
     return [api, sdkNode, otlp, resources];
   } catch (cause) {
-    throw new WeftError({
+    throw new SymplekError({
       code: "SETUP_ERROR",
       why: "OpenTelemetry export requires the optional @opentelemetry/* peer dependencies, which are not installed.",
       fix: {
         description:
           "Install the OpenTelemetry peer dependencies to enable OTLP export.",
-        docsUrl: "https://github.com/wefthq/weft#opentelemetry-export",
+        docsUrl: "https://github.com/symplek/symplek#opentelemetry-export",
       },
       example:
         "npm install @opentelemetry/api @opentelemetry/sdk-trace-node @opentelemetry/exporter-trace-otlp-http @opentelemetry/resources",

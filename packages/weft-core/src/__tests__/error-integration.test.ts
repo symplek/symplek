@@ -1,7 +1,7 @@
 /**
  * @fileoverview Error Integration Tests for AgentUnit
  * @description Tests for Story 01.03: AgentUnit Error Integration
- * @module weft-core/__tests__/error-integration
+ * @module @symplek/core/__tests__/error-integration
  * @since 1.0.0-beta.1
  *
  * 📝 BUILD[01.03]: Error integration tests
@@ -9,7 +9,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentUnit } from "../AgentUnit";
-import type { WeftErrorDetail } from "../errors";
+import type { SymplekErrorDetail } from "../errors";
 import type { AgentContext } from "../types";
 
 // Test context
@@ -38,7 +38,7 @@ describe("AgentUnit Error Integration (Story 01.03)", () => {
       const ctx = createTestContext();
 
       await expect(unit.run(ctx)).rejects.toMatchObject({
-        WeftError: expect.objectContaining({
+        SymplekError: expect.objectContaining({
           code: "E201",
         }),
       });
@@ -57,7 +57,7 @@ describe("AgentUnit Error Integration (Story 01.03)", () => {
       const ctx = createTestContext();
 
       await expect(unit.run(ctx)).rejects.toMatchObject({
-        WeftError: expect.objectContaining({
+        SymplekError: expect.objectContaining({
           code: "E203",
         }),
       });
@@ -75,7 +75,7 @@ describe("AgentUnit Error Integration (Story 01.03)", () => {
       const ctx = createTestContext();
 
       await expect(unit.run(ctx)).rejects.toMatchObject({
-        WeftError: expect.objectContaining({
+        SymplekError: expect.objectContaining({
           code: "E202",
         }),
       });
@@ -89,7 +89,7 @@ describe("AgentUnit Error Integration (Story 01.03)", () => {
       const ctx = createTestContext();
 
       await expect(unit.run(ctx)).rejects.toMatchObject({
-        WeftError: expect.objectContaining({
+        SymplekError: expect.objectContaining({
           code: "E401",
         }),
       });
@@ -107,7 +107,7 @@ describe("AgentUnit Error Integration (Story 01.03)", () => {
       const ctx = createTestContext();
 
       await expect(unit.run(ctx)).rejects.toMatchObject({
-        WeftError: expect.objectContaining({
+        SymplekError: expect.objectContaining({
           code: "E301",
         }),
       });
@@ -125,7 +125,7 @@ describe("AgentUnit Error Integration (Story 01.03)", () => {
       const ctx = createTestContext();
 
       await expect(unit.run(ctx)).rejects.toMatchObject({
-        WeftError: expect.objectContaining({
+        SymplekError: expect.objectContaining({
           code: "E101",
         }),
       });
@@ -143,7 +143,7 @@ describe("AgentUnit Error Integration (Story 01.03)", () => {
       const ctx = createTestContext();
 
       await expect(unit.run(ctx)).rejects.toMatchObject({
-        WeftError: expect.objectContaining({
+        SymplekError: expect.objectContaining({
           code: "E000",
         }),
       });
@@ -151,7 +151,7 @@ describe("AgentUnit Error Integration (Story 01.03)", () => {
   });
 
   describe("Error Enhancement", () => {
-    it("attaches WeftError property to thrown error", async () => {
+    it("attaches SymplekError property to thrown error", async () => {
       const unit = AgentUnit.from<string>(async () => {
         throw new Error("Timeout error");
       });
@@ -164,17 +164,17 @@ describe("AgentUnit Error Integration (Story 01.03)", () => {
       } catch (error) {
         expect(error).toBeInstanceOf(Error);
         expect(
-          (error as Error & { WeftError: WeftErrorDetail }).WeftError,
+          (error as Error & { SymplekError: SymplekErrorDetail }).SymplekError,
         ).toBeDefined();
 
-        const WeftError = (error as Error & { WeftError: WeftErrorDetail })
-          .WeftError;
-        expect(WeftError.code).toBe("E201");
-        expect(WeftError.message).toContain("[E201]");
-        expect(WeftError.fix).toBeDefined();
-        expect(WeftError.fix.docsUrl).toContain("Weft.ai");
-        expect(WeftError.originalMessage).toBe("Timeout error");
-        expect(WeftError.timestamp).toBeGreaterThan(0);
+        const SymplekError = (error as Error & { SymplekError: SymplekErrorDetail })
+          .SymplekError;
+        expect(SymplekError.code).toBe("E201");
+        expect(SymplekError.message).toContain("[E201]");
+        expect(SymplekError.fix).toBeDefined();
+        expect(SymplekError.fix.docsUrl).toContain("github.com/symplek/symplek");
+        expect(SymplekError.originalMessage).toBe("Timeout error");
+        expect(SymplekError.timestamp).toBeGreaterThan(0);
       }
     });
 
@@ -212,10 +212,10 @@ describe("AgentUnit Error Integration (Story 01.03)", () => {
         await unit.run(ctx);
         expect.fail("Should have thrown");
       } catch (error) {
-        const WeftError = (error as Error & { WeftError: WeftErrorDetail })
-          .WeftError;
-        expect(WeftError.location?.operatorChain).toBeDefined();
-        expect(WeftError.location?.operatorChain).toContain("flatMap");
+        const SymplekError = (error as Error & { SymplekError: SymplekErrorDetail })
+          .SymplekError;
+        expect(SymplekError.location?.operatorChain).toBeDefined();
+        expect(SymplekError.location?.operatorChain).toContain("flatMap");
       }
     });
   });
@@ -245,7 +245,7 @@ describe("AgentUnit Error Integration (Story 01.03)", () => {
 
       // Check for docs link
       expect(output).toContain("Docs:");
-      expect(output).toContain("Weft.ai");
+      expect(output).toContain("github.com/symplek/symplek");
     });
 
     it("includes code snippet in output when available", async () => {
@@ -277,7 +277,7 @@ describe("AgentUnit Error Integration (Story 01.03)", () => {
       await expect(
         unit.run(ctx, { trustMode: "legacy" }),
       ).rejects.toMatchObject({
-        WeftError: expect.objectContaining({
+        SymplekError: expect.objectContaining({
           code: "E201",
         }),
       });
@@ -300,7 +300,7 @@ describe("AgentUnit Error Integration (Story 01.03)", () => {
         expect(error).toBeInstanceOf(Error);
         expect((error as Error).message).toBe("String error message");
         expect(
-          (error as Error & { WeftError: WeftErrorDetail }).WeftError,
+          (error as Error & { SymplekError: SymplekErrorDetail }).SymplekError,
         ).toBeDefined();
       }
     });
@@ -353,9 +353,9 @@ describe("AgentUnit Error Integration (Story 01.03)", () => {
         await unit.run(ctx);
         expect.fail("Should have thrown");
       } catch (error) {
-        const WeftError = (error as Error & { WeftError: WeftErrorDetail })
-          .WeftError;
-        expect(WeftError.code).toBe(expectedCode);
+        const SymplekError = (error as Error & { SymplekError: SymplekErrorDetail })
+          .SymplekError;
+        expect(SymplekError.code).toBe(expectedCode);
       }
     });
   });

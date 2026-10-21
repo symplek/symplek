@@ -1,6 +1,6 @@
 /**
  * @module PlanOperator
- * @description plan() operator for weft-harness — runs the Claude Agent SDK in read-only
+ * @description plan() operator for @symplek/harness — runs the Claude Agent SDK in read-only
  * mode, accumulates tool calls, and produces a deterministically-IDed PlanArtifact inside
  * an AgentUnit<PlanArtifact>. Calling .run(ctx) wraps the artifact in a single TrackedResult
  * so result.value.id is the plan ID. When the SDK is not installed the operator falls back
@@ -9,8 +9,8 @@
  */
 
 import { createHash } from "node:crypto";
-import { AgentUnit } from "weft-core";
-import { LowProvenanceError } from "../errors";
+import { AgentUnit } from "@symplek/core";
+import { LowProvenanceError } from "../errors.js";
 import type {
   HarnessConfig,
   ImpactTier,
@@ -19,7 +19,7 @@ import type {
   PlanStep,
   PlanUnit,
   SourceRef,
-} from "../types";
+} from "../types.js";
 
 // ─── Minimal Claude Agent SDK interface stub ──────────────────────────────
 // Typed locally so the file compiles whether or not the SDK peer dep is installed.
@@ -82,7 +82,7 @@ function heuristicTier(intent: string, tools: readonly string[]): ImpactTier {
 
 /**
  * Classifies the impact tier for a plan. Attempts to delegate to
- * `weft-pro`'s changeKernel classifier when available; otherwise falls back
+ * `@symplek/pro`'s changeKernel classifier when available; otherwise falls back
  * to a local heuristic so the harness remains functional without the pro pkg.
  */
 async function classifyImpactTier(
@@ -92,13 +92,13 @@ async function classifyImpactTier(
   try {
     // Use a string variable so TypeScript cannot statically resolve this
     // optional peer dep — the import throws at runtime if absent.
-    const specifier: string = "weft-pro";
+    const specifier: string = "@symplek/pro";
     const mod = (await import(specifier)) as any;
     if (typeof mod?.changeKernel?.classify === "function") {
       return (await mod.changeKernel.classify(intent, tools)) as ImpactTier;
     }
   } catch {
-    // weft-pro not installed — heuristic follows
+    // @symplek/pro not installed — heuristic follows
   }
   return heuristicTier(intent, tools);
 }
@@ -252,17 +252,20 @@ export function makePlanUnit(
     } else {
       // Stub path: synthesise a plan from the declared tool list.
       // The resulting artifact carries synthesized:true — no tools actually ran.
+      //
+      // H8 fix: include ALL declared tools in the stub accumulator, not only
+      // READ_ONLY_TOOLS. When no SDK is wired the stub is recording intent, not
+      // gating execution — silently dropping write/shell tools from the stub
+      // made plans that could never be executed against their own declared tools.
       const declaredTools = options?.tools ?? config.tools ?? ["Read", "Grep"];
       const maxSteps = options?.maxSteps ?? declaredTools.length;
       for (const tool of declaredTools.slice(0, maxSteps)) {
-        if (READ_ONLY_TOOLS.has(tool)) {
-          accumulator.push({
-            tool,
-            args: {},
-            reasoning: `Exploratory ${tool} call for: ${intent}`,
-          });
-          config.onProgress?.({ phase: "planning", tool });
-        }
+        accumulator.push({
+          tool,
+          args: {},
+          reasoning: `Declared ${tool} step for: ${intent}`,
+        });
+        config.onProgress?.({ phase: "planning", tool });
       }
     }
 
@@ -301,6 +304,22 @@ export function makePlanUnit(
   return Object.assign(unit, {
     requireMinChainConfidence(threshold: number): AgentUnit<PlanArtifact> {
       return unit.flatMap((artifact) => {
+        // H9 fix: a synthesized plan has no real provenance — its sources are
+        // heuristic estimates with invented URIs and empty-string content hashes.
+        // Passing such sources through a confidence gate would allow callers to
+        // believe they have real provenance when they have none. Reject
+        // synthesized plans unconditionally so the gate is a real provenance
+        // check, not a confidence arithmetic pass-through on fabricated data.
+        if (artifact.synthesized === true) {
+          throw new LowProvenanceError(
+            `requireMinChainConfidence(${threshold}) rejected: plan "${artifact.id}" is synthesized — ` +
+              `its sources are heuristic estimates, not real execution records. ` +
+              `Run plan() against a wired SDK to produce real provenance.`,
+            threshold,
+            0,
+            artifact.sources.length,
+          );
+        }
         const mean =
           artifact.sources.length > 0
             ? artifact.sources.reduce((sum, s) => sum + s.confidence, 0) /

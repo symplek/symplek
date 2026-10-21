@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Tests for AgentUnit monad
- * @description Basic tests for weft-core AgentUnit
+ * @description Basic tests for @symplek/core AgentUnit
  *
  * 📝 BUILD[05.04]: Basic tests for AgentUnit
  * 📝 BUILD[01.05]: Updated to use legacy mode after zero-trust default change

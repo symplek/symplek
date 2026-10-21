@@ -1,14 +1,14 @@
 /**
  * @fileoverview Canonical ↔ Mirror Contract Tests
  * @description Asserts behavioral and structural equivalence between the
- *   canonical WEFT source at `convex/lib/agent_framework/` and
- *   the weft-core distribution mirror at `packages/weft-core/src/`.
+ *   canonical SYMPLEK source at `convex/lib/agent_framework/` and
+ *   the @symplek/core distribution mirror at `packages/symplek-core/src/`.
  *
- * SCOPE — four shared concepts per WEFT-ARCHITECTURE.md §"Shared concepts":
+ * SCOPE — four shared concepts per SYMPLEK-ARCHITECTURE.md §"Shared concepts":
  *   1. AgentUnit     canonical: algebra/core/AgentUnit.ts  | mirror: AgentUnit.ts
- *   2. WeftError     canonical: core/weftErrors.ts         | mirror: errors.ts
- *   3. WeftBuilder   canonical: weft/facades/shared.ts     | mirror: facade.ts
- *   4. RetryOptions  canonical: weft/core/validation.ts    | mirror: types.ts
+ *   2. SymplekError     canonical: core/symplekErrors.ts         | mirror: errors.ts
+ *   3. SymplekBuilder   canonical: symplek/facades/shared.ts     | mirror: facade.ts
+ *   4. RetryOptions  canonical: symplek/core/validation.ts    | mirror: types.ts
  *
  * STRATEGY
  *   Mirror side: imported directly from the package source (relative paths).
@@ -27,15 +27,15 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { WeftBuilder } from "../builder";
-import type { WeftErrorCode } from "../errors";
-import { WeftError } from "../errors";
+import { SymplekBuilder } from "../builder";
+import type { SymplekErrorCode } from "../errors";
+import { SymplekError } from "../errors";
 // ─── Mirror imports (always work — pure Node/Vitest) ─────────────────────────
 import { AgentUnit, createContext } from "../index";
 import type { AgentContext, RetryOptions } from "../types";
 
 // ─── Canonical source file paths (for structural fallbacks) ──────────────────
-// Four levels up from src/__tests__: src/__tests__ → src → weft-core → packages → repo root
+// Four levels up from src/__tests__: src/__tests__ → src → @symplek/core → packages → repo root
 const REPO_ROOT = resolve(__dirname, "../../../../");
 
 // ─── Skip-guard: canonical source only exists in the upstream private monorepo.
@@ -476,23 +476,23 @@ describe.skipIf(!canonicalPresent)("AgentUnit — canonical ↔ mirror contract"
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. WeftError
+// 2. SymplekError
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe.skipIf(!canonicalPresent)("WeftError — canonical ↔ mirror contract", () => {
+describe.skipIf(!canonicalPresent)("SymplekError — canonical ↔ mirror contract", () => {
   // ── 2a. ErrorCode taxonomy parity ─────────────────────────────────────────
 
   describe("ErrorCode taxonomy", () => {
     /**
      * STRUCTURAL-FALLBACK (both sides):
-     * The canonical WeftErrorCode is a union of descriptive strings.
-     * The mirror has two code systems: Exx codes (ErrorCode) + descriptive WeftErrorCode.
+     * The canonical SymplekErrorCode is a union of descriptive strings.
+     * The mirror has two code systems: Exx codes (ErrorCode) + descriptive SymplekErrorCode.
      * We assert:
-     *   (a) canonical's WeftErrorCode union members exist in the mirror's WeftErrorCode
-     *   (b) mirror's WeftErrorCode members are documented
+     *   (a) canonical's SymplekErrorCode union members exist in the mirror's SymplekErrorCode
+     *   (b) mirror's SymplekErrorCode members are documented
      */
 
-    // Canonical descriptive codes (from convex/lib/agent_framework/core/weftErrors.ts)
+    // Canonical descriptive codes (from convex/lib/agent_framework/core/symplekErrors.ts)
     const CANONICAL_CODES = [
       "MODEL_UNAVAILABLE",
       "MODEL_UNSUPPORTED_ALIAS",
@@ -507,8 +507,8 @@ describe.skipIf(!canonicalPresent)("WeftError — canonical ↔ mirror contract"
       "UNKNOWN",
     ] as const;
 
-    // Mirror descriptive codes (from packages/weft-core/src/errors.ts)
-    const MIRROR_CODES: WeftErrorCode[] = [
+    // Mirror descriptive codes (from packages/symplek-core/src/errors.ts)
+    const MIRROR_CODES: SymplekErrorCode[] = [
       "AUTH_FAILED",
       "RATE_LIMIT_EXCEEDED",
       "INVALID_SCHEMA",
@@ -519,74 +519,74 @@ describe.skipIf(!canonicalPresent)("WeftError — canonical ↔ mirror contract"
       "UNKNOWN_ERROR",
     ];
 
-    it("mirror: WeftErrorCode union includes TIMEOUT (shared code)", () => {
+    it("mirror: SymplekErrorCode union includes TIMEOUT (shared code)", () => {
       // TIMEOUT is the only code shared between canonical and mirror descriptive sets
       expect(MIRROR_CODES).toContain("TIMEOUT");
     });
 
-    it("canonical: WeftErrorCode union includes TIMEOUT (structural)", () => {
+    it("canonical: SymplekErrorCode union includes TIMEOUT (structural)", () => {
       const source = readCanonical(
-        "convex/lib/agent_framework/core/weftErrors.ts",
+        "convex/lib/agent_framework/core/symplekErrors.ts",
       );
       expect(source).toMatch(/"TIMEOUT"/);
     });
 
-    it("DIVERGENCE DOCUMENTED: canonical and mirror have different WeftErrorCode sets", () => {
+    it("DIVERGENCE DOCUMENTED: canonical and mirror have different SymplekErrorCode sets", () => {
       // The two descriptive code sets are intentionally different.
       // Canonical is Convex-oriented; mirror is package-oriented.
       // This test documents the known divergence for future maintainers.
       const canonicalSet = new Set(CANONICAL_CODES);
       const mirrorSet = new Set(MIRROR_CODES);
       const shared = [...canonicalSet].filter((c) =>
-        mirrorSet.has(c as WeftErrorCode),
+        mirrorSet.has(c as SymplekErrorCode),
       );
       // Only TIMEOUT is shared — document this
       expect(shared).toEqual(["TIMEOUT"]);
     });
 
-    it("canonical: WeftErrorCode type is exported (structural)", () => {
+    it("canonical: SymplekErrorCode type is exported (structural)", () => {
       const source = readCanonical(
-        "convex/lib/agent_framework/core/weftErrors.ts",
+        "convex/lib/agent_framework/core/symplekErrors.ts",
       );
-      expect(source).toMatch(/export type WeftErrorCode/);
+      expect(source).toMatch(/export type SymplekErrorCode/);
     });
 
-    it("mirror: WeftErrorCode type is exported (runtime)", () => {
-      // WeftError is already imported at the top of this file from "../errors".
+    it("mirror: SymplekErrorCode type is exported (runtime)", () => {
+      // SymplekError is already imported at the top of this file from "../errors".
       // The fact that the import succeeded proves errors.ts exports it correctly.
-      expect(typeof WeftError).toBe("function");
+      expect(typeof SymplekError).toBe("function");
     });
   });
 
-  // ── 2b. WeftError construction shape ──────────────────────────────────────
+  // ── 2b. SymplekError construction shape ──────────────────────────────────────
 
-  describe("WeftError construction", () => {
+  describe("SymplekError construction", () => {
     it("mirror: constructs with code and message fields", () => {
-      const err = new WeftError({
+      const err = new SymplekError({
         code: "SETUP_ERROR",
         message: "test error",
       });
       expect(err).toBeInstanceOf(Error);
-      expect(err).toBeInstanceOf(WeftError);
+      expect(err).toBeInstanceOf(SymplekError);
       expect(err.code).toBe("SETUP_ERROR");
-      expect(err.name).toBe("WeftError");
+      expect(err.name).toBe("SymplekError");
     });
 
     it("mirror: constructs with 'why' field (preferred over message)", () => {
-      const err = new WeftError({
+      const err = new SymplekError({
         code: "TIMEOUT",
         why: "the operation timed out",
       });
       expect(err.message).toContain("the operation timed out");
     });
 
-    it("mirror: message is prefixed with [weft@version]", () => {
-      const err = new WeftError({ code: "SETUP_ERROR", why: "oops" });
-      expect(err.message).toMatch(/^\[weft@/);
+    it("mirror: message is prefixed with [symplek@version]", () => {
+      const err = new SymplekError({ code: "SETUP_ERROR", why: "oops" });
+      expect(err.message).toMatch(/^\[symplek@/);
     });
 
     it("mirror: optional fields (action, docs, example, context) are settable", () => {
-      const err = new WeftError({
+      const err = new SymplekError({
         code: "SETUP_ERROR",
         why: "missing key",
         action: "Set the key",
@@ -601,21 +601,21 @@ describe.skipIf(!canonicalPresent)("WeftError — canonical ↔ mirror contract"
     });
 
     // STRUCTURAL-FALLBACK: canonical constructor shape
-    it("canonical: WeftError constructor takes code, why, fix (structural)", () => {
+    it("canonical: SymplekError constructor takes code, why, fix (structural)", () => {
       const source = readCanonical(
-        "convex/lib/agent_framework/core/weftErrors.ts",
+        "convex/lib/agent_framework/core/symplekErrors.ts",
       );
       // Canonical takes { code, why, fix } as required fields
-      expect(source).toMatch(/code:\s*WeftErrorCode/);
+      expect(source).toMatch(/code:\s*SymplekErrorCode/);
       expect(source).toMatch(/why:\s*string/);
       expect(source).toMatch(/fix:\s*string/);
     });
 
     it("DIVERGENCE DOCUMENTED: canonical requires 'fix' field; mirror makes it optional", () => {
       // Canonical: fix: string  (required)
-      // Mirror:    fix?: WeftErrorDetail["fix"]  (optional, different shape)
+      // Mirror:    fix?: SymplekErrorDetail["fix"]  (optional, different shape)
       const canonicalSource = readCanonical(
-        "convex/lib/agent_framework/core/weftErrors.ts",
+        "convex/lib/agent_framework/core/symplekErrors.ts",
       );
       // Canonical has `fix: string` (no ?)
       expect(canonicalSource).toMatch(/^\s+fix:\s+string/m);
@@ -630,7 +630,7 @@ describe.skipIf(!canonicalPresent)("WeftError — canonical ↔ mirror contract"
 
     it("DIVERGENCE DOCUMENTED: canonical has 'why' and 'recoverable' fields; mirror has neither", () => {
       const canonicalSource = readCanonical(
-        "convex/lib/agent_framework/core/weftErrors.ts",
+        "convex/lib/agent_framework/core/symplekErrors.ts",
       );
       // Canonical has `why`, `fix`, `recoverable` as class properties
       expect(canonicalSource).toMatch(/readonly why:/);
@@ -646,29 +646,29 @@ describe.skipIf(!canonicalPresent)("WeftError — canonical ↔ mirror contract"
     });
   });
 
-  // ── 2c. WeftError serialization ───────────────────────────────────────────
+  // ── 2c. SymplekError serialization ───────────────────────────────────────────
 
-  describe("WeftError serialization", () => {
+  describe("SymplekError serialization", () => {
     it("mirror: toJSON() returns structured SerializedError object", () => {
-      const err = new WeftError({
+      const err = new SymplekError({
         code: "SETUP_ERROR",
         why: "missing config",
         action: "Add config",
       });
       const json = err.toJSON();
-      expect(json.name).toBe("WeftError");
+      expect(json.name).toBe("SymplekError");
       expect(json.code).toBe("SETUP_ERROR");
       expect(typeof json.message).toBe("string");
     });
 
     it("mirror: toJSON() does not include stack trace", () => {
-      const err = new WeftError({ code: "TIMEOUT", why: "timed out" });
+      const err = new SymplekError({ code: "TIMEOUT", why: "timed out" });
       const json = err.toJSON() as Record<string, unknown>;
       expect(json.stack).toBeUndefined();
     });
 
     it("mirror: context is sanitized — sensitive keys are redacted", () => {
-      const err = new WeftError({
+      const err = new SymplekError({
         code: "SETUP_ERROR",
         why: "auth failed",
         context: { api_key: "sk-super-secret", component: "auth" },
@@ -680,14 +680,14 @@ describe.skipIf(!canonicalPresent)("WeftError — canonical ↔ mirror contract"
     // STRUCTURAL-FALLBACK: canonical has toEnvelope() instead of toJSON()
     it("canonical: exposes toEnvelope() for serialization (structural)", () => {
       const source = readCanonical(
-        "convex/lib/agent_framework/core/weftErrors.ts",
+        "convex/lib/agent_framework/core/symplekErrors.ts",
       );
       expect(source).toMatch(/export function toEnvelope/);
     });
 
     it("DIVERGENCE DOCUMENTED: mirror uses toJSON(); canonical uses toEnvelope() pattern", () => {
       const canonicalSource = readCanonical(
-        "convex/lib/agent_framework/core/weftErrors.ts",
+        "convex/lib/agent_framework/core/symplekErrors.ts",
       );
       const mirrorSource = readFileSync(
         resolve(__dirname, "../errors.ts"),
@@ -702,25 +702,25 @@ describe.skipIf(!canonicalPresent)("WeftError — canonical ↔ mirror contract"
     });
 
     // STRUCTURAL-FALLBACK: canonical type guards are exported
-    it("canonical: exports isWeftError, isWeftRecoverable, isWeftTerminal (structural)", () => {
+    it("canonical: exports isSymplekError, isSymplekRecoverable, isSymplekTerminal (structural)", () => {
       const source = readCanonical(
-        "convex/lib/agent_framework/core/weftErrors.ts",
+        "convex/lib/agent_framework/core/symplekErrors.ts",
       );
-      expect(source).toMatch(/export function isWeftError/);
-      expect(source).toMatch(/export function isWeftRecoverable/);
-      expect(source).toMatch(/export function isWeftTerminal/);
+      expect(source).toMatch(/export function isSymplekError/);
+      expect(source).toMatch(/export function isSymplekRecoverable/);
+      expect(source).toMatch(/export function isSymplekTerminal/);
     });
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. WeftBuilder
+// 3. SymplekBuilder
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe.skipIf(!canonicalPresent)("WeftBuilder — canonical ↔ mirror contract", () => {
+describe.skipIf(!canonicalPresent)("SymplekBuilder — canonical ↔ mirror contract", () => {
   /**
    * STRUCTURAL-FALLBACK (canonical side):
-   * The canonical WeftBuilder in convex/lib/agent_framework/weft/facades/shared.ts
+   * The canonical SymplekBuilder in convex/lib/agent_framework/symplek/facades/shared.ts
    * imports Convex-specific types (AgentContext with Convex bindings, LanguageModel
    * from "ai", GovernanceConfig, etc.) that fail to resolve outside of Convex.
    * All canonical assertions below are structural (source-text) checks only.
@@ -728,38 +728,38 @@ describe.skipIf(!canonicalPresent)("WeftBuilder — canonical ↔ mirror contrac
 
   // ── 3a. Class exists and is constructable ─────────────────────────────────
 
-  describe("WeftBuilder class presence", () => {
-    it("mirror: WeftBuilder is exported as a class", () => {
-      expect(typeof WeftBuilder).toBe("function");
-      expect(WeftBuilder.prototype).toBeDefined();
+  describe("SymplekBuilder class presence", () => {
+    it("mirror: SymplekBuilder is exported as a class", () => {
+      expect(typeof SymplekBuilder).toBe("function");
+      expect(SymplekBuilder.prototype).toBeDefined();
     });
 
-    it("canonical: WeftBuilder class is defined (structural)", () => {
+    it("canonical: SymplekBuilder class is defined (structural)", () => {
       const source = readCanonical(
-        "convex/lib/agent_framework/weft/facades/shared.ts",
+        "convex/lib/agent_framework/symplek/facades/shared.ts",
       );
-      expect(source).toMatch(/export class WeftBuilder/);
+      expect(source).toMatch(/export class SymplekBuilder/);
     });
   });
 
   // ── 3b. Fluent builder method names ───────────────────────────────────────
 
   describe("fluent method names", () => {
-    // Mirror methods that must exist on WeftBuilder prototype
+    // Mirror methods that must exist on SymplekBuilder prototype
     const MIRROR_BUILDER_METHODS = ["toUnit", "run", "then"] as const;
 
     for (const method of MIRROR_BUILDER_METHODS) {
-      it(`mirror: WeftBuilder has .${method}() method`, () => {
+      it(`mirror: SymplekBuilder has .${method}() method`, () => {
         expect(
-          typeof (WeftBuilder.prototype as Record<string, unknown>)[method],
+          typeof (SymplekBuilder.prototype as Record<string, unknown>)[method],
         ).toBe("function");
       });
     }
 
     // STRUCTURAL-FALLBACK: canonical method presence
-    it("canonical: WeftBuilder has .prompt(), .withFallback(), .withBudget(), .toUnit(), .run() (structural)", () => {
+    it("canonical: SymplekBuilder has .prompt(), .withFallback(), .withBudget(), .toUnit(), .run() (structural)", () => {
       const source = readCanonical(
-        "convex/lib/agent_framework/weft/facades/shared.ts",
+        "convex/lib/agent_framework/symplek/facades/shared.ts",
       );
       expect(source).toMatch(/prompt\s*\(/);
       expect(source).toMatch(/withFallback\s*\(/);
@@ -769,15 +769,15 @@ describe.skipIf(!canonicalPresent)("WeftBuilder — canonical ↔ mirror contrac
     });
 
     it("DIVERGENCE DOCUMENTED: canonical has .prompt()/.withFallback()/.withBudget(); mirror does not", () => {
-      // Mirror WeftBuilder is simpler: task + options only, no fluent chaining
+      // Mirror SymplekBuilder is simpler: task + options only, no fluent chaining
       expect(
-        typeof (WeftBuilder.prototype as Record<string, unknown>).prompt,
+        typeof (SymplekBuilder.prototype as Record<string, unknown>).prompt,
       ).toBe("undefined");
       expect(
-        typeof (WeftBuilder.prototype as Record<string, unknown>).withFallback,
+        typeof (SymplekBuilder.prototype as Record<string, unknown>).withFallback,
       ).toBe("undefined");
       expect(
-        typeof (WeftBuilder.prototype as Record<string, unknown>).withBudget,
+        typeof (SymplekBuilder.prototype as Record<string, unknown>).withBudget,
       ).toBe("undefined");
     });
   });
@@ -786,13 +786,13 @@ describe.skipIf(!canonicalPresent)("WeftBuilder — canonical ↔ mirror contrac
 
   describe(".toUnit()", () => {
     it("mirror: .toUnit() returns an AgentUnit instance", () => {
-      const builder = new WeftBuilder("test task");
+      const builder = new SymplekBuilder("test task");
       const unit = builder.toUnit();
       expect(unit).toBeInstanceOf(AgentUnit);
     });
 
     it("mirror: consecutive .toUnit() calls return the same cached instance", () => {
-      const builder = new WeftBuilder("test task");
+      const builder = new SymplekBuilder("test task");
       const unit1 = builder.toUnit();
       const unit2 = builder.toUnit();
       expect(unit1).toBe(unit2);
@@ -801,7 +801,7 @@ describe.skipIf(!canonicalPresent)("WeftBuilder — canonical ↔ mirror contrac
     // STRUCTURAL-FALLBACK: canonical toUnit() returns AgentUnit
     it("canonical: .toUnit() returns AgentUnit.from(...) (structural)", () => {
       const source = readCanonical(
-        "convex/lib/agent_framework/weft/facades/shared.ts",
+        "convex/lib/agent_framework/symplek/facades/shared.ts",
       );
       expect(source).toMatch(/return AgentUnit\.from\(computation\)/);
     });
@@ -810,17 +810,17 @@ describe.skipIf(!canonicalPresent)("WeftBuilder — canonical ↔ mirror contrac
   // ── 3d. Mirror is PromiseLike ──────────────────────────────────────────────
 
   describe("PromiseLike contract", () => {
-    it("mirror: WeftBuilder implements PromiseLike (.then is defined)", () => {
-      const builder = new WeftBuilder("test");
+    it("mirror: SymplekBuilder implements PromiseLike (.then is defined)", () => {
+      const builder = new SymplekBuilder("test");
       expect(typeof builder.then).toBe("function");
     });
 
     // STRUCTURAL-FALLBACK: canonical does NOT implement PromiseLike
-    it("canonical: WeftBuilder does not implement PromiseLike (structural divergence)", () => {
+    it("canonical: SymplekBuilder does not implement PromiseLike (structural divergence)", () => {
       const source = readCanonical(
-        "convex/lib/agent_framework/weft/facades/shared.ts",
+        "convex/lib/agent_framework/symplek/facades/shared.ts",
       );
-      // Canonical WeftBuilder does not implement PromiseLike
+      // Canonical SymplekBuilder does not implement PromiseLike
       expect(source).not.toMatch(/implements PromiseLike/);
     });
   });
@@ -828,13 +828,13 @@ describe.skipIf(!canonicalPresent)("WeftBuilder — canonical ↔ mirror contrac
   // ── 3e. Default options ────────────────────────────────────────────────────
 
   describe("defaults", () => {
-    it("mirror: WeftBuilder constructs without options (defaults applied)", () => {
-      expect(() => new WeftBuilder("simple task")).not.toThrow();
+    it("mirror: SymplekBuilder constructs without options (defaults applied)", () => {
+      expect(() => new SymplekBuilder("simple task")).not.toThrow();
     });
 
-    it("mirror: WeftBuilder accepts WeftOptions with retry field matching RetryOptions type", () => {
+    it("mirror: SymplekBuilder accepts SymplekOptions with retry field matching RetryOptions type", () => {
       const retryOpts: RetryOptions = { maxAttempts: 3, baseDelayMs: 100 };
-      expect(() => new WeftBuilder("task", { retry: retryOpts })).not.toThrow();
+      expect(() => new SymplekBuilder("task", { retry: retryOpts })).not.toThrow();
     });
   });
 
@@ -843,7 +843,7 @@ describe.skipIf(!canonicalPresent)("WeftBuilder — canonical ↔ mirror contrac
   describe("facadeMethodRegistry (canonical-only)", () => {
     it("canonical: exports facadeMethodRegistry Map (structural)", () => {
       const source = readCanonical(
-        "convex/lib/agent_framework/weft/facades/shared.ts",
+        "convex/lib/agent_framework/symplek/facades/shared.ts",
       );
       expect(source).toMatch(/export const facadeMethodRegistry/);
       expect(source).toMatch(/new Map/);
@@ -869,7 +869,7 @@ describe.skipIf(!canonicalPresent)("RetryOptions — canonical ↔ mirror contra
   /**
    * TWO RetryOptions exist and they are intentionally different:
    *
-   *   canonical (weft/core/validation.ts):
+   *   canonical (symplek/core/validation.ts):
    *     { maxRetries?, baseDelayMs?, originalPrompt? }
    *     Used for LLM response retry-with-feedback (schema validation retries).
    *
@@ -917,21 +917,21 @@ describe.skipIf(!canonicalPresent)("RetryOptions — canonical ↔ mirror contra
   describe("canonical RetryOptions (for validation retry)", () => {
     it("canonical: RetryOptions type has maxRetries field (structural)", () => {
       const source = readCanonical(
-        "convex/lib/agent_framework/weft/core/validation.ts",
+        "convex/lib/agent_framework/symplek/core/validation.ts",
       );
       expect(source).toMatch(/maxRetries\?:/);
     });
 
     it("canonical: RetryOptions type has baseDelayMs field (structural)", () => {
       const source = readCanonical(
-        "convex/lib/agent_framework/weft/core/validation.ts",
+        "convex/lib/agent_framework/symplek/core/validation.ts",
       );
       expect(source).toMatch(/baseDelayMs\?:/);
     });
 
     it("canonical: RetryOptions type has originalPrompt field (structural)", () => {
       const source = readCanonical(
-        "convex/lib/agent_framework/weft/core/validation.ts",
+        "convex/lib/agent_framework/symplek/core/validation.ts",
       );
       expect(source).toMatch(/originalPrompt\?:/);
     });
@@ -942,7 +942,7 @@ describe.skipIf(!canonicalPresent)("RetryOptions — canonical ↔ mirror contra
   describe("divergence documentation", () => {
     it("DIVERGENCE DOCUMENTED: canonical uses maxRetries; mirror uses maxAttempts", () => {
       const canonicalSource = readCanonical(
-        "convex/lib/agent_framework/weft/core/validation.ts",
+        "convex/lib/agent_framework/symplek/core/validation.ts",
       );
       const mirrorSource = readFileSync(
         resolve(__dirname, "../types.ts"),
@@ -958,7 +958,7 @@ describe.skipIf(!canonicalPresent)("RetryOptions — canonical ↔ mirror contra
 
     it("DIVERGENCE DOCUMENTED: canonical has originalPrompt (schema retry); mirror has jitter + retryIf (operator retry)", () => {
       const canonicalSource = readCanonical(
-        "convex/lib/agent_framework/weft/core/validation.ts",
+        "convex/lib/agent_framework/symplek/core/validation.ts",
       );
       const mirrorSource = readFileSync(
         resolve(__dirname, "../types.ts"),
@@ -973,7 +973,7 @@ describe.skipIf(!canonicalPresent)("RetryOptions — canonical ↔ mirror contra
 
     it("baseDelayMs is a shared field on both RetryOptions types", () => {
       const canonicalSource = readCanonical(
-        "convex/lib/agent_framework/weft/core/validation.ts",
+        "convex/lib/agent_framework/symplek/core/validation.ts",
       );
       const mirrorSource = readFileSync(
         resolve(__dirname, "../types.ts"),
@@ -1016,21 +1016,21 @@ describe.skipIf(!canonicalPresent)("RetryOptions — canonical ↔ mirror contra
 
     it("canonical: retryWithFeedback is exported from validation module (structural)", () => {
       const source = readCanonical(
-        "convex/lib/agent_framework/weft/core/validation.ts",
+        "convex/lib/agent_framework/symplek/core/validation.ts",
       );
       expect(source).toMatch(/export async function retryWithFeedback/);
     });
 
     it("canonical: validateResponse is exported from validation module (structural)", () => {
       const source = readCanonical(
-        "convex/lib/agent_framework/weft/core/validation.ts",
+        "convex/lib/agent_framework/symplek/core/validation.ts",
       );
       expect(source).toMatch(/export function validateResponse/);
     });
 
     it("canonical: exponential backoff uses 2^attempt multiplier (structural)", () => {
       const source = readCanonical(
-        "convex/lib/agent_framework/weft/core/validation.ts",
+        "convex/lib/agent_framework/symplek/core/validation.ts",
       );
       // The calculateDelay function: baseDelayMs * 2 ** attempt
       expect(source).toMatch(/2\s*\*\*\s*attempt/);
@@ -1039,14 +1039,14 @@ describe.skipIf(!canonicalPresent)("RetryOptions — canonical ↔ mirror contra
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 5. Additional shared concepts not explicitly named in WEFT-ARCHITECTURE.md
+// 5. Additional shared concepts not explicitly named in SYMPLEK-ARCHITECTURE.md
 //    (flagged for maintainer review)
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe.skipIf(!canonicalPresent)("Additional shared concepts — maintainer flags", () => {
   /**
    * These types/functions appear in both codebases but are not listed in the
-   * WEFT-ARCHITECTURE.md §"Shared concepts" table. They may warrant explicit
+   * SYMPLEK-ARCHITECTURE.md §"Shared concepts" table. They may warrant explicit
    * coverage in a future update to that table.
    */
 
@@ -1090,15 +1090,15 @@ describe.skipIf(!canonicalPresent)("Additional shared concepts — maintainer fl
     expect(canonicalCtxSource).not.toMatch(/export function createContext/);
   });
 
-  it("FLAG: WeftErrorEnvelope (canonical) has no equivalent in mirror — different serialization strategy", () => {
+  it("FLAG: SymplekErrorEnvelope (canonical) has no equivalent in mirror — different serialization strategy", () => {
     const canonicalSource = readCanonical(
-      "convex/lib/agent_framework/core/weftErrors.ts",
+      "convex/lib/agent_framework/core/symplekErrors.ts",
     );
-    expect(canonicalSource).toMatch(/WeftErrorEnvelope/);
+    expect(canonicalSource).toMatch(/SymplekErrorEnvelope/);
     const mirrorSource = readFileSync(
       resolve(__dirname, "../errors.ts"),
       "utf8",
     );
-    expect(mirrorSource).not.toMatch(/WeftErrorEnvelope/);
+    expect(mirrorSource).not.toMatch(/SymplekErrorEnvelope/);
   });
 });

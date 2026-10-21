@@ -1,13 +1,13 @@
 /**
- * @module agent - Minimal AgentBuilder for Weft.agent() namespace method
- * @description Thin builder wrapping WeftBuilder for fluent agent-style composition.
+ * @module agent - Minimal AgentBuilder for Symplek.agent() namespace method
+ * @description Thin builder wrapping SymplekBuilder for fluent agent-style composition.
  * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
  * @runtime node
  * @surface server:internal
  */
 
-import type { WeftOptions } from "./builder";
-import { WeftBuilder } from "./builder";
+import type { SymplekOptions } from "./builder";
+import { SymplekBuilder } from "./builder";
 import type { TrackedResult } from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -15,7 +15,7 @@ import type { TrackedResult } from "./types";
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Configuration for an agent created via `Weft.agent()`.
+ * Configuration for an agent created via `Symplek.agent()`.
  */
 export interface AgentConfig {
   /** Model override for all prompts on this agent. */
@@ -46,16 +46,16 @@ export class PromptBuilder {
 
   /** Execute the prompt against the configured agent. */
   async run(): Promise<TrackedResult<string>> {
-    // N50 fix: forward all AgentConfig fields to WeftOptions.
+    // N50 fix: forward all AgentConfig fields to SymplekOptions.
     // Previously only `model` was forwarded; provider, system, and temperature
     // were accepted in AgentConfig but silently dropped here.
-    const opts: WeftOptions<string> = {
+    const opts: SymplekOptions<string> = {
       model: this.config.model,
       provider: this.config.provider,
       system: this.config.system,
       temperature: this.config.temperature,
     };
-    return new WeftBuilder<string>(this.promptText, opts).run();
+    return new SymplekBuilder<string>(this.promptText, opts).run();
   }
 }
 
@@ -64,11 +64,11 @@ export class PromptBuilder {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Fluent builder returned by `Weft.agent(config?)`.
+ * Fluent builder returned by `Symplek.agent(config?)`.
  *
  * @example
  * ```typescript
- * const agent = Weft.agent({ model: 'gpt-4o' });
+ * const agent = Symplek.agent({ model: 'gpt-4o' });
  * const result = await agent.prompt('Summarize this').run();
  * ```
  */
@@ -94,7 +94,7 @@ export class AgentBuilder {
 
 /**
  * Creates a new `AgentBuilder` with the given configuration.
- * Used internally by `Weft.agent()`.
+ * Used internally by `Symplek.agent()`.
  */
 export function createAgent(config?: AgentConfig): AgentBuilder {
   return new AgentBuilder(config);

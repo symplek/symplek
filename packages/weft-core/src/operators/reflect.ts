@@ -1,5 +1,5 @@
 /**
- * @module weft-core/operators/reflect
+ * @module @symplek/core/operators/reflect
  * @description Reflect operator: recursive self-review — critique, optional structured
  *   verification, and optional bounded improvement of a computation's output.
  * @blast_radius MEDIUM
@@ -51,7 +51,7 @@ async function resolveReflectAgent<I, O>(
   const result = agent(input);
   if (result && typeof (result as { run?: unknown }).run === "function") {
     const unit = result as import("../AgentUnit").AgentUnit<O>;
-    return unit.run(ctx, { trustMode: "legacy" });
+    return (await unit.run(ctx)).value;
   }
   if (result instanceof Promise) {
     return result;

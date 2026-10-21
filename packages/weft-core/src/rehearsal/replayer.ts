@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Trace Replayer for deterministic playback
  * @description Replays execution traces with divergence detection
- * @module weft-core/rehearsal/replayer
+ * @module @symplek/core/rehearsal/replayer
  * @since 1.0.0
  *
  * 📝 BUILD[03.03]: Version Checker
@@ -303,7 +303,9 @@ export class TraceReplayer<T = unknown> {
             temperature: payload.temperature as number | undefined,
             maxTokens: payload.maxTokens as number | undefined,
           },
-          configHash: payload.promptHash as string,
+          // Replay compares against the hash of the whole config. Older
+          // traces only carry the prompt hash, which never matches it.
+          configHash: (payload.configHash ?? payload.promptHash) as string,
         };
       } else if (event.type === "llm_response" && pendingCall) {
         const payload = event.payload as unknown as Record<string, unknown>;

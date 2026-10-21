@@ -1,15 +1,15 @@
 /**
  * @module parity-pro — CR-201 export-parity gate
- * @description Asserts that every runtime value weft-pro exposes for the
+ * @description Asserts that every runtime value @symplek/pro exposes for the
  *   confidence, coherence, interview, change-kernel, and operator subsystems
- *   is also accessible from the corresponding weft-core subpath export.
+ *   is also accessible from the corresponding @symplek/core subpath export.
  *
- * Purpose: prevent a re-export collapse regression where weft-pro keeps a
- * symbol that weft-core's subpath no longer provides.
+ * Purpose: prevent a re-export collapse regression where @symplek/pro keeps a
+ * symbol that @symplek/core's subpath no longer provides.
  *
- * Note: weft-pro/src/types.ts type-only symbols (ConvergeContribution etc.)
+ * Note: @symplek/pro/src/types.ts type-only symbols (ConvergeContribution etc.)
  * are erased at runtime and therefore not in this runtime-value list.
- * Their structural correctness is enforced by the weft-pro typecheck.
+ * Their structural correctness is enforced by the @symplek/pro typecheck.
  */
 import { describe, expect, it } from "vitest";
 import * as CoreConfidence from "../confidence/index";
@@ -19,7 +19,7 @@ import * as CoreChangeKernel from "../change-kernel/index";
 import * as CoreOperators from "../operators/index";
 
 // ─── CONFIDENCE ──────────────────────────────────────────────────────────────
-// Runtime values weft-pro exposed from its confidence barrel (pre-collapse):
+// Runtime values @symplek/pro exposed from its confidence barrel (pre-collapse):
 const PRO_CONFIDENCE_VALUES = [
   "CONFIDENCE_THRESHOLDS",
   "calculateAgreementRate",

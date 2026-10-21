@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Unit tests for Trace Storage
- * @module weft-core/rehearsal/__tests__/storage
+ * @module @symplek/core/rehearsal/__tests__/storage
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

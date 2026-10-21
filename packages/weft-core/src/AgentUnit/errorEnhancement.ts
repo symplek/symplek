@@ -9,7 +9,7 @@
  * @surface internal
  */
 
-import type { ErrorCode, WeftErrorDetail } from "../errors";
+import type { ErrorCode, SymplekErrorDetail } from "../errors";
 import { COLORS, ERROR_PATTERNS, FIX_SUGGESTIONS } from "./errorMessages";
 
 /** Detect error code from error message and name. */
@@ -36,9 +36,9 @@ export function buildEnhancedMessage(code: ErrorCode, error: Error): string {
   return `[${code}] ${category}: ${error.message}`;
 }
 
-/** Format a WeftErrorDetail for console output with optional colors. */
+/** Format a SymplekErrorDetail for console output with optional colors. */
 export function formatForConsole(
-  weftError: WeftErrorDetail,
+  symplekError: SymplekErrorDetail,
   colorize = true,
 ): string {
   const c = colorize
@@ -47,39 +47,39 @@ export function formatForConsole(
 
   const lines: string[] = [];
   lines.push(
-    `${c.red}${c.bold}[${weftError.code}]${c.reset} ${weftError.message}`,
+    `${c.red}${c.bold}[${symplekError.code}]${c.reset} ${symplekError.message}`,
   );
 
   if (
-    weftError.location?.operatorChain &&
-    weftError.location.operatorChain.length > 0
+    symplekError.location?.operatorChain &&
+    symplekError.location.operatorChain.length > 0
   ) {
-    const chain = weftError.location.operatorChain.join(" → ");
+    const chain = symplekError.location.operatorChain.join(" → ");
     lines.push(`${c.dim}  chain: ${chain}${c.reset}`);
   }
 
   lines.push("");
-  lines.push(`${c.green}${c.bold}Fix:${c.reset} ${weftError.fix.description}`);
+  lines.push(`${c.green}${c.bold}Fix:${c.reset} ${symplekError.fix.description}`);
 
-  if (weftError.fix.codeSnippet) {
+  if (symplekError.fix.codeSnippet) {
     lines.push("");
-    lines.push(`${c.cyan}${weftError.fix.codeSnippet}${c.reset}`);
+    lines.push(`${c.cyan}${symplekError.fix.codeSnippet}${c.reset}`);
   }
 
   lines.push("");
-  lines.push(`${c.blue}Docs: ${weftError.fix.docsUrl}${c.reset}`);
+  lines.push(`${c.blue}Docs: ${symplekError.fix.docsUrl}${c.reset}`);
   return lines.join("\n");
 }
 
-/** Enhance an error with WeftError metadata. */
+/** Enhance an error with SymplekError metadata. */
 export function enhanceError(
   error: Error,
   operatorChain: string[],
-): Error & { WeftError: WeftErrorDetail } {
+): Error & { SymplekError: SymplekErrorDetail } {
   const code = detectErrorCode(error);
   const fix = FIX_SUGGESTIONS[code];
 
-  const detail: WeftErrorDetail = {
+  const detail: SymplekErrorDetail = {
     code,
     message: buildEnhancedMessage(code, error),
     location: { operatorChain },
@@ -92,13 +92,13 @@ export function enhanceError(
     timestamp: Date.now(),
   };
 
-  (error as Error & { WeftError: WeftErrorDetail }).WeftError = detail;
-  return error as Error & { WeftError: WeftErrorDetail };
+  (error as Error & { SymplekError: SymplekErrorDetail }).SymplekError = detail;
+  return error as Error & { SymplekError: SymplekErrorDetail };
 }
 
 /** Enhance, log, and re-throw an error. */
 export function handleError(error: Error, operatorChain: string[]): never {
   const enhancedError = enhanceError(error, operatorChain);
-  console.error(formatForConsole(enhancedError.WeftError));
+  console.error(formatForConsole(enhancedError.SymplekError));
   throw enhancedError;
 }

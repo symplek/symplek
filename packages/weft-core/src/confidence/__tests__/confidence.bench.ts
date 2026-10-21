@@ -1,8 +1,8 @@
 ﻿/**
  * @fileoverview Performance benchmarks for objective confidence calculations
- * @module packages/Weft-core/src/confidence/__tests__/confidence.bench
+ * @module packages/symplek-core/src/confidence/__tests__/confidence.bench
  *
- * Run with: npx vitest bench packages/Weft-core/src/confidence/__tests__/confidence.bench.ts
+ * Run with: npx vitest bench packages/symplek-core/src/confidence/__tests__/confidence.bench.ts
  *
  * Target performance:
  * - 5 responses: < 0.1ms

@@ -1,7 +1,7 @@
 ﻿/**
  * @fileoverview Checkpoint Manager for partial replay support
  * @description Manages state snapshots for efficient trace replay
- * @module weft-core/rehearsal/checkpoint
+ * @module @symplek/core/rehearsal/checkpoint
  * @since 1.0.0
  *
  * 📝 BUILD[03.04]: Checkpoint Manager implementation

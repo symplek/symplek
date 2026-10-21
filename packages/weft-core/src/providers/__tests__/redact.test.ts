@@ -9,7 +9,7 @@
 
 import { inspect } from "node:util";
 import { describe, expect, it } from "vitest";
-import { WeftError } from "../../errors";
+import { SymplekError } from "../../errors";
 import { redactErrorMessage, redactKey, safeCause } from "../redact";
 
 const FAKE_KEY = "sk-ant-FAKEKEY1234567890";
@@ -78,8 +78,8 @@ describe("safeCause", () => {
     expect(cause.status).toBe(401);
   });
 
-  it("the resulting WeftError does not leak the key via util.inspect (.cause walk)", () => {
-    const err = new WeftError({
+  it("the resulting SymplekError does not leak the key via util.inspect (.cause walk)", () => {
+    const err = new SymplekError({
       code: "PROVIDER_ERROR",
       why: `request failed: ${redactErrorMessage(FAKE_KEY, makeSdkError())}`,
       fix: { description: "x", docsUrl: "https://x" },
@@ -103,7 +103,7 @@ describe("sanitizeContext (M5)", () => {
 
     let result: Record<string, any> | undefined;
     expect(() => {
-      result = WeftError.sanitizeContext(a);
+      result = SymplekError.sanitizeContext(a);
     }).not.toThrow();
     expect(result?.name).toBe("root");
     expect(result?.self).toBe("[Circular]");
@@ -122,7 +122,7 @@ describe("sanitizeContext (M5)", () => {
       entries: [{ secret: FAKE_KEY }],
     };
 
-    const out = WeftError.sanitizeContext(ctx);
+    const out = SymplekError.sanitizeContext(ctx);
     const serialized = JSON.stringify(out);
 
     expect(serialized).not.toContain(FAKE_KEY);
@@ -135,12 +135,12 @@ describe("sanitizeContext (M5)", () => {
   it("redacts a key whose own name matches a sensitive substring (e.g. `tokens`)", () => {
     // Defense-in-depth: `tokens` contains the substring `token`, so the whole
     // value is redacted wholesale. This is intentional over-redaction.
-    const out = WeftError.sanitizeContext({ tokens: [FAKE_KEY] });
+    const out = SymplekError.sanitizeContext({ tokens: [FAKE_KEY] });
     expect(out.tokens).toBe("[REDACTED]");
   });
 
   it("redacts top-level sensitive keys and recurses into plain objects", () => {
-    const out = WeftError.sanitizeContext({
+    const out = SymplekError.sanitizeContext({
       api_key: FAKE_KEY,
       nested: { secret: FAKE_KEY, safe: "ok" },
       keep: 123,
@@ -151,10 +151,10 @@ describe("sanitizeContext (M5)", () => {
     expect(out.keep).toBe(123);
   });
 
-  it("the WeftError constructor sanitizes a circular context without throwing", () => {
+  it("the SymplekError constructor sanitizes a circular context without throwing", () => {
     const ctx: Record<string, any> = { token: FAKE_KEY };
     ctx.loop = ctx;
-    const err = new WeftError({
+    const err = new SymplekError({
       code: "PROVIDER_ERROR",
       why: "boom",
       context: ctx,

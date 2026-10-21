@@ -5,7 +5,7 @@
  *   Operators are injected via prototype augmentation from ./operators/index.
  * @blast_radius HIGH — every agent in the system depends on this class.
  * @status STABLE
- * @rules @.cursor/rules/frameworks/206-weft-framework.mdc
+ * @rules @.cursor/rules/frameworks/206-symplek-framework.mdc
  * @runtime node
  * @surface internal
  */
@@ -13,7 +13,7 @@
 import type { z } from "zod";
 import type { HasVotes } from "../coherence/types";
 import type { ContractOptions } from "../contract";
-import { IdempotencyStoreWriteError, WeftError } from "../errors";
+import { IdempotencyStoreWriteError, SymplekError } from "../errors";
 import {
   _idempotencyInFlight,
   buildFlightKey,
@@ -190,7 +190,7 @@ export class AgentUnit<T> {
    *
    * @example
    * ```typescript
-   * import { AgentUnit, createContext } from "weft-core";
+   * import { AgentUnit, createContext } from "@symplek/core";
    *
    * const ctx = createContext();
    * const unit = AgentUnit.fromPromise(fetch("https://api.example.com/data").then(r => r.text()));
@@ -264,7 +264,7 @@ export class AgentUnit<T> {
    *
    * @example
    * ```typescript
-   * import { AgentUnit, createContext } from "weft-core";
+   * import { AgentUnit, createContext } from "@symplek/core";
    *
    * const ctx = createContext();
    * const unit = AgentUnit.fail<string>(new Error("Not available"))
@@ -348,7 +348,7 @@ export class AgentUnit<T> {
    *
    * @example
    * ```typescript
-   * import { AgentUnit, createContext } from "weft-core";
+   * import { AgentUnit, createContext } from "@symplek/core";
    *
    * const ctx = createContext();
    * const result = await AgentUnit.of("input")
@@ -370,7 +370,7 @@ export class AgentUnit<T> {
    *
    * @example
    * ```typescript
-   * import { AgentUnit, createContext } from "weft-core";
+   * import { AgentUnit, createContext } from "@symplek/core";
    *
    * const ctx = createContext();
    * const result = await AgentUnit.of("hello")
@@ -442,7 +442,7 @@ export class AgentUnit<T> {
    *
    * @example
    * ```typescript
-   * import { AgentUnit, createContext } from "weft-core";
+   * import { AgentUnit, createContext } from "@symplek/core";
    *
    * const ctx = createContext();
    * const result = await AgentUnit.race([
@@ -482,7 +482,7 @@ export class AgentUnit<T> {
    * Moving all operator methods into the class body would eliminate the need for
    * prototype augmentation entirely, making internal imports safe. This is a multi-day
    * refactor deferred to avoid breaking the current operator extension pattern.
-   * See: packages/weft-core/src/AgentUnit/operators/index.ts
+   * See: packages/symplek-core/src/AgentUnit/operators/index.ts
    */
 
   // ─── EXECUTION ────────────────────────────────────────────────────────────────
@@ -501,20 +501,25 @@ export class AgentUnit<T> {
    * ```typescript
    * const unit = AgentUnit.of("hello");
    * const tracked = await unit.run(ctx);
-   * console.log(tracked.value); // "hello"
-   * console.log(tracked.source); // { operatorChain: ["of"], id: "..." }
+   * console.log(tracked.value);      // "hello"
+   * console.log(tracked.source);     // "agent"
+   * console.log(tracked.confidence); // 0.85 (base) — adjusts per operator chain
    * ```
-   *
-   * @deprecated trustMode: 'legacy' will be removed in v3.0
    */
   async run(ctx: import("../types").AgentContext): Promise<TrackedResult<T>>;
   async run(
     ctx: import("../types").AgentContext,
-    options: { trustMode?: "zero-trust"; captureIntermediates?: boolean },
+    options: Omit<RunOptionsWithTrust, "trustMode"> & {
+      trustMode?: "zero-trust";
+    },
   ): Promise<TrackedResult<T>>;
+  /**
+   * @deprecated trustMode: 'legacy' will be removed in v3.0. Use the default
+   *   zero-trust mode instead.
+   */
   async run(
     ctx: import("../types").AgentContext,
-    options: { trustMode: "legacy"; captureIntermediates?: boolean },
+    options: Omit<RunOptionsWithTrust, "trustMode"> & { trustMode: "legacy" },
   ): Promise<T>;
   async run(
     ctx: import("../types").AgentContext,
@@ -522,11 +527,11 @@ export class AgentUnit<T> {
   ): Promise<TrackedResult<T> | T> {
     // Runtime guard: detect missing prototype augmentation (import from internal path)
     if (typeof (this as any).retry !== "function") {
-      throw new WeftError({
+      throw new SymplekError({
         code: "SETUP_ERROR",
         message:
-          'AgentUnit operators not loaded. Import from "weft-core", not internal paths.',
-        action: 'Change import to: import { AgentUnit } from "weft-core";',
+          'AgentUnit operators not loaded. Import from "@symplek/core", not internal paths.',
+        action: 'Change import to: import { AgentUnit } from "@symplek/core";',
       });
     }
     const trustMode: TrustMode = options?.trustMode ?? "zero-trust";
@@ -582,7 +587,7 @@ export class AgentUnit<T> {
             const storeResult = await idemStore!.get(idempotency.key);
             if (storeResult !== null) {
               if (!isTrackedResult<T>(storeResult)) {
-                throw new WeftError({
+                throw new SymplekError({
                   code: "SETUP_ERROR",
                   why:
                     "Cached idempotency result is not a genuine TrackedResult — " +
@@ -631,7 +636,7 @@ export class AgentUnit<T> {
           // before returning it. A malicious or shared store could inject arbitrary
           // objects.
           if (!isTrackedResult<T>(cached)) {
-            throw new WeftError({
+            throw new SymplekError({
               code: "SETUP_ERROR",
               why:
                 "Cached idempotency result is not a genuine TrackedResult — " +
@@ -709,7 +714,7 @@ export class AgentUnit<T> {
    *
    * @example
    * ```typescript
-   * import { AgentUnit } from "weft-core";
+   * import { AgentUnit } from "@symplek/core";
    *
    * const unit = AgentUnit.of("hello").map((s) => s.toUpperCase()).retry(2);
    * const meta = unit.getMetadata();

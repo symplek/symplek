@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { createContext } from "weft-core";
+import { createContext } from "@symplek/core";
 import { ContractViolationError } from "../errors";
 import type { SdkSession } from "../operators/execute";
 import { execute } from "../operators/execute";

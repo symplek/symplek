@@ -1,6 +1,6 @@
 ﻿/**
  * @fileoverview Integration Tests for Solo Mechanism
- * @module weft-core/solo/__tests__/integration
+ * @module @symplek/core/solo/__tests__/integration
  *
  * 📝 BUILD[STORY-03.05]: Integration tests for AgentUnit.solo()
  */

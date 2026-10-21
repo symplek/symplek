@@ -1,10 +1,10 @@
 ﻿/**
  * @fileoverview Interview computation factories
  * @description createInterviewComputation and createConductComputation following operator pattern
- * @module weft-core/interview/computations
- * @since 1.0.0-beta.3
+ * @module @symplek/core/interview/computations
+ * @since 1.0.0-beta.1
  *
- * 📝 BUILD[Weft-interview]: Computation factories for interview operators
+ * 📝 BUILD[Symplek-interview]: Computation factories for interview operators
  */
 
 import type { AgentComputation, AgentUnitMetadata } from "../AgentUnit";
@@ -128,9 +128,7 @@ export function createConductComputation<TContext>(
       // STEP 1: EVALUATE CLARITY
       // -----------------------------------------------------------------------
 
-      const clarityResult = await evaluator(state).run(ctx, {
-        trustMode: "legacy",
-      });
+      const { value: clarityResult } = await evaluator(state).run(ctx);
       currentClarity = clarityResult;
       state.clarityHistory.push(currentClarity);
 
@@ -153,9 +151,10 @@ export function createConductComputation<TContext>(
       // STEP 3: GENERATE QUESTION
       // -----------------------------------------------------------------------
 
-      const questionResult = await questioner(state, currentClarity).run(ctx, {
-        trustMode: "legacy",
-      });
+      const { value: questionResult } = await questioner(
+        state,
+        currentClarity,
+      ).run(ctx);
 
       // null means questioner has no more questions
       if (questionResult === null) {
@@ -205,9 +204,7 @@ export function createConductComputation<TContext>(
     // EXTRACTION PHASE
     // =========================================================================
 
-    const extractedContext = await extractor(state).run(ctx, {
-      trustMode: "legacy",
-    });
+    const { value: extractedContext } = await extractor(state).run(ctx);
 
     // Build assumptions list (for transparency)
     const assumptions = buildAssumptions(state, extractedContext);

@@ -1,7 +1,7 @@
 /**
  * @fileoverview Vector Clock Manager for causal ordering
  * @description Lamport-style vector clocks for multi-agent event ordering
- * @module weft-core/rehearsal/vectorClock
+ * @module @symplek/core/rehearsal/vectorClock
  * @since 1.0.0
  *
  * 📝 BUILD[01.02]: Vector Clock Manager for causal ordering
