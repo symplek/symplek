@@ -16,6 +16,10 @@ importers:
         version: 2.31.0(@types/node@22.19.18)
 
   packages/create-weft:
+    dependencies:
+      weft-cli:
+        specifier: workspace:*
+        version: link:../weft-cli
     devDependencies:
       '@types/node':
         specifier: ^20.11.0
@@ -76,10 +80,10 @@ importers:
   packages/weft-convex:
     dependencies:
       weft-core:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../weft-core
       zod:
-        specifier: ^3.0.0
+        specifier: ^3.25.28 || ^4.0.0
         version: 3.25.76
     devDependencies:
       '@types/node':
@@ -103,6 +107,9 @@ importers:
       openai:
         specifier: '>=4.0.0'
         version: 4.104.0(ws@8.18.0)(zod@3.25.76)
+      zod-to-json-schema:
+        specifier: ^3.25.2
+        version: 3.25.2(zod@3.25.76)
     devDependencies:
       '@anthropic-ai/sdk':
         specifier: ^0.78.0
@@ -125,15 +132,9 @@ importers:
       '@opentelemetry/sdk-trace-node':
         specifier: ^2.8.0
         version: 2.8.0(@opentelemetry/api@1.9.1)
-      '@size-limit/preset-small-lib':
-        specifier: ^11.0.0
-        version: 11.2.0(size-limit@11.2.0)
       '@types/node':
         specifier: ^22.14.0
         version: 22.19.18
-      size-limit:
-        specifier: ^11.0.0
-        version: 11.2.0
       tsup:
         specifier: ^8.4.0
         version: 8.5.1(jiti@2.7.0)(postcss@8.5.14)(typescript@5.9.3)
@@ -144,7 +145,7 @@ importers:
         specifier: ^4.0.17
         version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@22.19.18)(jsdom@26.1.0)(vite@6.4.2(@types/node@22.19.18)(jiti@2.7.0))
       zod:
-        specifier: ^3.24.0
+        specifier: ^3.25.28
         version: 3.25.76
 
   packages/weft-devtools:
@@ -198,12 +199,6 @@ importers:
 
   packages/weft-harness:
     dependencies:
-      '@anthropic-ai/claude-agent-sdk':
-        specifier: '>=0.2.0'
-        version: 0.2.138
-      openai:
-        specifier: ^4.0.0
-        version: 4.104.0(ws@8.18.0)(zod@3.25.76)
       react:
         specifier: ^18.0.0 || ^19.0.0
         version: 19.2.6
@@ -227,7 +222,7 @@ importers:
   packages/weft-mcp:
     dependencies:
       weft-core:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../weft-core
     devDependencies:
       '@modelcontextprotocol/sdk':
@@ -249,7 +244,7 @@ importers:
   packages/weft-pro:
     dependencies:
       weft-core:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../weft-core
     devDependencies:
       '@types/node':
@@ -271,7 +266,7 @@ importers:
   packages/weft-react:
     dependencies:
       weft-core:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../weft-core
     devDependencies:
       '@testing-library/react':
@@ -311,7 +306,7 @@ importers:
   packages/weft-testing:
     dependencies:
       weft-core:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../weft-core
     devDependencies:
       '@types/node':
@@ -329,63 +324,8 @@ importers:
 
 packages:
 
-  '@anthropic-ai/claude-agent-sdk-darwin-arm64@0.2.138':
-    resolution: {integrity: sha512-aObxJ/GeJ5UxT9N8XypUHPYQKpwYsRT5THiJl5E2pKEUk/Xt42gT55N5GV0TOjtgxVAnDMWjxTAgGCGoDzjgpg==}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@anthropic-ai/claude-agent-sdk-darwin-x64@0.2.138':
-    resolution: {integrity: sha512-ou3i1/gAf2PEgVl2WYJb7ZdE+KGwoB1I46JRhWHSC3uD6lb9HMZam233T/rlKCVX9e5dzfkujUOnmCkmXjgVGQ==}
-    cpu: [x64]
-    os: [darwin]
-
-  '@anthropic-ai/claude-agent-sdk-linux-arm64-musl@0.2.138':
-    resolution: {integrity: sha512-uZaEFND1pl7KD9tdYqj2hd6ktjlYizVmkHRgU2Aj/P1CC6WMDsKG+rqPP7dsVXO77gMXhL4xjjwwqMjxx83HkA==}
-    cpu: [arm64]
-    os: [linux]
-
-  '@anthropic-ai/claude-agent-sdk-linux-arm64@0.2.138':
-    resolution: {integrity: sha512-jp8lmAVe9uI9X5o+IYWFajLbN+Z80XogVX7NeyaenLHdpHkxg29Yf8pb6Os4OvHMjJOAdwDhPpXajf6RtBeEDA==}
-    cpu: [arm64]
-    os: [linux]
-
-  '@anthropic-ai/claude-agent-sdk-linux-x64-musl@0.2.138':
-    resolution: {integrity: sha512-T16F8Vkikb98E781ZM6Cx84yEBk+loSCqAObjaZ1hzQ1eKcpnxzSTF4rH2bz6N91dhFuCfIjFaBfNYg+oQA+yQ==}
-    cpu: [x64]
-    os: [linux]
-
-  '@anthropic-ai/claude-agent-sdk-linux-x64@0.2.138':
-    resolution: {integrity: sha512-SLuUmu/nH1Wh0wnoXj/Bwh0nbDfEn9PgXqMsZHEUk3x1zxeR+6aRqFLjKZ8TawBey7xod7nfYUIjPnQx6IWDzg==}
-    cpu: [x64]
-    os: [linux]
-
-  '@anthropic-ai/claude-agent-sdk-win32-arm64@0.2.138':
-    resolution: {integrity: sha512-H/sD25fmMyEeJWamYmBKRS3E7jaIrg2S8KWxyR37P+xTZgkLe19sDTp7gYYywMXf1X9CJZJ8jJZ93qxINZoCeA==}
-    cpu: [arm64]
-    os: [win32]
-
-  '@anthropic-ai/claude-agent-sdk-win32-x64@0.2.138':
-    resolution: {integrity: sha512-cSOdTH1OfIamVdJit9laWZiXne81ewgdP8MGh5HzLLLci0NGHkME7YxCWd0lYkCNkfiOEcToKU9axaZ+84jGiw==}
-    cpu: [x64]
-    os: [win32]
-
-  '@anthropic-ai/claude-agent-sdk@0.2.138':
-    resolution: {integrity: sha512-rH6dFI3DBBsPBPcHTBdTZCHA14OCt2t4+6XYi2MJB/GlFrnZvlWmMIk2z9uxAiZ05Txg8YbftgSuE5A1qpAXwg==}
-    engines: {node: '>=18.0.0'}
-    peerDependencies:
-      zod: ^4.0.0
-
   '@anthropic-ai/sdk@0.78.0':
     resolution: {integrity: sha512-PzQhR715td/m1UaaN5hHXjYB8Gl2lF9UVhrrGrZeysiF6Rb74Wc9GCB8hzLdzmQtBd1qe89F9OptgB9Za1Ib5w==}
-    hasBin: true
-    peerDependencies:
-      zod: ^3.25.0 || ^4.0.0
-    peerDependenciesMeta:
-      zod:
-        optional: true
-
-  '@anthropic-ai/sdk@0.81.0':
-    resolution: {integrity: sha512-D4K5PvEV6wPiRtVlVsJHIUhHAmOZ6IT/I9rKlTf84gR7GyyAurPJK7z9BOf/AZqC5d1DhYQGJNKRmV+q8dGhgw==}
     hasBin: true
     peerDependencies:
       zod: ^3.25.0 || ^4.0.0
@@ -1401,23 +1341,6 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@size-limit/esbuild@11.2.0':
-    resolution: {integrity: sha512-vSg9H0WxGQPRzDnBzeDyD9XT0Zdq0L+AI3+77/JhxznbSCMJMMr8ndaWVQRhOsixl97N0oD4pRFw2+R1Lcvi6A==}
-    engines: {node: ^18.0.0 || >=20.0.0}
-    peerDependencies:
-      size-limit: 11.2.0
-
-  '@size-limit/file@11.2.0':
-    resolution: {integrity: sha512-OZHE3putEkQ/fgzz3Tp/0hSmfVo3wyTpOJSRNm6AmcwX4Nm9YtTfbQQ/hZRwbBFR23S7x2Sd9EbqYzngKwbRoA==}
-    engines: {node: ^18.0.0 || >=20.0.0}
-    peerDependencies:
-      size-limit: 11.2.0
-
-  '@size-limit/preset-small-lib@11.2.0':
-    resolution: {integrity: sha512-RFbbIVfv8/QDgTPyXzjo5NKO6CYyK5Uq5xtNLHLbw5RgSKrgo8WpiB/fNivZuNd/5Wk0s91PtaJ9ThNcnFuI3g==}
-    peerDependencies:
-      size-limit: 11.2.0
-
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
@@ -1790,10 +1713,6 @@ packages:
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
     peerDependencies:
       esbuild: '>=0.18'
-
-  bytes-iec@3.1.1:
-    resolution: {integrity: sha512-fey6+4jDK7TFtFg/klGSvNKJctyU7n2aQdnM+CO0ruLPbqqMOM8Tio0Pc+deqUeVKX1tL5DQep1zQ7+37aTAsA==}
-    engines: {node: '>= 0.8'}
 
   bytes@3.1.2:
     resolution: {integrity: sha512-/Nf7TyzTx6S3yRJObOAV7956r8cr2+Oj8AC5dt8wSP3BQAoeX58NoHyCU8P8zGkNXStjTSi6fzO6F0pBdcYbEg==}
@@ -2564,14 +2483,6 @@ packages:
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
-  nanoid@5.1.11:
-    resolution: {integrity: sha512-v+KEsUv2ps74PaSKv0gHTxTCgMXOIfBEbaqa6w6ISIGC7ZsvHN4N9oJ8d4cmf0n5oTzQz2SLmThbQWhjd/8eKg==}
-    engines: {node: ^18 || >=20}
-    hasBin: true
-
-  nanospinner@1.2.2:
-    resolution: {integrity: sha512-Zt/AmG6qRU3e+WnzGGLuMCEAO/dAu45stNbHY223tUxldaDAeE+FxSPsd9Q+j+paejmm0ZbrNVs5Sraqy3dRxA==}
-
   negotiator@1.0.0:
     resolution: {integrity: sha512-8Ofs/AUQh8MaEcrlq5xOX0CQ9ypTF5dl78mjlMNfOK08fzpgTHQRQPBxcPlEtIw0yRpws+Zo/3r+5WRby7u3Gg==}
     engines: {node: '>= 0.6'}
@@ -2942,11 +2853,6 @@ packages:
   signal-exit@4.1.0:
     resolution: {integrity: sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==}
     engines: {node: '>=14'}
-
-  size-limit@11.2.0:
-    resolution: {integrity: sha512-2kpQq2DD/pRpx3Tal/qRW1SYwcIeQ0iq8li5CJHQgOC+FtPn2BVmuDtzUCgNnpCrbgtfEHqh+iWzxK+Tq6C+RQ==}
-    engines: {node: ^18.0.0 || >=20.0.0}
-    hasBin: true
 
   slash@3.0.0:
     resolution: {integrity: sha512-g9Q1haeby36OSStwb4ntCGGGaKsaVSjQ68fBxoQcutl5fS1vuY18H3wSt3jFyFtrkx+Kz0V1G85A4MyAdDMi2Q==}
@@ -3345,56 +3251,11 @@ packages:
 
 snapshots:
 
-  '@anthropic-ai/claude-agent-sdk-darwin-arm64@0.2.138':
-    optional: true
-
-  '@anthropic-ai/claude-agent-sdk-darwin-x64@0.2.138':
-    optional: true
-
-  '@anthropic-ai/claude-agent-sdk-linux-arm64-musl@0.2.138':
-    optional: true
-
-  '@anthropic-ai/claude-agent-sdk-linux-arm64@0.2.138':
-    optional: true
-
-  '@anthropic-ai/claude-agent-sdk-linux-x64-musl@0.2.138':
-    optional: true
-
-  '@anthropic-ai/claude-agent-sdk-linux-x64@0.2.138':
-    optional: true
-
-  '@anthropic-ai/claude-agent-sdk-win32-arm64@0.2.138':
-    optional: true
-
-  '@anthropic-ai/claude-agent-sdk-win32-x64@0.2.138':
-    optional: true
-
-  '@anthropic-ai/claude-agent-sdk@0.2.138':
-    dependencies:
-      '@anthropic-ai/sdk': 0.81.0
-      '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
-    optionalDependencies:
-      '@anthropic-ai/claude-agent-sdk-darwin-arm64': 0.2.138
-      '@anthropic-ai/claude-agent-sdk-darwin-x64': 0.2.138
-      '@anthropic-ai/claude-agent-sdk-linux-arm64': 0.2.138
-      '@anthropic-ai/claude-agent-sdk-linux-arm64-musl': 0.2.138
-      '@anthropic-ai/claude-agent-sdk-linux-x64': 0.2.138
-      '@anthropic-ai/claude-agent-sdk-linux-x64-musl': 0.2.138
-      '@anthropic-ai/claude-agent-sdk-win32-arm64': 0.2.138
-      '@anthropic-ai/claude-agent-sdk-win32-x64': 0.2.138
-    transitivePeerDependencies:
-      - '@cfworker/json-schema'
-      - supports-color
-
   '@anthropic-ai/sdk@0.78.0(zod@3.25.76)':
     dependencies:
       json-schema-to-ts: 3.1.1
     optionalDependencies:
       zod: 3.25.76
-
-  '@anthropic-ai/sdk@0.81.0':
-    dependencies:
-      json-schema-to-ts: 3.1.1
 
   '@asamuzakjp/css-color@3.2.0':
     dependencies:
@@ -4286,22 +4147,6 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.60.3':
     optional: true
 
-  '@size-limit/esbuild@11.2.0(size-limit@11.2.0)':
-    dependencies:
-      esbuild: 0.25.12
-      nanoid: 5.1.11
-      size-limit: 11.2.0
-
-  '@size-limit/file@11.2.0(size-limit@11.2.0)':
-    dependencies:
-      size-limit: 11.2.0
-
-  '@size-limit/preset-small-lib@11.2.0(size-limit@11.2.0)':
-    dependencies:
-      '@size-limit/esbuild': 11.2.0(size-limit@11.2.0)
-      '@size-limit/file': 11.2.0(size-limit@11.2.0)
-      size-limit: 11.2.0
-
   '@standard-schema/spec@1.1.0': {}
 
   '@testing-library/dom@10.4.1':
@@ -4737,8 +4582,6 @@ snapshots:
     dependencies:
       esbuild: 0.27.7
       load-tsconfig: 0.2.5
-
-  bytes-iec@3.1.1: {}
 
   bytes@3.1.2: {}
 
@@ -5383,7 +5226,8 @@ snapshots:
     optionalDependencies:
       '@pkgjs/parseargs': 0.11.0
 
-  jiti@2.7.0: {}
+  jiti@2.7.0:
+    optional: true
 
   jose@6.2.3: {}
 
@@ -5539,12 +5383,6 @@ snapshots:
       thenify-all: 1.6.0
 
   nanoid@3.3.12: {}
-
-  nanoid@5.1.11: {}
-
-  nanospinner@1.2.2:
-    dependencies:
-      picocolors: 1.1.1
 
   negotiator@1.0.0: {}
 
@@ -5926,16 +5764,6 @@ snapshots:
   signal-exit@3.0.7: {}
 
   signal-exit@4.1.0: {}
-
-  size-limit@11.2.0:
-    dependencies:
-      bytes-iec: 3.1.1
-      chokidar: 4.0.3
-      jiti: 2.7.0
-      lilconfig: 3.1.3
-      nanospinner: 1.2.2
-      picocolors: 1.1.1
-      tinyglobby: 0.2.16
 
   slash@3.0.0: {}
 

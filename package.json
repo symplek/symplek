@@ -1,16 +1,20 @@
 {
-  "name": "weft-workspace",
+  "name": "symplek-workspace",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Weft — composable AI agents for TypeScript. Workspace root.",
+  "description": "Symplek — composable AI agents for TypeScript. Workspace root.",
   "scripts": {
-    "build": "pnpm --filter \"weft-*\" --filter \"create-weft\" run build",
-    "test": "pnpm --filter \"weft-*\" run test",
-    "lint": "pnpm --filter \"weft-*\" run lint",
-    "typecheck": "pnpm --filter \"weft-*\" run typecheck",
+    "build": "pnpm --filter \"@symplek/*\" --filter \"create-symplek\" run build",
+    "test": "pnpm --filter \"@symplek/*\" run test",
+    "lint": "pnpm --filter \"@symplek/*\" --filter \"create-symplek\" run lint",
+    "typecheck": "pnpm --filter \"@symplek/*\" --filter \"create-symplek\" run typecheck",
+    "check:versions": "node scripts/sync-versions.mjs --check",
+    "check:docs": "node scripts/check-readme-imports.mjs",
+    "check:consumer": "node scripts/consumer-smoke.mjs",
+    "check:scaffold": "node scripts/scaffold-e2e.mjs",
     "changeset": "changeset",
-    "version-packages": "changeset version",
+    "version-packages": "changeset version && node scripts/sync-versions.mjs",
     "release": "pnpm build && changeset publish"
   },
   "devDependencies": {

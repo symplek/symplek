@@ -1,4 +1,4 @@
-# Weft Launch Marketing
+# Symplek Launch Marketing
 
 Internal strategy doc. Not for publishing. The raw material that launch content gets cut from.
 
@@ -24,7 +24,7 @@ So he built his own. Extracted from a real product, not imagined in a vacuum. A 
 
 ### 5. The Framework
 
-Weft. MIT core, BSL 1.1 Pro tier. Nine packages. TypeScript-native. The first agent framework that treats multi-agent coordination as a first-class composable primitive, not an afterthought bolted onto a prompt chain.
+Symplek. MIT core, BSL 1.1 Pro tier. Nine packages. TypeScript-native. The first agent framework that treats multi-agent coordination as a first-class composable primitive, not an afterthought bolted onto a prompt chain.
 
 ---
 
@@ -39,16 +39,16 @@ Weft. MIT core, BSL 1.1 Pro tier. Nine packages. TypeScript-native. The first ag
 
 ## Competitive Position
 
-### What Weft is NOT competing against
+### What Symplek is NOT competing against
 
 - Python frameworks (CrewAI, AutoGen, LangGraph). Different ecosystem. Don't fight on their turf.
 - Vercel AI SDK. Streaming-focused, different problem space. Complementary, not competitive.
 
-### What Weft IS competing against
+### What Symplek IS competing against
 
-- **"Just write the Promise.all yourself"** mentality. The biggest competitor is hand-rolled coordination code. Weft has to prove the abstraction is worth the dependency.
-- **Mastra.** Closest TypeScript competitor. Imperative, VC-backed, bigger community. Weft's edge: monadic composition is genuinely more elegant, and the confidence/coherence math is more rigorous.
-- **LangChain.js.** Established but bloated. Chain-of-prompts model. Weft is smaller, more opinionated, better typed.
+- **"Just write the Promise.all yourself"** mentality. The biggest competitor is hand-rolled coordination code. Symplek has to prove the abstraction is worth the dependency.
+- **Mastra.** Closest TypeScript competitor. Imperative, VC-backed, bigger community. Symplek's edge: monadic composition is genuinely more elegant, and the confidence/coherence math is more rigorous.
+- **LangChain.js.** Established but bloated. Chain-of-prompts model. Symplek is smaller, more opinionated, better typed.
 - **VoltAgent.** Newer entrant, agent engineering platform angle. Less mature coordination primitives.
 
 ### The wedge
@@ -63,7 +63,7 @@ TypeScript developers who need multi-agent coordination with real type safety, r
 
 **Lead:** "I was building a multi-agent SaaS for the construction industry and every TypeScript agent framework made me write 80 lines of scaffolding for basic coordination. So I built my own."
 
-**Follow:** Weft is extracted from a real product. The API was shaped by actual usage, not by imagining what developers might want. It's MIT-licensed, 25KB core, zero required peer deps, and the coordination operators (consensus, debate, dialectic, converge) are the things you're currently hand-rolling badly every time.
+**Follow:** Symplek is extracted from a real product. The API was shaped by actual usage, not by imagining what developers might want. It's MIT-licensed, 25KB core, zero required peer deps, and the coordination operators (consensus, debate, dialectic, converge) are the things you're currently hand-rolling badly every time.
 
 **Proof:** Show the 15-line example vs the 80-line equivalent. Then show consensus in 5 lines. Then show debate. Let the code do the talking.
 
@@ -71,7 +71,7 @@ TypeScript developers who need multi-agent coordination with real type safety, r
 
 **Lead with frustration, not biography.** The single dad, self-taught, construction background comes in paragraph two as colour that makes you memorable. Not paragraph one as a sympathy play.
 
-**The Convex angle.** Don't lead with it (small community), but use it as a credibility signal. "I picked Convex because I'm one person and needed maximum leverage. Turned out real-time subscriptions are exactly what multi-agent coordination needs. Weft was born inside a Convex app and has first-class bindings for it."
+**The Convex angle.** Don't lead with it (small community), but use it as a credibility signal. "I picked Convex because I'm one person and needed maximum leverage. Turned out real-time subscriptions are exactly what multi-agent coordination needs. Symplek was born inside a Convex app and has first-class bindings for it."
 
 **The constraint narrative.** Every technical decision traces back to having no spare resources. The framework is small and composable because it had to be. The Convex integration exists because that's where the real problem lives. Constraint-driven engineering. Not a funded team building features speculatively. One person building what they actually need.
 
@@ -90,7 +90,7 @@ TypeScript developers who need multi-agent coordination with real type safety, r
 The origin story format. Technical substance with personal context. HN rewards "I built this because I needed it" when the technical work is real. The construction angle makes it memorable. The monadic composition gives the FP crowd something to engage with.
 
 **Title options:**
-- "Show HN: Weft, composable agent primitives for TypeScript"
+- "Show HN: Symplek, composable agent primitives for TypeScript"
 - "Show HN: I built a TypeScript agent framework because existing ones couldn't handle multi-agent consensus"
 
 **Timing:** Weekday morning US time. Tuesday-Thursday.
@@ -111,7 +111,7 @@ Longer-form version of the Show HN. "Why I Built Another TypeScript Agent Framew
 
 ### 5. Convex community
 
-Dedicated post in Convex Discord/community. "Weft was born inside a Convex app. Here's the integration." This audience is small but highly aligned and likely to adopt.
+Dedicated post in Convex Discord/community. "Symplek was born inside a Convex app. Here's the integration." This audience is small but highly aligned and likely to adopt.
 
 ---
 
@@ -148,11 +148,11 @@ The free tier is genuinely generous. This is deliberate. Adoption first, revenue
 **DONE.** README restructured. The progression is now:
 
 1. Multi-agent consensus (the differentiator, 10 lines)
-2. Weft facade for simple AI calls (3 lines)
+2. Symplek facade for simple AI calls (3 lines)
 3. `.toUnit()` bridging facade into full coordination
 4. Resilience (retry/timeout/fallback)
 
-The `.toUnit()` bridge was already in the code but undocumented. Now it's front and centre in the README, facade JSDoc, and WeftBuilder JSDoc.
+The `.toUnit()` bridge was already in the code but undocumented. Now it's front and centre in the README, facade JSDoc, and SymplekBuilder JSDoc.
 
 ---
 
@@ -161,7 +161,7 @@ The `.toUnit()` bridge was already in the code but undocumented. Now it's front 
 - Don't lead with "single dad" as the headline. It's colour, not the pitch.
 - Don't position as a Convex-only framework. Provider-agnostic first, Convex-native second.
 - Don't compare directly to Python frameworks. Different audience, different fight.
-- Don't launch all nine packages simultaneously. Lead with weft-core. The rest follows.
+- Don't launch all nine packages simultaneously. Lead with @symplek/core. The rest follows.
 - Don't undersell the technical work. "I used AI to code" is not the framing. Architecture is the framing.
 - Don't wait for the perfect launch. The framework is ready. Ship the announcement.
 
@@ -170,7 +170,7 @@ The `.toUnit()` bridge was already in the code but undocumented. Now it's front 
 ## Open Questions
 
 - [ ] Exact Convex-to-coordination mechanism: need Anthony to articulate the specific reactive pattern (consensus votes as subscriptions? agent results as mutations?) in one concrete sentence.
-- [ ] npm publish: is @weft/* claimed? Check namespace availability before launch day.
-- [ ] GitHub repo visibility: wefthq/weft is the target. When does it go public?
-- [ ] Landing page: does Weft need one, or is the GitHub README sufficient for v1?
+- [ ] npm publish: is @symplek/* claimed? Check namespace availability before launch day.
+- [ ] GitHub repo visibility: symplek/symplek is the target. When does it go public?
+- [ ] Landing page: does Symplek need one, or is the GitHub README sufficient for v1?
 - [ ] Pro tier pricing: what's the model? Per-seat? Usage-based? Flat monthly?
