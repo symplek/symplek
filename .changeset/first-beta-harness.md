@@ -1,5 +1,5 @@
 ---
-"weft-harness": minor
+"@symplek/harness": minor
 ---
 
 - Results from the stub session are stamped `source: "synthesized"`. Only a real execution is stamped `"verified"`.

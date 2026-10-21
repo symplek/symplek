@@ -1,0 +1,43 @@
+import "./symplek.config.js";
+import { createContext } from "@symplek/core";
+import { Symplek } from "@symplek/core/server";
+
+/**
+ * {{name}} — a minimal Symplek agent.
+ *
+ * Demonstrates the core pattern:
+ *   1. `Symplek(prompt)` builds an AI call.
+ *   2. `.coordinate()` lifts it into the AgentUnit<T> algebra.
+ *   3. Layer safety operators on top (retry, timeout, fallback, …).
+ *   4. `.run(ctx)` executes and returns a TrackedResult.
+ *
+ * Scripts:
+ *   pnpm dev    — watch mode (re-runs on file change)
+ *   pnpm start  — one-shot
+ */
+
+if (!process.env.OPENAI_API_KEY) {
+  console.error("[{{name}}] OPENAI_API_KEY is not set.");
+  console.error("Set it and re-run:  export OPENAI_API_KEY=sk-...");
+  process.exit(1);
+}
+
+async function main(): Promise<void> {
+  const ctx = createContext();
+  const input = "The quick brown fox jumps over the lazy dog.";
+
+  const result = await Symplek(`Summarise in one sentence: ${input}`)
+    .coordinate()
+    .retry(2)
+    .timeout(15_000)
+    .run(ctx);
+
+  console.log("Input:      ", input);
+  console.log("Summary:    ", result.value);
+  console.log("Confidence: ", result.confidence);
+}
+
+main().catch((err: unknown) => {
+  console.error("[{{name}}] agent failed:", err);
+  process.exit(1);
+});

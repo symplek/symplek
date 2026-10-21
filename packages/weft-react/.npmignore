@@ -1,6 +1,0 @@
-src/
-__tests__/
-*.test.ts
-*.spec.ts
-tsconfig.json
-coverage/

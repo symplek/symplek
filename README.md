@@ -1,4 +1,4 @@
-# Weft
+# Symplek
 
 Composable agent primitives for TypeScript.
 
@@ -8,14 +8,14 @@ Composable agent primitives for TypeScript.
 
 Coordinating multiple LLM calls in TypeScript usually means writing 80+ lines of scaffolding: promise chains, error handling, retry logic, consensus aggregation, and result tracking, before you get to any actual agent logic.
 
-Weft replaces that scaffolding with a small algebra. The same coordination patterns, retry, fallback, parallel consensus, iterative refinement, compose as method chains on a single type: `AgentUnit<T>`.
+Symplek replaces that scaffolding with a small algebra. The same coordination patterns, retry, fallback, parallel consensus, iterative refinement, compose as method chains on a single type: `AgentUnit<T>`.
 
 ### Multi-agent consensus in 10 lines
 
 Three agents vote on whether a contract clause is fair. Parallel execution, weighted voting, confidence tracking, all composed:
 
 ```typescript
-import { AgentUnit, createContext } from "weft-core";
+import { AgentUnit, createContext } from "@symplek/core";
 
 const ctx = createContext();
 
@@ -36,16 +36,16 @@ console.log(result.value.votes);          // [{decision: 'reject', confidence: 0
 
 No agent registration. No routing config. No network topology. Hand it functions, get a consensus result with provenance.
 
-### Simple AI calls with the Weft facade
+### Simple AI calls with the Symplek facade
 
-For single-prompt work, the `Weft` callable is the fastest path:
+For single-prompt work, the `Symplek` callable is the fastest path:
 
 ```typescript
-import { Weft } from "weft-core/server";
+import { Symplek } from "@symplek/core/server";
 
-Weft.configure({ provider: "anthropic", model: "claude-sonnet-4-20250514" });
+Symplek.configure({ provider: "anthropic", model: "claude-sonnet-4-20250514" });
 
-const result = await Weft("Summarise this contract in three bullet points");
+const result = await Symplek("Summarise this contract in three bullet points");
 console.log(result.value);
 ```
 
@@ -54,7 +54,7 @@ console.log(result.value);
 The facade and the coordination algebra connect through `.coordinate()`. Start simple, compose up:
 
 ```typescript
-const result = await Weft("Analyse this contract clause for risk")
+const result = await Symplek("Analyse this contract clause for risk")
   .coordinate()
   .consensus([
     (analysis) => reviewAsLegalCounsel(analysis),
@@ -86,14 +86,14 @@ const result = await AgentUnit.from(async () => {
   .run(ctx, { trustMode: "legacy" });
 ```
 
-**Equivalent without Weft: ~80 lines** of try/catch, `Promise.race`, setTimeout, custom error classes, and a `while` loop.
+**Equivalent without Symplek: ~80 lines** of try/catch, `Promise.race`, setTimeout, custom error classes, and a `while` loop.
 
 ---
 
 ## Install
 
 ```
-pnpm add weft-core
+pnpm add @symplek/core
 ```
 
 Node 18+. No required peer dependencies for the core package.
@@ -104,15 +104,15 @@ Node 18+. No required peer dependencies for the core package.
 
 | Package | Description | License |
 |---|---|---|
-| `weft-core` | `AgentUnit` algebra: operators, error handling, observability | MIT |
-| `weft-react` | React hooks (`useWeftStream`, `AIErrorBoundary`) | MIT |
-| `weft-convex` | Convex action bindings | MIT |
-| `weft-cli` | Scaffolding and agent debugging CLI | MIT |
-| `weft-mcp` | MCP server exposing Weft operations as tool calls | MIT |
-| `weft-harness` | Unit-testing harness for AgentUnit compositions | MIT |
-| `weft-testing` | Vitest utilities and mock factories | MIT |
-| `weft-devtools` | Chrome DevTools extension bridge for agent traces | MIT |
-| `weft-pro` | Organisational features: TaCo consensus, trust registry, antibodies | BSL 1.1 |
+| `@symplek/core` | `AgentUnit` algebra: operators, error handling, observability | MIT |
+| `@symplek/react` | React hooks (`useSymplekStream`, `AIErrorBoundary`) | MIT |
+| `@symplek/convex` | Convex action bindings | MIT |
+| `@symplek/cli` | Scaffolding and agent debugging CLI | MIT |
+| `@symplek/mcp` | MCP server exposing Symplek operations as tool calls | MIT |
+| `@symplek/harness` | Unit-testing harness for AgentUnit compositions | MIT |
+| `@symplek/testing` | Vitest utilities and mock factories | MIT |
+| `@symplek/devtools` | Chrome DevTools extension bridge for agent traces | MIT |
+| `@symplek/pro` | Organisational features: TaCo consensus, trust registry, antibodies | BSL 1.1 |
 
 ---
 
@@ -149,7 +149,7 @@ All operators on `AgentUnit<T>` are free (MIT). The full list:
 
 ## Record & Replay
 
-Weft's record/replay engine is the foundation for deterministic agent testing. Record a run once, replay it infinitely at zero cost. The agent body is **never called** during replay — responses come from the stored trace.
+Symplek's record/replay engine is the foundation for deterministic agent testing. Record a run once, replay it infinitely at zero cost. The agent body is **never called** during replay — responses come from the stored trace.
 
 ```mermaid
 flowchart LR
@@ -176,19 +176,19 @@ flowchart LR
 
 | Framework | Replay Type | Re-executes LLM? | Deterministic? | Costs Tokens? |
 |---|---|---|---|---|
-| **Weft** | Recorded trace replay | **No** | **Yes** | **No** |
+| **Symplek** | Recorded trace replay | **No** | **Yes** | **No** |
 | LangGraph | Time-travel from checkpoints | Yes | No | Yes |
 | Mastra | No replay primitive | N/A | N/A | N/A |
 
 **[Full architecture →](docs/architecture.md)**
 
-> **Legal disclaimer — replay determinism.** `.replay()` replays a stored trace through the same operator logic with the same inputs, producing the same output _for a given version of Weft and a given underlying AI model_. It does **not** guarantee identical outputs across model version upgrades, provider API changes, or different runtime environments. Replay is a testing and debugging aid, not a cryptographic audit trail. Do not rely on replay parity as evidence of correctness in regulated or compliance-critical workflows without independent verification.
+> **Legal disclaimer — replay determinism.** `.replay()` replays a stored trace through the same operator logic with the same inputs, producing the same output _for a given version of Symplek and a given underlying AI model_. It does **not** guarantee identical outputs across model version upgrades, provider API changes, or different runtime environments. Replay is a testing and debugging aid, not a cryptographic audit trail. Do not rely on replay parity as evidence of correctness in regulated or compliance-critical workflows without independent verification.
 
 **Tracking**
 - `.tracked(opts?)` — source-tracking wrapper
 - `.tap(fn)` — side-effect without modifying value
 
-**Observability** (also free, in `weft-core`)
+**Observability** (also free, in `@symplek/core`)
 - `observable(unit, opts?)` — emit trace entries for a unit
 - `createOperatorSpan(type, name, parentSpanId?)` — manual span timing
 - `getTraces()` / `clearTraces()` — in-memory trace store
@@ -204,7 +204,7 @@ Pre-1.0. API is stabilising but may change between minor versions. We commit to 
 
 ## Demo
 
-See the adversarial demo at [wefthq/weft-demo](https://github.com/wefthq/weft-demo) — a flaky agent that fails 80% of the time, recorded and replayed deterministically.
+See the adversarial demo at [symplek/symplek-demo](https://github.com/symplek/symplek-demo) — a flaky agent that fails 80% of the time, recorded and replayed deterministically.
 
 **[Full demo transcript →](docs/demo-transcript.md)**
 
@@ -239,7 +239,7 @@ Agent re-executed: ✓ NO (deterministic!)
 - [Architecture](docs/ARCHITECTURE.md) — canonical vs mirror model, package structure, known asymmetries
 - [Record/Replay Architecture](docs/architecture.md) — deep dive into `.rehearse()` / `.replay()`
 - [Demo Transcript](docs/demo-transcript.md) — full adversarial demo output
-- [GitHub Discussions](https://github.com/wefthq/weft/discussions) — questions, feature proposals, show-and-tell
+- [GitHub Discussions](https://github.com/symplek/symplek/discussions) — questions, feature proposals, show-and-tell
 
 ---
 
@@ -251,7 +251,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Short version: this repo is a distributi
 
 ## Licence
 
-`weft-core` and all packages except `weft-pro` are MIT.  
-`weft-pro` is [Business Source License 1.1](packages/weft-pro/LICENSE) — source-available; converts to MIT on 2030-04-24.
+`@symplek/core` and all packages except `@symplek/pro` are MIT.  
+`@symplek/pro` is [Business Source License 1.1](packages/symplek-pro/LICENSE) — source-available; converts to MIT on 2030-04-24.
 
 See [LICENSE](LICENSE) for the full per-package breakdown.

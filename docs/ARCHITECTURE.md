@@ -1,8 +1,8 @@
-# Weft Architecture — Record/Replay Loop
+# Symplek Architecture — Record/Replay Loop
 
 ## Overview
 
-Weft's record/replay engine is the foundation for deterministic agent testing. It decouples **execution** from **observation**: record a run once, replay it infinitely at zero cost.
+Symplek's record/replay engine is the foundation for deterministic agent testing. It decouples **execution** from **observation**: record a run once, replay it infinitely at zero cost.
 
 ```mermaid
 flowchart TB
@@ -104,9 +104,9 @@ The agent body is **never called** during replay. The `TraceReplayer` replays fr
 
 | Framework | Replay Type | Re-executes LLM? | Deterministic? | Costs Tokens? |
 |---|---|---|---|---|
-| **Weft** | Recorded trace replay | **No** | **Yes** | **No** |
+| **Symplek** | Recorded trace replay | **No** | **Yes** | **No** |
 | LangGraph | Time-travel from checkpoints | Yes | No | Yes |
 | Mastra | No replay primitive | N/A | N/A | N/A |
 | Vercel AI SDK | No replay primitive | N/A | N/A | N/A |
 
-Weft is the only framework where replay is a first-class primitive that never calls the model.
+Symplek is the only framework where replay is a first-class primitive that never calls the model.

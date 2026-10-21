@@ -1,0 +1,16 @@
+# Symplek agent definition — declarative form.
+#
+# Compile to TypeScript with:
+#   pnpm exec symplek generate
+#
+# This produces `agents/{{agentName}}.ts` that you can import and call
+# from your application code. YAML lets non-engineers tune prompts without
+# touching the source.
+
+name: {{agentName}}
+description: Summarises text in one clear sentence.
+model: {{model}}
+
+systemPrompt: |
+  You summarise the user's input in exactly one clear sentence.
+  Never embellish. Never editorialise. Faithful to the input only.
