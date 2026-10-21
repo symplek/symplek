@@ -1,16 +1,16 @@
-# CODEOWNERS — Weft
+# CODEOWNERS — Symplek
 
 # Default owner for everything in this repo. Replace with named owners once
-# the wefthq/maintainers team is populated on GitHub.
-* @wefthq/maintainers
+# the symplek/maintainers team is populated on GitHub.
+* @symplek/maintainers
 
 # Pro-tier package — gated by maintainer review of the BSL boundary.
-/packages/weft-pro/ @wefthq/maintainers
+/packages/symplek-pro/ @symplek/maintainers
 
 # Release tooling.
-/.changeset/ @wefthq/maintainers
-/.github/workflows/ @wefthq/maintainers
+/.changeset/ @symplek/maintainers
+/.github/workflows/ @symplek/maintainers
 
 # Security-sensitive surface.
-/SECURITY.md @wefthq/maintainers
-/.github/dependabot.yml @wefthq/maintainers
+/SECURITY.md @symplek/maintainers
+/.github/dependabot.yml @symplek/maintainers

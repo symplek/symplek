@@ -1,12 +1,12 @@
 ---
-"weft-convex": minor
-"weft-testing": patch
+"@symplek/convex": minor
+"@symplek/testing": patch
 ---
 
-**weft-convex**
+**@symplek/convex**
 
 - `withAI` throws when `trackCost` is supplied without `costContext.userId`, instead of recording cost against an undefined owner.
 
-**weft-testing**
+**@symplek/testing**
 
-- The rehearsal engine re-exports `weft-core/rehearsal`, replacing a second copy that lacked the trace-integrity checks. Existing deep import paths keep resolving.
+- The rehearsal engine re-exports `@symplek/core/rehearsal`, replacing a second copy that lacked the trace-integrity checks. Existing deep import paths keep resolving.

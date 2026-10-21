@@ -27,29 +27,29 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Lint packages
-        run: pnpm --filter "weft-*" --filter "create-weft" run lint
+        run: pnpm --filter "@symplek/*" --filter "create-symplek" run lint
       # Packages resolve each other's types through the built `dist/` output,
       # so a clean runner must build before it can type check.
       - name: Build packages
-        run: pnpm --filter "weft-*" --filter "create-weft" run build
+        run: pnpm --filter "@symplek/*" --filter "create-symplek" run build
       - name: Type check packages
-        run: pnpm --filter "weft-*" --filter "create-weft" run typecheck
+        run: pnpm --filter "@symplek/*" --filter "create-symplek" run typecheck
 
   tier-boundary:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Fail if @weft/core imports weft-pro
+      - name: Fail if @symplek/core imports @symplek/pro
         run: |
-          # Match only actual import/require statements, not comments or prose.
-          # Previous grep for bare 'weft-pro' false-positived on comment text.
-          matches=$(grep -rEl "from ['\"]weft-pro" packages/weft-core/src --include='*.ts' || true)
+          # Match import forms only (static `from`, dynamic `import()`, `require()`),
+          # not comments or prose: a grep for bare '@symplek/pro' false-positives on comment text.
+          matches=$(grep -rEl "(from|import\(|require\()\s*['\"]@symplek/pro" packages/symplek-core/src --include='*.ts' || true)
           if [ -n "$matches" ]; then
-            echo "Error: @weft/core must not import weft-pro. Offending files:"
+            echo "Error: @symplek/core must not import @symplek/pro. Offending files:"
             echo "$matches"
             exit 1
           fi
-          echo "OK: no weft-pro imports in packages/weft-core/src"
+          echo "OK: no @symplek/pro imports in packages/symplek-core/src"
 
   build:
     runs-on: ubuntu-latest
@@ -64,47 +64,33 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Build packages
-        run: pnpm --filter "weft-*" --filter "create-weft" run build
+        run: pnpm --filter "@symplek/*" --filter "create-symplek" run build
       - name: Check build artefacts present
         run: |
-          for package in weft-core weft-convex weft-react weft-pro weft-mcp weft-harness weft-testing; do
+          for package in @symplek/core @symplek/convex @symplek/react @symplek/pro @symplek/mcp @symplek/harness @symplek/testing; do
             if [ ! -d "packages/$package/dist" ]; then
               echo "Error: packages/$package/dist not found"
               exit 1
             fi
           done
-          # weft-cli builds via `tsc && copy-templates`; its entry is dist/index.js.
-          if [ ! -f "packages/weft-cli/dist/index.js" ]; then
-            echo "Error: packages/weft-cli/dist/index.js not found"
+          # @symplek/cli builds via `tsc && copy-templates`; its entry is dist/index.js.
+          if [ ! -f "packages/symplek-cli/dist/index.js" ]; then
+            echo "Error: packages/symplek-cli/dist/index.js not found"
             exit 1
           fi
-          # create-weft builds to dist/index.js (CJS bundle).
-          if [ ! -f "packages/create-weft/dist/index.js" ]; then
-            echo "Error: packages/create-weft/dist/index.js not found"
+          # create-symplek builds to dist/index.js (CJS bundle).
+          if [ ! -f "packages/create-symplek/dist/index.js" ]; then
+            echo "Error: packages/create-symplek/dist/index.js not found"
             exit 1
           fi
           echo "OK: all published packages emitted their build artefacts"
-      - name: Inspect packed weft-pro for unresolved workspace specifiers
-        working-directory: packages/weft-pro
-        run: |
-          # `peerDependencies.weft-core` is `workspace:*` in source; `pnpm pack`
-          # (and `changeset publish`) rewrites it to a real semver range. A raw
-          # `npm publish` would ship the unresolvable `workspace:` literal.
-          # Assert the rewrite worked. `pnpm pack` is non-recursive, so it must
-          # run from the package directory (no --filter).
-          set -euo pipefail
-          work_dir="$(mktemp -d)"
-          pnpm pack --pack-destination "$work_dir"
-          tarball="$(ls "$work_dir"/*.tgz)"
-          echo "Inspecting packed tarball: $tarball"
-          tar -xzf "$tarball" -C "$work_dir"
-          packed_pkg="$work_dir/package/package.json"
-          if grep -q 'workspace:' "$packed_pkg"; then
-            echo "Error: packed weft-pro package.json still contains a 'workspace:' specifier:"
-            grep -n 'workspace:' "$packed_pkg"
-            exit 1
-          fi
-          echo "OK: packed weft-pro package.json has no 'workspace:' specifiers"
+      - name: Inspect every packed package
+        # Packs each publishable package with `pnpm pack`, as `changeset publish`
+        # does, and checks the tarball: no `workspace:` specifier left in the
+        # packed package.json (pnpm rewrites it; a raw `npm publish` would not),
+        # every main / types / exports / bin target is in the tarball, every bin
+        # target parses, and a LICENSE file is included. Publishes nothing.
+        run: node .github/scripts/check-packed-packages.mjs
 
   test:
     runs-on: ubuntu-latest
@@ -119,9 +105,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Build packages
-        run: pnpm --filter "weft-*" --filter "create-weft" run build
+        run: pnpm --filter "@symplek/*" --filter "create-symplek" run build
       - name: Test packages
-        run: pnpm --filter "weft-*" test
+        run: pnpm --filter "@symplek/*" test
 
   # Gated publish via the changesets flow. Runs ONLY on push to main, after all
   # quality gates pass. On a normal push it opens/updates a "Version Packages" PR;
