@@ -3,7 +3,7 @@
   "changelog": "@changesets/cli/changelog",
   "commit": false,
   "fixed": [],
-  "linked": [["weft-core", "weft-pro"]],
+  "linked": [["@symplek/core", "@symplek/pro"]],
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",

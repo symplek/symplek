@@ -1,0 +1,59 @@
+{
+  "name": "@symplek/react",
+  "version": "0.1.0",
+  "description": "Symplek Framework — React hooks and components for AI agent UIs",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --watch --dts",
+    "lint": "biome check .",
+    "typecheck": "tsc --noEmit",
+    "typecheck:boundary": "tsc --noEmit -p tsconfig.boundary.json",
+    "test:contract": "vitest run src/__tests__/contractSmoke.test.ts"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0",
+    "@symplek/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.17",
+    "zod": "^3.24.0"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "react",
+    "symplek",
+    "hooks"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/symplek/symplek.git",
+    "directory": "packages/symplek-react"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

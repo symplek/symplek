@@ -1,14 +1,14 @@
 {
-  "name": "weft-workspace",
+  "name": "symplek-workspace",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Weft — composable AI agents for TypeScript. Workspace root.",
+  "description": "Symplek — composable AI agents for TypeScript. Workspace root.",
   "scripts": {
-    "build": "pnpm --filter \"weft-*\" --filter \"create-weft\" run build",
-    "test": "pnpm --filter \"weft-*\" run test",
-    "lint": "pnpm --filter \"weft-*\" run lint",
-    "typecheck": "pnpm --filter \"weft-*\" run typecheck",
+    "build": "pnpm --filter \"@symplek/*\" --filter \"create-symplek\" run build",
+    "test": "pnpm --filter \"@symplek/*\" run test",
+    "lint": "pnpm --filter \"@symplek/*\" run lint",
+    "typecheck": "pnpm --filter \"@symplek/*\" run typecheck",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "pnpm build && changeset publish"

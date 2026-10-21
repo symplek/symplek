@@ -1,0 +1,50 @@
+{
+  "name": "@symplek/mcp",
+  "version": "0.1.0",
+  "description": "MCP Fabric for Symplek — trust-aware tool consumption via Model Context Protocol",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "private": false,
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai-agents",
+    "consensus",
+    "debate",
+    "symplek"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "bin": {
+    "@symplek/mcp": "./dist/server.cjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup --entry.index=src/index.ts --entry.server=src/server/index.ts --format cjs,esm --dts --outDir dist",
+    "dev": "tsup src/index.ts --format cjs,esm --watch --dts --outDir dist",
+    "lint": "biome check .",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "peerDependencies": {
+    "@symplek/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.24.0",
+    "@types/node": "^22.14.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.17"
+  }
+}

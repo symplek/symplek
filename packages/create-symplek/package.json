@@ -1,0 +1,42 @@
+{
+  "name": "create-symplek",
+  "version": "0.1.0",
+  "description": "Scaffold a Symplek agent project — npm create wrapper around @symplek/cli init.",
+  "license": "MIT",
+  "bin": {
+    "create-symplek": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "ai",
+    "agents",
+    "Symplek",
+    "scaffolding",
+    "create"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/symplek/symplek.git",
+    "directory": "packages/create-symplek"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs --outDir dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

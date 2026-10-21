@@ -27,23 +27,23 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Lint packages
-        run: pnpm --filter "weft-*" run lint
+        run: pnpm --filter "@symplek/*" run lint
       - name: Type check packages
-        run: pnpm --filter "weft-*" run typecheck
+        run: pnpm --filter "@symplek/*" run typecheck
 
   tier-boundary:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Fail if @weft/core imports weft-pro
+      - name: Fail if @symplek/core imports @symplek/pro
         run: |
-          matches=$(grep -rEl 'weft-pro' packages/weft-core/src --include='*.ts' || true)
+          matches=$(grep -rEl '@symplek/pro' packages/symplek-core/src --include='*.ts' || true)
           if [ -n "$matches" ]; then
-            echo "Error: @weft/core must not import weft-pro. Offending files:"
+            echo "Error: @symplek/core must not import @symplek/pro. Offending files:"
             echo "$matches"
             exit 1
           fi
-          echo "OK: no weft-pro imports in packages/weft-core/src"
+          echo "OK: no @symplek/pro imports in packages/symplek-core/src"
 
   build:
     runs-on: ubuntu-latest
@@ -60,25 +60,25 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Build packages
-        run: pnpm --filter "weft-*" run build
+        run: pnpm --filter "@symplek/*" run build
       - name: Check build artefacts present
         run: |
-          for package in weft-core weft-convex weft-react weft-pro; do
+          for package in @symplek/core @symplek/convex @symplek/react @symplek/pro; do
             if [ ! -d "packages/$package/dist" ]; then
               echo "Error: packages/$package/dist not found"
               exit 1
             fi
           done
-          # weft-cli builds via `tsc && copy-templates`; its entry is dist/index.js.
-          if [ ! -f "packages/weft-cli/dist/index.js" ]; then
-            echo "Error: packages/weft-cli/dist/index.js not found"
+          # @symplek/cli builds via `tsc && copy-templates`; its entry is dist/index.js.
+          if [ ! -f "packages/symplek-cli/dist/index.js" ]; then
+            echo "Error: packages/symplek-cli/dist/index.js not found"
             exit 1
           fi
           echo "OK: all published packages emitted their build artefacts"
-      - name: Inspect packed weft-pro for unresolved workspace specifiers
-        working-directory: packages/weft-pro
+      - name: Inspect packed @symplek/pro for unresolved workspace specifiers
+        working-directory: packages/symplek-pro
         run: |
-          # `peerDependencies.weft-core` is `workspace:*` in source; `pnpm pack`
+          # `peerDependencies.symplek-core` is `workspace:*` in source; `pnpm pack`
           # (and `changeset publish`) rewrites it to a real semver range. A raw
           # `npm publish` would ship the unresolvable `workspace:` literal.
           # Assert the rewrite worked. `pnpm pack` is non-recursive, so it must
@@ -91,11 +91,11 @@ jobs:
           tar -xzf "$tarball" -C "$work_dir"
           packed_pkg="$work_dir/package/package.json"
           if grep -q 'workspace:' "$packed_pkg"; then
-            echo "Error: packed weft-pro package.json still contains a 'workspace:' specifier:"
+            echo "Error: packed @symplek/pro package.json still contains a 'workspace:' specifier:"
             grep -n 'workspace:' "$packed_pkg"
             exit 1
           fi
-          echo "OK: packed weft-pro package.json has no 'workspace:' specifiers"
+          echo "OK: packed @symplek/pro package.json has no 'workspace:' specifiers"
 
   test:
     runs-on: ubuntu-latest
@@ -112,9 +112,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Build packages
-        run: pnpm --filter "weft-*" run build
+        run: pnpm --filter "@symplek/*" run build
       - name: Test packages
-        run: pnpm --filter "weft-*" test
+        run: pnpm --filter "@symplek/*" test
 
   # Gated publish via the changesets flow. Runs ONLY on push to main, after all
   # quality gates pass. On a normal push it opens/updates a "Version Packages" PR;

@@ -1,6 +1,6 @@
-# Weft Demo — Terminal Transcript
+# Symplek Demo — Terminal Transcript
 
-> **ℹ️ Note:** This is a text transcript of the adversarial demo at [wefthq/weft-demo](https://github.com/wefthq/weft-demo). An actual screen recording would show the same sequence. This transcript is deterministic — it was captured from a real `npm run demo` execution.
+> **ℹ️ Note:** This is a text transcript of the adversarial demo at [symplek/symplek-demo](https://github.com/symplek/symplek-demo). An actual screen recording would show the same sequence. This transcript is deterministic — it was captured from a real `npm run demo` execution.
 
 ## The Adversarial Demo
 
@@ -8,7 +8,7 @@ The demo simulates a flaky data pipeline with **5 API calls**, two of which fail
 
 ### Phase 1 — The Problem: Flaky Agent
 
-Running the bare agent 5 times without Weft:
+Running the bare agent 5 times without Symplek:
 
 ```
   Run 1: ✗ FAILED — [API #3] POST /analyze → TIMEOUT (5000ms)
@@ -19,11 +19,11 @@ Running the bare agent 5 times without Weft:
   → 4/5 runs failed (genuinely non-deterministic)
 ```
 
-**4 out of 5 runs fail.** Different failures each time. Without Weft, debugging this means re-running and hoping you hit the failure — burning API tokens every attempt.
+**4 out of 5 runs fail.** Different failures each time. Without Symplek, debugging this means re-running and hoping you hit the failure — burning API tokens every attempt.
 
 ### Phase 2 — Record with `.rehearse()`
 
-Weft wraps the agent and records a successful run:
+Symplek wraps the agent and records a successful run:
 
 ```
   Attempt 1: ✗ Failed, retrying...
@@ -67,7 +67,7 @@ The sentinel value `apiCallCount = -999` proves the agent body never executed. Y
 
 ## The Wedge
 
-| Without Weft | With Weft |
+| Without Symplek | With Symplek |
 |---|---|
 | Flaky agents fail intermittently — hard to reproduce | `.rehearse()` captures every decision, call, and output |
 | Each debug attempt re-executes LLM calls — different results | `.replay()` reproduces the EXACT trace — 2 events, zero re-execution |
@@ -76,13 +76,13 @@ The sentinel value `apiCallCount = -999` proves the agent body never executed. Y
 ## How to Reproduce
 
 ```bash
-git clone https://github.com/wefthq/weft-demo.git
-cd weft-demo
+git clone https://github.com/symplek/symplek-demo.git
+cd symplek-demo
 npm install
 npm run demo
 ```
 
-> **Note:** The demo depends on `weft-core` via a local `file:` dependency. Clone `wefthq/weft` alongside and adjust the path if needed.
+> **Note:** The demo depends on `@symplek/core` via a local `file:` dependency. Clone `symplek/symplek` alongside and adjust the path if needed.
 
 ## Running the Demo (Real Output)
 
@@ -92,12 +92,12 @@ Here's a complete terminal capture from an actual run:
 $ npm run demo
 
 ══════════════════════════════════════════════════════════════
-  WEFT ADVERSARIAL DEMO
+  SYMPLEK ADVERSARIAL DEMO
   Deterministic Failure Replay
 ══════════════════════════════════════════════════════════════
 
 ▶ Phase 1 — The Problem: Flaky Agent
-  Running bare agent 5 times (no Weft). Each run makes 5 API calls.
+  Running bare agent 5 times (no Symplek). Each run makes 5 API calls.
   Two of those calls fail ~40% of the time.
 
   Run 1: ✗ FAILED — [API #3] POST /analyze → TIMEOUT (5000ms)
@@ -132,19 +132,19 @@ $ npm run demo
   Agent re-executed: ✓ NO (deterministic!)
 
 ══════════════════════════════════════════════════════════════
-  THE WEFT WEDGE
+  THE SYMPLEK WEDGE
 ══════════════════════════════════════════════════════════════
 
-  Without Weft:
+  Without Symplek:
     • Flaky agents fail intermittently — hard to reproduce
     • Each debug attempt re-executes LLM calls — different results
     • You pay for every token burned during debugging
 
-  With Weft:
+  With Symplek:
     • .rehearse() captures every decision, call, and output
     • .replay() reproduces the EXACT trace — 2 events, zero re-execution
     • The agent body is NEVER called — deterministic by construction
     • Output is identical: yes
 
-  Get started: npm create weft@latest
+  Get started: npm create symplek@latest
 ```
