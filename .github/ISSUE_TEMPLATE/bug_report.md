@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: A confirmed, reproducible bug in a published @weft/* package
+about: A confirmed, reproducible bug in a published @symplek/* package
 title: "[bug] "
 labels: bug
 assignees: ''
@@ -8,7 +8,7 @@ assignees: ''
 
 ## What package and version?
 
-- Package: `@weft/...`
+- Package: `@symplek/...`
 - Version: `0.x.x`
 - Node: `20.x.x`
 - OS: macOS / Linux / Windows
