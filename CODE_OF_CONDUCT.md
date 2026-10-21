@@ -11,7 +11,7 @@ The full text is canonical at the link above. The summary, for the impatient:
 
 ## Reporting
 
-Report concerns to **conduct@weft.dev**. Reports are confidential. Maintainers will respond within 7 days.
+Report concerns to **conduct@symplek.dev**. Reports are confidential. Maintainers will respond within 7 days.
 
 ## Enforcement
 
@@ -26,4 +26,4 @@ Bans are appealable in writing to the same email after 90 days.
 
 ## Scope
 
-This applies to all project spaces: this repo's issues, PRs, discussions, the `@weft/*` npm registry pages where comments are possible, and any public communication that explicitly references this project.
+This applies to all project spaces: this repo's issues, PRs, discussions, the `@symplek/*` npm registry pages where comments are possible, and any public communication that explicitly references this project.
