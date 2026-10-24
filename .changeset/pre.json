@@ -1,0 +1,17 @@
+{
+  "mode": "pre",
+  "tag": "beta",
+  "initialVersions": {
+    "create-symplek": "0.1.0",
+    "@symplek/cli": "0.1.0",
+    "@symplek/convex": "0.1.0",
+    "@symplek/core": "1.0.0-beta.1",
+    "@symplek/devtools": "0.1.0",
+    "@symplek/harness": "0.1.0-alpha.1",
+    "@symplek/mcp": "0.1.0",
+    "@symplek/pro": "1.0.0-beta.1",
+    "@symplek/react": "0.1.0",
+    "@symplek/testing": "0.1.0"
+  },
+  "changesets": []
+}

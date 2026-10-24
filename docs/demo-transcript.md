@@ -1,14 +1,14 @@
-# Weft Demo — Terminal Transcript
+# Symplek Demo: Terminal Transcript
 
-> **ℹ️ Note:** This is a text transcript of the adversarial demo at [wefthq/weft-demo](https://github.com/wefthq/weft-demo). An actual screen recording would show the same sequence. This transcript is deterministic — it was captured from a real `npm run demo` execution.
+> **Status.** This is a transcript from a demo script that lives outside this repository. The demo repository it came from (`symplek/symplek-demo`) is not published, so the output below has not been re-run against this checkout and cannot be reproduced from here. For something you can run yourself, use the record and replay example in the [README](../README.md#record-and-replay). It shows the same behaviour: two events recorded, nothing executed on replay.
 
 ## The Adversarial Demo
 
-The demo simulates a flaky data pipeline with **5 API calls**, two of which fail ~40% of the time due to `Math.random()`. This is genuinely non-deterministic — you can't predict which runs will fail.
+The demo simulates a flaky data pipeline with **5 API calls**, two of which fail ~40% of the time due to `Math.random()`. You cannot predict which runs will fail.
 
-### Phase 1 — The Problem: Flaky Agent
+### Phase 1: The Problem, a Flaky Agent
 
-Running the bare agent 5 times without Weft:
+Running the bare agent 5 times without Symplek:
 
 ```
   Run 1: ✗ FAILED — [API #3] POST /analyze → TIMEOUT (5000ms)
@@ -19,11 +19,11 @@ Running the bare agent 5 times without Weft:
   → 4/5 runs failed (genuinely non-deterministic)
 ```
 
-**4 out of 5 runs fail.** Different failures each time. Without Weft, debugging this means re-running and hoping you hit the failure — burning API tokens every attempt.
+**4 out of 5 runs fail.** Different failures each time. Without a recording, debugging this means re-running and hoping you hit the failure.
 
-### Phase 2 — Record with `.rehearse()`
+### Phase 2: Record with `.rehearse()`
 
-Weft wraps the agent and records a successful run:
+Symplek wraps the agent and records a successful run:
 
 ```
   Attempt 1: ✗ Failed, retrying...
@@ -36,9 +36,9 @@ Weft wraps the agent and records a successful run:
            "[API #5] POST /export → 200"]
 ```
 
-Every decision, every API call, every output is captured in the trace. Once recorded, the successful run is frozen forever.
+The trace holds the outcome of that run: a start event, an end event and the final output. That is why the count says 2 events. The five API calls inside the agent are not recorded one by one.
 
-### Phase 3 — Deterministic Replay with `.replay()`
+### Phase 3: Replay with `.replay()`
 
 The trace is replayed. The original agent body is **never called**:
 
@@ -54,9 +54,9 @@ The trace is replayed. The original agent body is **never called**:
                      "[API #5] POST /export → 200"]
 ```
 
-The sentinel value `apiCallCount = -999` proves the agent body never executed. Yet the output is identical.
+The sentinel value `apiCallCount = -999` shows the agent body never executed. The output is identical because replay returns the stored output.
 
-### Phase 4 — Verification
+### Phase 4: Verification
 
 ```
   Original output:  ["[API #1] GET /products → 200", ...]
@@ -65,86 +65,14 @@ The sentinel value `apiCallCount = -999` proves the agent body never executed. Y
   Agent re-executed: ✓ NO (deterministic!)
 ```
 
-## The Wedge
+## What this shows, and what it does not
 
-| Without Weft | With Weft |
+| Without Symplek | With Symplek |
 |---|---|
-| Flaky agents fail intermittently — hard to reproduce | `.rehearse()` captures every decision, call, and output |
-| Each debug attempt re-executes LLM calls — different results | `.replay()` reproduces the EXACT trace — 2 events, zero re-execution |
-| You pay for every token burned during debugging | The agent body is NEVER called — deterministic by construction |
+| A flaky agent fails intermittently and is hard to reproduce | `.rehearse()` keeps the outcome of one good run |
+| Each debug attempt re-executes the calls and gets different results | `.replay()` hands that stored outcome back, with zero re-execution |
+| You pay for every token burned during debugging | Nothing runs on replay, so nothing is spent |
 
-## How to Reproduce
+Replay does not re-run the agent. It cannot tell you whether the agent still behaves the way it did when the trace was recorded. `Replay matched: YES` means the trace is intact, not that today's agent would produce the same output. See [Record and replay](ARCHITECTURE.md) for the detail.
 
-```bash
-git clone https://github.com/wefthq/weft-demo.git
-cd weft-demo
-npm install
-npm run demo
-```
-
-> **Note:** The demo depends on `weft-core` via a local `file:` dependency. Clone `wefthq/weft` alongside and adjust the path if needed.
-
-## Running the Demo (Real Output)
-
-Here's a complete terminal capture from an actual run:
-
-```
-$ npm run demo
-
-══════════════════════════════════════════════════════════════
-  WEFT ADVERSARIAL DEMO
-  Deterministic Failure Replay
-══════════════════════════════════════════════════════════════
-
-▶ Phase 1 — The Problem: Flaky Agent
-  Running bare agent 5 times (no Weft). Each run makes 5 API calls.
-  Two of those calls fail ~40% of the time.
-
-  Run 1: ✗ FAILED — [API #3] POST /analyze → TIMEOUT (5000ms)
-  Run 2: ✗ FAILED — [API #3] POST /analyze → TIMEOUT (5000ms)
-  Run 3: ✗ FAILED — [API #5] POST /export → TIMEOUT (3000ms)
-  Run 4: ✓ SUCCESS — 5 results
-  Run 5: ✗ FAILED — [API #5] POST /export → TIMEOUT (3000ms)
-  → 4/5 runs failed (genuinely non-deterministic)
-
-▶ Phase 2 — Record a run with .rehearse()
-  Trying until we get a successful run, then recording it...
-
-  Attempt 1: ✗ Failed, retrying...
-  Attempt 2: ✗ Failed, retrying...
-  Attempt 3: ✓ Success — 2 events recorded
-  Output: ["[API #1] GET /products → 200","[API #2] GET /prices → 200","[API #3] POST /analyze → 200","[API #4] GET /summary → 200","[API #5] POST /export → 200"]
-
-▶ Phase 3 — Deterministic Replay with .replay()
-  Replaying the recorded trace. The agent body is NEVER called.
-
-  Events replayed: 2/2
-  apiCallCount:    -999 (should be -999 — agent never ran!)
-  Replay matched:  ✓ YES
-  Divergences:     0
-  Replayed output: ["[API #1] GET /products → 200","[API #2] GET /prices → 200","[API #3] POST /analyze → 200","[API #4] GET /summary → 200","[API #5] POST /export → 200"]
-
-▶ Phase 4 — Verification
-
-  Original output:  ["[API #1] GET /products → 200","[API #2] GET /prices → 200","[API #3] POST /analyze → 200","[API #4] GET /summary → 200","[API #5] POST /export → 200"]
-  Replayed output:  ["[API #1] GET /products → 200","[API #2] GET /prices → 200","[API #3] POST /analyze → 200","[API #4] GET /summary → 200","[API #5] POST /export → 200"]
-  Exact match:      ✓ YES
-  Agent re-executed: ✓ NO (deterministic!)
-
-══════════════════════════════════════════════════════════════
-  THE WEFT WEDGE
-══════════════════════════════════════════════════════════════
-
-  Without Weft:
-    • Flaky agents fail intermittently — hard to reproduce
-    • Each debug attempt re-executes LLM calls — different results
-    • You pay for every token burned during debugging
-
-  With Weft:
-    • .rehearse() captures every decision, call, and output
-    • .replay() reproduces the EXACT trace — 2 events, zero re-execution
-    • The agent body is NEVER called — deterministic by construction
-    • Output is identical: yes
-
-  Get started: npm create weft@latest
-```
+The original transcript ended with a full capture of the demo's terminal output, including a "Get started" command that used `npm create symplek`. That section is removed: the capture cannot be reproduced without the demo repository, and `create-symplek` on npm is someone else's package.

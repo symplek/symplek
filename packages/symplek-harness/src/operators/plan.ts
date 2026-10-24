@@ -1,0 +1,340 @@
+/**
+ * @module PlanOperator
+ * @description plan() operator for @symplek/harness — runs the Claude Agent SDK in read-only
+ * mode, accumulates tool calls, and produces a deterministically-IDed PlanArtifact inside
+ * an AgentUnit<PlanArtifact>. Calling .run(ctx) wraps the artifact in a single TrackedResult
+ * so result.value.id is the plan ID. When the SDK is not installed the operator falls back
+ * to a synthesised stub plan; PlanArtifact.synthesized=true signals no real tool was called.
+ * @rules @.cursor/rules/patterns/029-file-header-contracts.mdc
+ */
+
+import { createHash } from "node:crypto";
+import { AgentUnit } from "@symplek/core";
+import { LowProvenanceError } from "../errors.js";
+import type {
+  HarnessConfig,
+  ImpactTier,
+  PlanArtifact,
+  PlanOptions,
+  PlanStep,
+  PlanUnit,
+  SourceRef,
+} from "../types.js";
+
+// ─── Minimal Claude Agent SDK interface stub ──────────────────────────────
+// Typed locally so the file compiles whether or not the SDK peer dep is installed.
+
+interface SDKContent {
+  type: string;
+  text?: string;
+}
+
+interface SDKEvent {
+  type: string;
+  content?: SDKContent[];
+}
+
+interface SDKRunOptions {
+  permissionMode: string;
+  canUseTool?: (
+    toolName: string,
+    args: unknown,
+  ) => { behavior: "allow" | "block" };
+  onEvent?: (event: SDKEvent) => void;
+}
+
+interface SDKRunResult {
+  finalMessage: string;
+}
+
+interface ClaudeAgentSession {
+  run(prompt: string, options: SDKRunOptions): Promise<SDKRunResult>;
+}
+
+// ─── Internals ────────────────────────────────────────────────────────────
+
+interface ToolCallRecord {
+  tool: string;
+  args: unknown;
+  reasoning: string;
+}
+
+const READ_ONLY_TOOLS = new Set([
+  "Read",
+  "Glob",
+  "Grep",
+  "WebSearch",
+  "WebFetch",
+]);
+const FILE_TOOLS = new Set(["Read", "Glob", "Grep"]);
+const WRITE_SHELL_TOOLS = new Set(["Edit", "Write", "Bash"]);
+const WEB_TOOLS = new Set(["WebSearch", "WebFetch"]);
+const HIGH_RISK_RE = /\b(auth|security|schema|migration)\b/i;
+
+function heuristicTier(intent: string, tools: readonly string[]): ImpactTier {
+  const hasWriteShell = tools.some((t) => WRITE_SHELL_TOOLS.has(t));
+  if (hasWriteShell && HIGH_RISK_RE.test(intent)) return "P0";
+  if (hasWriteShell) return "P1";
+  const hasWeb = tools.some((t) => WEB_TOOLS.has(t));
+  if (hasWeb) return "P2";
+  return "P3";
+}
+
+/**
+ * Classifies the impact tier for a plan. Attempts to delegate to
+ * `@symplek/pro`'s changeKernel classifier when available; otherwise falls back
+ * to a local heuristic so the harness remains functional without the pro pkg.
+ */
+async function classifyImpactTier(
+  intent: string,
+  tools: readonly string[],
+): Promise<ImpactTier> {
+  try {
+    // Use a string variable so TypeScript cannot statically resolve this
+    // optional peer dep — the import throws at runtime if absent.
+    const specifier: string = "@symplek/pro";
+    const mod = (await import(specifier)) as any;
+    if (typeof mod?.changeKernel?.classify === "function") {
+      return (await mod.changeKernel.classify(intent, tools)) as ImpactTier;
+    }
+  } catch {
+    // @symplek/pro not installed — heuristic follows
+  }
+  return heuristicTier(intent, tools);
+}
+
+function computePlanId(steps: readonly PlanStep[]): string {
+  const sorted = [...steps].sort((a, b) => a.index - b.index);
+  return createHash("sha256").update(JSON.stringify(sorted)).digest("hex");
+}
+
+function resolveUri(args: unknown): string {
+  if (args !== null && typeof args === "object") {
+    const first = Object.values(args as Record<string, unknown>)[0];
+    return first !== undefined ? String(first) : "";
+  }
+  return "";
+}
+
+async function buildPlanArtifact(
+  intent: string,
+  accumulator: ToolCallRecord[],
+  wasRealExecution: boolean,
+): Promise<PlanArtifact> {
+  const steps: PlanStep[] = accumulator.map((record, i) => ({
+    index: i,
+    tool: record.tool,
+    targetPath: resolveUri(record.args) || undefined,
+    reasoning: record.reasoning,
+    dependsOn: i > 0 ? [i - 1] : [],
+  }));
+
+  const sources: SourceRef[] = accumulator
+    .filter(
+      (r) =>
+        r.tool === "Read" ||
+        r.tool === "Grep" ||
+        r.tool === "WebSearch" ||
+        r.tool === "WebFetch",
+    )
+    .map(
+      (r): SourceRef => ({
+        kind: FILE_TOOLS.has(r.tool) ? "file" : "web",
+        uri: resolveUri(r.args),
+        // File tools: hash the resolved URI for a stable content fingerprint.
+        // Web tools: hash the args JSON since the actual response is not yet available.
+        contentHash: FILE_TOOLS.has(r.tool)
+          ? createHash("sha256")
+              .update(resolveUri(r.args))
+              .digest("hex")
+              .slice(0, 12)
+          : createHash("sha256")
+              .update(JSON.stringify(r.args))
+              .digest("hex")
+              .slice(0, 12),
+        // Per-tool confidence reflects source reliability:
+        //   WebFetch: 0.85 (direct URL fetch, high fidelity)
+        //   WebSearch: 0.70 (search index snippet, lower fidelity)
+        //   File tools (Read/Grep): 0.80 (local codebase, high fidelity)
+        confidence:
+          r.tool === "WebFetch" ? 0.85 : r.tool === "WebSearch" ? 0.7 : 0.8,
+      }),
+    );
+
+  const requiredTools = [...new Set(accumulator.map((r) => r.tool))];
+  const estimatedImpact = await classifyImpactTier(intent, requiredTools);
+  const id = computePlanId(steps);
+
+  return {
+    id,
+    intent,
+    steps,
+    requiredTools,
+    estimatedImpact,
+    sources,
+    // Flag synthesised plans so consumers know no real tool call was made.
+    ...(wasRealExecution ? {} : { synthesized: true as const }),
+  };
+}
+
+// ─── SDK session factory (optional peer dep) ──────────────────────────────
+// Wired at runtime when @anthropic-ai/claude-agent-sdk is installed.
+// W1-B does not call the real SDK; stub behaviour always runs.
+// Replace `null` with the actual SDK client construction in W1-B final wiring.
+async function tryLoadSession(
+  _config: HarnessConfig,
+): Promise<ClaudeAgentSession | null> {
+  // TODO(W1-B-wiring): instantiate from @anthropic-ai/claude-agent-sdk once published.
+  // Example:
+  //   const { Claude } = await import("@anthropic-ai/claude-agent-sdk");
+  //   return new Claude({ model: config.model ?? "claude-opus-4-5" });
+  return null;
+}
+
+// ─── Exported operator ────────────────────────────────────────────────────
+
+/**
+ * Creates an AgentUnit<PlanArtifact>.
+ *
+ * The unit runs the Claude Agent SDK in read-only permission mode, recording
+ * every permitted tool call (Read, Glob, Grep, WebSearch, WebFetch) into an
+ * accumulator. After the session the accumulator is shaped into a PlanArtifact
+ * with a deterministic SHA-256 ID.
+ *
+ * `AgentUnit.run(ctx)` wraps the artifact in a single TrackedResult:
+ *   `result.value` is the PlanArtifact → `result.value.id` is the plan ID.
+ *
+ * When the SDK is not installed the operator falls back to a synthesised plan
+ * built from the declared tool list. The resulting artifact carries
+ * `synthesized: true` — no real tool was called and no real provenance exists.
+ */
+export function makePlanUnit(
+  intent: string,
+  options: PlanOptions | undefined,
+  config: HarnessConfig,
+): PlanUnit {
+  const unit = AgentUnit.from<PlanArtifact>(async (_ctx) => {
+    const accumulator: ToolCallRecord[] = [];
+    let lastAssistantText = "";
+
+    const sdkSession = await tryLoadSession(config);
+    const wasRealExecution = Boolean(sdkSession);
+
+    config.onProgress?.({
+      phase: "planning",
+      message: "Starting plan session",
+    });
+
+    if (sdkSession) {
+      await sdkSession.run(intent, {
+        permissionMode: "default",
+        canUseTool: (toolName, args) => {
+          if (READ_ONLY_TOOLS.has(toolName)) {
+            accumulator.push({
+              tool: toolName,
+              args,
+              reasoning: lastAssistantText,
+            });
+            config.onProgress?.({ phase: "planning", tool: toolName });
+            return { behavior: "allow" };
+          }
+          return { behavior: "block" };
+        },
+        onEvent: (event) => {
+          if (event.type === "assistant" && Array.isArray(event.content)) {
+            const textBlock = event.content.find((c) => c.type === "text");
+            if (textBlock?.text) {
+              lastAssistantText = textBlock.text;
+            }
+          }
+        },
+      });
+    } else {
+      // Stub path: synthesise a plan from the declared tool list.
+      // The resulting artifact carries synthesized:true — no tools actually ran.
+      //
+      // H8 fix: include ALL declared tools in the stub accumulator, not only
+      // READ_ONLY_TOOLS. When no SDK is wired the stub is recording intent, not
+      // gating execution — silently dropping write/shell tools from the stub
+      // made plans that could never be executed against their own declared tools.
+      const declaredTools = options?.tools ?? config.tools ?? ["Read", "Grep"];
+      const maxSteps = options?.maxSteps ?? declaredTools.length;
+      for (const tool of declaredTools.slice(0, maxSteps)) {
+        accumulator.push({
+          tool,
+          args: {},
+          reasoning: `Declared ${tool} step for: ${intent}`,
+        });
+        config.onProgress?.({ phase: "planning", tool });
+      }
+    }
+
+    const artifact = await buildPlanArtifact(intent, accumulator, wasRealExecution);
+
+    config.onProgress?.({
+      phase: "planning",
+      planId: artifact.id,
+      message: "Plan extracted",
+    });
+
+    // minSourceConfidence gate
+    if (
+      options?.minSourceConfidence !== undefined &&
+      artifact.sources.length > 0
+    ) {
+      const mean =
+        artifact.sources.reduce((sum, s) => sum + s.confidence, 0) /
+        artifact.sources.length;
+      if (mean < options.minSourceConfidence) {
+        throw new LowProvenanceError(
+          `Plan source confidence ${mean.toFixed(3)} is below required minimum ${options.minSourceConfidence}`,
+          options.minSourceConfidence,
+          mean,
+          artifact.sources.length,
+        );
+      }
+    }
+
+    // Return the artifact directly. AgentUnit.run() wraps it in a single
+    // TrackedResult<PlanArtifact>, so result.value.id is the plan ID — no
+    // double-wrap hazard.
+    return artifact;
+  });
+
+  return Object.assign(unit, {
+    requireMinChainConfidence(threshold: number): AgentUnit<PlanArtifact> {
+      return unit.flatMap((artifact) => {
+        // H9 fix: a synthesized plan has no real provenance — its sources are
+        // heuristic estimates with invented URIs and empty-string content hashes.
+        // Passing such sources through a confidence gate would allow callers to
+        // believe they have real provenance when they have none. Reject
+        // synthesized plans unconditionally so the gate is a real provenance
+        // check, not a confidence arithmetic pass-through on fabricated data.
+        if (artifact.synthesized === true) {
+          throw new LowProvenanceError(
+            `requireMinChainConfidence(${threshold}) rejected: plan "${artifact.id}" is synthesized — ` +
+              `its sources are heuristic estimates, not real execution records. ` +
+              `Run plan() against a wired SDK to produce real provenance.`,
+            threshold,
+            0,
+            artifact.sources.length,
+          );
+        }
+        const mean =
+          artifact.sources.length > 0
+            ? artifact.sources.reduce((sum, s) => sum + s.confidence, 0) /
+              artifact.sources.length
+            : 0;
+        if (mean < threshold) {
+          throw new LowProvenanceError(
+            `Plan source confidence ${mean.toFixed(3)} below required ${threshold}`,
+            threshold,
+            mean,
+            artifact.sources.length,
+          );
+        }
+        return AgentUnit.of(artifact);
+      });
+    },
+  }) as PlanUnit;
+}

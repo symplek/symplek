@@ -1,0 +1,140 @@
+{
+  "name": "@symplek/core",
+  "version": "1.0.0-beta.1",
+  "description": "Composable AI agents for TypeScript",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": {
+    ".": {
+      "import": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+      "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
+    },
+    "./server": {
+      "import": { "types": "./dist/server.d.ts", "default": "./dist/server.js" },
+      "require": { "types": "./dist/server.d.cts", "default": "./dist/server.cjs" }
+    },
+    "./confidence": {
+      "import": { "types": "./dist/confidence/index.d.ts", "default": "./dist/confidence/index.js" },
+      "require": { "types": "./dist/confidence/index.d.cts", "default": "./dist/confidence/index.cjs" }
+    },
+    "./coherence": {
+      "import": { "types": "./dist/coherence/index.d.ts", "default": "./dist/coherence/index.js" },
+      "require": { "types": "./dist/coherence/index.d.cts", "default": "./dist/coherence/index.cjs" }
+    },
+    "./interview": {
+      "import": { "types": "./dist/interview/index.d.ts", "default": "./dist/interview/index.js" },
+      "require": { "types": "./dist/interview/index.d.cts", "default": "./dist/interview/index.cjs" }
+    },
+    "./change-kernel": {
+      "import": { "types": "./dist/change-kernel/index.d.ts", "default": "./dist/change-kernel/index.js" },
+      "require": { "types": "./dist/change-kernel/index.d.cts", "default": "./dist/change-kernel/index.cjs" }
+    },
+    "./operators": {
+      "import": { "types": "./dist/operators/index.d.ts", "default": "./dist/operators/index.js" },
+      "require": { "types": "./dist/operators/index.d.cts", "default": "./dist/operators/index.cjs" }
+    },
+    "./rehearsal": {
+      "import": { "types": "./dist/rehearsal/index.d.ts", "default": "./dist/rehearsal/index.js" },
+      "require": { "types": "./dist/rehearsal/index.d.cts", "default": "./dist/rehearsal/index.cjs" }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "ai",
+    "agents",
+    "multi-agent",
+    "consensus",
+    "llm",
+    "typescript",
+    "orchestration",
+    "openai",
+    "anthropic",
+    "streaming"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/symplek/symplek.git",
+    "directory": "packages/symplek-core"
+  },
+  "bugs": {
+    "url": "https://github.com/symplek/symplek/issues"
+  },
+  "homepage": "https://github.com/symplek/symplek#readme",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "biome check .",
+    "typecheck": "tsc --noEmit",
+    "typecheck:boundary": "tsc --noEmit -p tsconfig.boundary.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:contract": "vitest run src/__tests__/contractSmoke.test.ts src/__tests__/serverContractSmoke.test.ts",
+    "test:golden": "vitest run src/__tests__/golden-path.test.ts",
+    "typecheck:change-kernel": "tsc --noEmit -p tsconfig.change-kernel.json"
+  },
+  "peerDependencies": {
+    "@anthropic-ai/sdk": ">=0.78.0",
+    "@google/generative-ai": ">=0.24.0",
+    "@opentelemetry/api": ">=1.9.0 <2.0.0",
+    "@opentelemetry/exporter-trace-otlp-http": ">=0.200.0 <1.0.0",
+    "@opentelemetry/resources": ">=2.0.0 <3.0.0",
+    "@opentelemetry/sdk-trace-node": ">=2.0.0 <3.0.0",
+    "openai": ">=4.0.0",
+    "zod": "^3.25.28 || ^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@opentelemetry/api": {
+      "optional": true
+    },
+    "@opentelemetry/exporter-trace-otlp-http": {
+      "optional": true
+    },
+    "@opentelemetry/resources": {
+      "optional": true
+    },
+    "@opentelemetry/sdk-trace-node": {
+      "optional": true
+    },
+    "openai": {
+      "optional": true
+    },
+    "@anthropic-ai/sdk": {
+      "optional": true
+    },
+    "@google/generative-ai": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "@google/generative-ai": "^0.24.1",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
+    "@opentelemetry/resources": "^2.8.0",
+    "@opentelemetry/sdk-trace-base": "^2.8.0",
+    "@opentelemetry/sdk-trace-node": "^2.8.0",
+    "@types/node": "^22.14.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.17",
+    "zod": "^3.25.28"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "dependencies": {
+    "zod-to-json-schema": "^3.25.2"
+  }
+}
