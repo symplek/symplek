@@ -1,0 +1,6 @@
+{
+  "design": {
+    "tokenDirs": ["packages/symplek-devtools/src/panel/styles"],
+    "surfaceSelector": "^[.](Symplek-devtools-panel)$"
+  }
+}

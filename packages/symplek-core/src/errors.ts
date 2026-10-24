@@ -56,6 +56,7 @@ export type SymplekErrorCode =
   | "NETWORK_ERROR"
   | "IDEMPOTENCY_VIOLATION"
   | "IDEMPOTENCY_STORE_WRITE_FAILED"
+  | "IDEMPOTENCY_STORE_CORRUPTED"
   | "COMPENSATION_FAILED"
   | "VALIDATION_ERROR"
   | "UNKNOWN_ERROR";
@@ -229,6 +230,37 @@ export class SymplekError extends Error {
       example: this.example,
       context: this.context,
     };
+  }
+}
+
+/**
+ * Thrown when the idempotency store contains an entry for `key` but the entry
+ * cannot be parsed or deserialized. This is distinct from absence: an entry
+ * that was written but cannot be read back indicates backend corruption, not a
+ * cache miss. Returning null would silently authorise re-execution of a side
+ * effect that may already have committed (e.g. charging a payment).
+ *
+ * Callers MUST NOT treat this as a cache miss and re-run the computation.
+ * Instead, inspect the backend entry at the given key, restore it from a
+ * backup if the side effect is not idempotent, or delete it and re-run only
+ * if the side effect is safe to repeat.
+ */
+export class IdempotencyStoreCorruptedError extends SymplekError {
+  /** The idempotency key whose backend entry could not be parsed. */
+  readonly key: string;
+
+  constructor(key: string, cause: unknown) {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    super({
+      code: "IDEMPOTENCY_STORE_CORRUPTED",
+      why: `Idempotency store entry for key "${key}" exists but could not be parsed: ${detail}. Treating the entry as absent would risk re-running a side effect that already completed.`,
+      action:
+        "Inspect the durable store backend for the entry at this key. If the entry is genuinely corrupted and the side effect is idempotent, delete the entry and re-run. If the side effect is not idempotent, restore the entry from a backup before resuming.",
+      cause: cause instanceof Error ? cause : new Error(detail),
+      context: { key },
+    });
+    this.name = "IdempotencyStoreCorruptedError";
+    this.key = key;
   }
 }
 

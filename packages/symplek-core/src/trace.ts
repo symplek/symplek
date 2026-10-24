@@ -40,6 +40,14 @@ export interface Trace {
     total: number;
   };
   timestamp: number;
+  /**
+   * Set to `true` when a schema was requested but the provider could not
+   * enforce it at generation time (e.g. strictStructuredOutput is false or the
+   * schema couldn't convert), so the format fell back to json_object.
+   * Absent or `false` when strict enforcement was used or no schema was given.
+   * Consumers MUST check this field when strict output is required.
+   */
+  structuredOutputDegraded?: boolean;
 }
 
 export type TraceCallback = (trace: Trace) => void;

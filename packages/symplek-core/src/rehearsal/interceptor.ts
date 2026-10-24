@@ -254,12 +254,15 @@ export class RecordingLLMInterceptor implements InterceptorProvider {
 
   /**
    * Redact sensitive content from a string.
+   * Forces global replacement regardless of whether the caller's pattern carries
+   * the g flag — same guarantee as applyRedact in golden.ts.
    */
   private redact(value: string | undefined): string | undefined {
     if (!value) return value;
     let result = value;
     for (const pattern of this.redactPatterns) {
-      result = result.replace(pattern, "[REDACTED]");
+      const gp = pattern.global ? pattern : new RegExp(pattern.source, pattern.flags + "g");
+      result = result.replace(gp, "[REDACTED]");
     }
     return result;
   }
@@ -305,6 +308,13 @@ export class ReplayLLMInterceptor implements InterceptorProvider {
   // are still required so the lifecycle works. The `void` reads below keep
   // biome's noUnusedPrivateClassMembers honest without weakening the type.
   private recorder: InterceptorRecorder | null = null;
+  /**
+   * Tracks {promptHash, responseHash} for each successful replayCall() invocation.
+   * promptHash = DJB2(config.prompt) — mirrors how RecordingLLMInterceptor records it.
+   * responseHash = recorded call's responseHash (same as stored in golden trace).
+   * Used by replayAgentWithTrace to compute the llmEventSequenceHash for comparison.
+   */
+  private consumedCallDetails: Array<{ promptHash: string; responseHash: string }> = [];
 
   constructor(calls: RecordedLLMCall[]) {
     this.calls = calls;
@@ -314,11 +324,21 @@ export class ReplayLLMInterceptor implements InterceptorProvider {
     this.recorder = recorder;
     void this.recorder;
     this.callIndex = 0;
+    this.consumedCallDetails = [];
   }
 
   uninstall(): void {
     this.recorder = null;
     void this.recorder;
+  }
+
+  /**
+   * Return the {promptHash, responseHash} pairs for each replayCall() invocation
+   * in call order. Used by replayAgentWithTrace to compute the actual sequence hash
+   * and compare it against the golden contract.
+   */
+  getConsumedCallDetails(): Array<{ promptHash: string; responseHash: string }> {
+    return [...this.consumedCallDetails];
   }
 
   intercept(request: unknown): Promise<unknown> | undefined {
@@ -344,6 +364,14 @@ export class ReplayLLMInterceptor implements InterceptorProvider {
     }
 
     const recorded = this.calls[this.callIndex++];
+
+    // Track consumed call details for sequence hash comparison.
+    // promptHash = DJB2(config.prompt) — same algorithm as RecordingLLMInterceptor.
+    // responseHash comes from the recorded call (what the model originally returned).
+    this.consumedCallDetails.push({
+      promptHash: this.hash(config.prompt ?? ""),
+      responseHash: recorded.responseHash,
+    });
 
     // Verify config hash matches (optional strict mode)
     const configHash = this.hash(JSON.stringify(config));

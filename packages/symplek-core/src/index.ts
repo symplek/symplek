@@ -47,7 +47,7 @@ export type {
   SymplekErrorDetail,
   SymplekErrorOptions,
 } from "./errors";
-export { CompensationError, IdempotencyStoreWriteError, SymplekError } from "./errors";
+export { CompensationError, IdempotencyStoreCorruptedError, IdempotencyStoreWriteError, SymplekError } from "./errors";
 export type {
   InterviewConfig,
   InterviewOptions,
@@ -91,7 +91,25 @@ export {
 export { CoherenceError, createSoloComputation } from "./operators";
 // ─── Provider ────────────────────────────────────────────────────────────────
 export { resolveModelFromContext } from "./providers/auto";
-export type { AIMessage, Provider } from "./providers/interface";
+export type {
+  AIMessage,
+  FinishPart,
+  Provider,
+  ReasoningPart,
+  ResponseFormat,
+  SourcePart,
+  StreamPart,
+  TextDeltaPart,
+  ToolCallPart,
+  ToolResultPart,
+} from "./providers/interface";
+// ─── Streaming Parts (CR-502) ────────────────────────────────────────────────
+export {
+  resolveResponseFormat,
+  streamPartsFromChunks,
+  textPartsOnly,
+  validateSchemaForProvider,
+} from "./streaming-parts";
 // ─── Rehearsal ───────────────────────────────────────────────────────────────
 export {
   CheckpointManager,
@@ -217,6 +235,10 @@ export type {
 } from "./types";
 // ─── Trust / TrackedResult (unforgeable — marker is module-private) ──────────
 export { createTrackedResult, isTrackedResult, unwrapTrackedResult, extractTrackedConfidence } from "./trust";
+// Durable execution (CR-403) is published on the `@symplek/core/store` subpath,
+// matching every other Wave 5 capability (`./uncertainty`, `./rehearsal`,
+// `./agent`). Keeping new capability surface off the root barrel is what lets
+// boundaryTest and exportCount stay meaningful as the framework grows.
 export { isTracked, unwrapTracked } from "./utils";
 // ─── Version ─────────────────────────────────────────────────────────────────
 export { VERSION } from "./version";

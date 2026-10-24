@@ -73,7 +73,12 @@ import type {
   SupervisedDecision,
   SupervisedOptions,
 } from "./operators/supervised";
-import { emitDeprecationWarning, wrapInTrackedResult } from "./zeroTrust";
+import type { LoopOperatorOptions } from "./operators/loop";
+import {
+  emitDeprecationWarning,
+  extractCoherence,
+  wrapInTrackedResult,
+} from "./zeroTrust";
 
 export type { AgentComputation, AgentUnitMetadata };
 export { generateId } from "./metadata";
@@ -297,16 +302,31 @@ export class AgentUnit<T> {
    * ```
    */
   map<U>(f: (value: T) => U): AgentUnit<U> {
+    // Allocate metadata eagerly so the coherence field can be mutated at
+    // computation time (inside the closure) before wrapInTrackedResult reads it.
+    const newMeta: AgentUnitMetadata = {
+      id: generateId(),
+      operatorChain: [...this._metadata.operatorChain, "map"],
+      createdAt: Date.now(),
+    };
     return new AgentUnit<U>(
       async (ctx) => {
         const value = await this.computation(ctx);
+        // Capture coherence before the transform discards the structured value
+        // (e.g. map(() => "done")). Two sources, tried in order:
+        //  1. Direct: value carries EnsembleCoherence (first map in a chain).
+        //  2. Side-channel: upstream map() already captured it into its own
+        //     metadata, which is `this._metadata`. That field is populated
+        //     only after `this.computation(ctx)` runs above, so the read here
+        //     is safe — it sees the populated value for chain depth > 1.
+        const upstreamCoherence =
+          extractCoherence(value) ?? this._metadata.coherence;
+        if (upstreamCoherence !== undefined) {
+          newMeta.coherence = upstreamCoherence;
+        }
         return f(value);
       },
-      {
-        id: generateId(),
-        operatorChain: [...this._metadata.operatorChain, "map"],
-        createdAt: Date.now(),
-      },
+      newMeta,
     );
   }
 
@@ -864,6 +884,20 @@ export interface AgentUnit<T> {
     reviewFn: (value: T) => Promise<SupervisedDecision<T>>,
     options?: SupervisedOptions<T>,
   ): AgentUnit<T>;
+
+  // ─── loop ─────────────────────────────────────────────────────────────────────
+  /**
+   * Drive a multi-turn LLM tool-call cycle.
+   *
+   * Takes the current unit's resolved value as the initial user prompt, calls
+   * the provider iteratively, executes tool calls, and stops when the stop
+   * condition fires or maxSteps is reached.
+   *
+   * Tools with requiresApproval gate through the requireApproval callback
+   * in options before execution. Without the callback, encountering such a
+   * tool throws ToolApprovalRequiredError.
+   */
+  loop(options?: LoopOperatorOptions): AgentUnit<import("../agent/executor").AgentResult>;
 
   // ─── runStandalone ───────────────────────────────────────────────────────
   /** Execute without a pre-created AgentContext. */

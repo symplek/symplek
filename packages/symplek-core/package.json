@@ -42,6 +42,18 @@
     "./rehearsal": {
       "import": { "types": "./dist/rehearsal/index.d.ts", "default": "./dist/rehearsal/index.js" },
       "require": { "types": "./dist/rehearsal/index.d.cts", "default": "./dist/rehearsal/index.cjs" }
+    },
+    "./uncertainty": {
+      "import": { "types": "./dist/uncertainty/index.d.ts", "default": "./dist/uncertainty/index.js" },
+      "require": { "types": "./dist/uncertainty/index.d.cts", "default": "./dist/uncertainty/index.cjs" }
+    },
+    "./store": {
+      "import": { "types": "./dist/store/index.d.ts", "default": "./dist/store/index.js" },
+      "require": { "types": "./dist/store/index.d.cts", "default": "./dist/store/index.cjs" }
+    },
+    "./agent": {
+      "import": { "types": "./dist/agent/index.d.ts", "default": "./dist/agent/index.js" },
+      "require": { "types": "./dist/agent/index.d.cts", "default": "./dist/agent/index.cjs" }
     }
   },
   "files": [
