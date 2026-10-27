@@ -1,6 +1,6 @@
 {
   "name": "@symplek/testing",
-  "version": "0.1.0",
+  "version": "0.1.1-beta.0",
   "description": "Testing utilities for Symplek agent compositions",
   "license": "MIT",
   "type": "module",
