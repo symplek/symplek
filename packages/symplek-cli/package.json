@@ -1,6 +1,6 @@
 {
   "name": "@symplek/cli",
-  "version": "0.1.0",
+  "version": "0.2.0-beta.0",
   "description": "Symplek CLI - AI Agent Development Toolkit",
   "license": "MIT",
   "bin": {
@@ -51,7 +51,7 @@
     "@symplek/core": "workspace:*"
   },
   "peerDependencies": {
-    "@symplek/core": ">=1.0.0-beta.1"
+    "@symplek/core": ">=1.0.0-beta.2"
   },
   "engines": {
     "node": ">=20.19"

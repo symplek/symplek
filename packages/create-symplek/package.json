@@ -1,6 +1,6 @@
 {
   "name": "create-symplek",
-  "version": "0.1.0",
+  "version": "0.2.0-beta.0",
   "private": true,
   "description": "Scaffold a Symplek agent project: a thin wrapper around `symplek init` from @symplek/cli.",
   "license": "MIT",

@@ -13,5 +13,12 @@
     "@symplek/react": "0.1.0",
     "@symplek/testing": "0.1.0"
   },
-  "changesets": []
+  "changesets": [
+    "first-beta-cli",
+    "first-beta-convex-testing",
+    "first-beta-core-and-pro",
+    "first-beta-harness",
+    "first-beta-mcp",
+    "first-beta-react"
+  ]
 }
