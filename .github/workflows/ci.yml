@@ -5,6 +5,14 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # The release job opens the "Version Packages" PR with GITHUB_TOKEN. GitHub
+  # holds pull_request runs for PRs that token opens or updates until someone
+  # with write access approves them; unapproved, the run gets no jobs and ends
+  # as "failure" when the PR closes. workflow_dispatch runs start at once, so
+  # the release job dispatches CI on the PR's branch to give the PR its checks.
+  # The held run still appears. A GitHub App token on changesets/action would
+  # remove it, and this trigger and the dispatch step with it.
+  workflow_dispatch:
 
 # Default to least-privilege. Individual jobs can opt up if they need write
 # access (e.g. publishing). Dependabot keeps the pinned action versions
@@ -60,9 +68,11 @@ jobs:
           fi
           echo "OK: no @symplek/pro imports in packages/symplek-core/src"
 
+  # lint-and-typecheck, tier-boundary, build and test share no outputs: each
+  # job installs and builds for itself, so they run side by side. Only
+  # release waits, on all four.
   build:
     runs-on: ubuntu-latest
-    needs: lint-and-typecheck
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -89,7 +99,6 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    needs: build
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -108,6 +117,8 @@ jobs:
   # quality gates pass. On a normal push it opens/updates a "Version Packages" PR;
   # when that PR merges (consuming the changesets), it runs `release` and publishes.
   # GITHUB_TOKEN is auto-provided; NPM_TOKEN must be set as a repo secret for publish.
+  # Opening the PR with GITHUB_TOKEN needs the repo setting "Allow GitHub Actions
+  # to create and approve pull requests"; without it this job fails (run 40084529144).
   release:
     runs-on: ubuntu-latest
     needs: [lint-and-typecheck, tier-boundary, build, test]
@@ -116,6 +127,7 @@ jobs:
       contents: write
       pull-requests: write
       id-token: write
+      actions: write # dispatch CI onto the Version Packages PR branch
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -126,6 +138,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Create release PR or publish
+        id: changesets
         uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
         with:
           publish: pnpm release
@@ -134,3 +147,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
+      # Gives the Version Packages PR the same checks every other PR gets
+      # (see the workflow_dispatch note at the top). The runs land on the PR's
+      # head commit, so they show on the PR.
+      - name: Run CI on the Version Packages PR
+        if: steps.changesets.outputs.pullRequestNumber != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ steps.changesets.outputs.pullRequestNumber }}
+        run: |
+          branch=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json headRefName --jq .headRefName)
+          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$branch"
+          echo "Dispatched CI on $branch for PR #$PR"
