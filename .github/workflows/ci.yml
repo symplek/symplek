@@ -5,10 +5,13 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  # The release job opens the "Version Packages" PR with GITHUB_TOKEN, and
-  # GitHub starts no workflow for events that token causes, so that PR would
-  # merge with no checks at all. workflow_dispatch is the one exception: the
-  # release job dispatches this workflow on the PR's branch instead.
+  # The release job opens the "Version Packages" PR with GITHUB_TOKEN. GitHub
+  # holds pull_request runs for PRs that token opens or updates until someone
+  # with write access approves them; unapproved, the run gets no jobs and ends
+  # as "failure" when the PR closes. workflow_dispatch runs start at once, so
+  # the release job dispatches CI on the PR's branch to give the PR its checks.
+  # The held run still appears. A GitHub App token on changesets/action would
+  # remove it, and this trigger and the dispatch step with it.
   workflow_dispatch:
 
 # Default to least-privilege. Individual jobs can opt up if they need write
@@ -114,6 +117,8 @@ jobs:
   # quality gates pass. On a normal push it opens/updates a "Version Packages" PR;
   # when that PR merges (consuming the changesets), it runs `release` and publishes.
   # GITHUB_TOKEN is auto-provided; NPM_TOKEN must be set as a repo secret for publish.
+  # Opening the PR with GITHUB_TOKEN needs the repo setting "Allow GitHub Actions
+  # to create and approve pull requests"; without it this job fails (run 40084529144).
   release:
     runs-on: ubuntu-latest
     needs: [lint-and-typecheck, tier-boundary, build, test]
